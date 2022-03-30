@@ -1,0 +1,37 @@
+#cloud-config
+
+users:
+  - name: minifig
+    ssh_import_id:
+      - gh:proegssilb
+    groups: users, admin, sudo
+    shell: /usr/bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+runcmd:
+  - "curl -sfL https://get.rke2.io | sh -"
+  - "systemctl enable rke2-server.service"
+  - "systemctl start rke2-server.service"
+write_files:
+  - path: /var/lib/rancher/rke2/server/manifests/kube-vip.yaml
+    owner: root:root
+    encoding: gzip+base64
+    defer: true
+    content: |
+      H4sICMw5HmIAAzAxMC1rdWJlLXZpcC55YW1sAK1W224aMRB95yssnrOUkPSifaMJqiI1qApRq6qq
+      IuMdwMVrb8c2Ca367x3vcjGsidqq+4CWsc+c8cyZ8fJKfgS00uicrc47S6mLnE0AV1LAUAjjteuU
+      4HjBHc87jGleQs6WfgrZSlYbg6242Frt2jooO1mWdXjkG6dc9Lh3C4PyB3dk6y3f2J40L3asV8oT
+      FO+MggNKrrVxNcSGvyzpi6hRg4PaJa0ZXxGeguo69NDdRd6El28PkGFgQ6+g9p0xivkdEtjm7Eu3
+      +7XhA2s8CqhttsmN7Z6x3fsLS/H52qRNQWsNbgU4rTFKWtc9684h/D5yJxZhaxNhvfeIVxiDhdRx
+      mlKhKOD2FBlr2FiLjt4EQkMcitTK/VsySD3/8+q15XGc5OnGZUj2Hczqom7O+4xv2tUWxrN1tH76
+      DYSjUmYsqeR/1y+vKruX6jWH0ugJHPZGnVfafS/JpeMlHU57pVqsWWFPE9sKRHBmQdFRDDaSL0MV
+      3/MpqE0PpH2Sg0oF2TegKLbwnI4vPOrAe9o/hbUJLzx8NpNaunWEIfUPW9Yg2+9eIhTXHkkHE7GA
+      wit6u5lrszOPnkD4EF+MbHxONsm4Byzt4XLW5Gb0VFFv2P2QiHcsYZ3XfmqZHA2LkgdxHWEYMxUg
+      D/lnoyfqKPt/SYXRjswZVUvDn3IHEJeaJLllo7mB84g7xKX5PDoO6FW83BSV6vnAsYp4V1z5eFge
+      7q8MusTmV5eXF+3NwbnUlNIZabuNAl0NbH/WT+KELDBBdDFo04jqATSfqgTFiVMQYtdzbVDcg6nQ
+      ikLbBNWMK5vgsivxt+EFEproBWAtdhLV30ItdRXyE8iXaRiChseCaKkdU7GeKDCCwzWpVJoiATpv
+      g3hRhFZpbz5/Peidv+oN+r3BblGWpOGczRcCQ7NsZ9DuJV/1e5e9/uH+DzTKPhglBbXdUD3y9Z6s
+      NfSbJ7pMf/7aWS1NIaT5dUXdBk8ubmzBKz6VSjoJRw1PxzseS+PR/cPw+vZmnLDfDT8dWSefJw/3
+      N7ejjXlhrBuDezS4zFkoemcbXHyfjVPncjRtMP5cCu5hNiNN5WxsNsN3X+sTwybGNJP5WUjzdTFx
+      ZIf5uk5o81FUX4weSWdu7EuagdsA6BoNFaTPpXAzJNd0bbyV1qbsd6TadTD8BmeGNBzECgAA
+package_update: true
+package_upgrade: true
