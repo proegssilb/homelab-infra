@@ -1,0 +1,27 @@
+#cloud-config
+
+users:
+  - name: minifig
+    ssh_import_id:
+      - gh:proegssilb
+    groups: users, admin, sudo
+    shell: /usr/bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+runcmd:
+  - "curl -sfL https://get.rke2.io | sh -"
+  - "systemctl enable rke2-server.service"
+  - "systemctl start rke2-server.service"
+write_files:
+%{ if vipconfig != "" }
+  - path: /var/lib/rancher/rke2/server/manifests/kube-vip.yaml
+    owner: root:root
+    encoding: gz+b64
+    defer: true
+    content: ${vipconfig}
+%{ endif }
+  - path: /etc/rancher/rke2/config.yaml
+    owner: root:root
+    encoding: gz+b64
+    content: ${rkeconfig}
+package_update: true
+package_upgrade: true

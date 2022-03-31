@@ -1,0 +1,6 @@
+token: ${token}
+tls-san:
+  - ${virtual_ip}
+  - k8s.i.xenrelay.com
+  - k8s.m.xenrelay.com
+server: ${virtual_ip}
