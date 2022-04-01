@@ -12,12 +12,12 @@ runcmd:
   - "systemctl enable rke2-server.service"
   - "systemctl start rke2-server.service"
 write_files:
-%{ if vipconfig != "" }
-  - path: /var/lib/rancher/rke2/server/manifests/kube-vip.yaml
+%{ if kubemanifest != "" }
+  - path: /var/lib/rancher/rke2/server/manifests/kube-manifest.yaml
     owner: root:root
     encoding: gz+b64
     defer: true
-    content: ${vipconfig}
+    content: ${kubemanifest}
 %{ endif }
   - path: /etc/rancher/rke2/config.yaml
     owner: root:root

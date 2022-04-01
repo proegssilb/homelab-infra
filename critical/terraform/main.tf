@@ -4,8 +4,15 @@ terraform {
       source = "suchpuppet/maas"
       version = "3.1.3"
     }
+    flux = {
+      source = "fluxcd/flux"
+      version = "0.12.2"
+    }
   }
 }
+
+provider "flux" {}
+
 
 provider "maas" {
   api_version = "2.0"
@@ -49,8 +56,26 @@ data "template_file" "node1_cloudinit" {
   template = file("./files/cloudconfig.yaml")
   
   vars = {
-    vipconfig = local.cloudinit_kube_vip_config
+    kubemanifest = local.cloudinit_kube_vip_config
     rkeconfig = local.cloudinit_rke_node1_config
+  }
+}
+
+data "template_file" "node2_cloudinit" {
+  template = file("./files/cloudconfig.yaml")
+  
+  vars = {
+    kubemanifest = ""
+    rkeconfig = local.cloudinit_rke_node2_config
+  }
+}
+
+data "template_file" "node3_cloudinit" {
+  template = file("./files/cloudconfig.yaml")
+  
+  vars = {
+    kubemanifest = ""
+    rkeconfig = local.cloudinit_rke_node2_config
   }
 }
 
@@ -61,4 +86,32 @@ resource "maas_instance" "first_node" {
   distro_series = var.mach_distro
   release_erase_secure = true
   release_erase_quick = true
+}
+
+resource "maas_instance" "second_node" {
+  count = 1
+  tags = ["k8s-critical", "slot2"]
+  user_data = data.template_file.node2_cloudinit.rendered
+  distro_series = var.mach_distro
+  release_erase_secure = true
+  release_erase_quick = true
+  
+  # Until the first node is up, the VIP won't work.
+  depends_on = [
+    maas_instance.first_node
+  ]
+}
+
+resource "maas_instance" "third_node" {
+  count = 1
+  tags = ["k8s-critical", "slot3"]
+  user_data = data.template_file.node3_cloudinit.rendered
+  distro_series = var.mach_distro
+  release_erase_secure = true
+  release_erase_quick = true
+  
+  # Until the first node is up, the VIP won't work.
+  depends_on = [
+    maas_instance.second_node
+  ]
 }
