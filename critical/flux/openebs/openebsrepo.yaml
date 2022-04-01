@@ -1,0 +1,17 @@
+ apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: openebs-repo
+  namespace: openebs
+spec:
+  interval: 6h
+  url: https://openebs.github.io/charts
+---
+ apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: openebs-cstor-repo
+  namespace: openebs
+spec:
+  interval: 6h
+  url: https://openebs.github.io/cstor-operators
