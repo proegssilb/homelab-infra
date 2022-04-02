@@ -1,0 +1,31 @@
+apiVersion: cstor.openebs.io/v1
+kind: CStorPoolCluster
+metadata:
+  name: cstor-storage
+  namespace: openebs
+spec:
+  pools:
+    - nodeSelector:
+        kubernetes.io/hostname: "aware-husky"
+      dataRaidGroups:
+      - blockDevices:
+          - blockDeviceName: "blockdevice-9a72409b1128f1657cb8119e8d4d1679"
+          - blockDeviceName: "blockdevice-f912817e7d93e2d15601de98a9578330"
+      poolConfig:
+        dataRaidGroupType: "stripe"
+    - nodeSelector:
+        kubernetes.io/hostname: "choice-sawfly"
+      dataRaidGroups:
+      - blockDevices:
+          - blockDeviceName: "blockdevice-19f8dbe7b25be043d49da77118dad882"
+          - blockDeviceName: "blockdevice-a4224eaa174feada47014cb0dd7317a8"
+      poolConfig:
+        dataRaidGroupType: "stripe"
+    - nodeSelector:
+        kubernetes.io/hostname: "still-chimp"
+      dataRaidGroups:
+      - blockDevices:
+          - blockDeviceName: "blockdevice-5f2d8a4ed33d3db94161fb81aae9e99f"
+          - blockDeviceName: "blockdevice-eff82fe8682bc5e58c8f77cd4e966117"
+      poolConfig:
+        dataRaidGroupType: "stripe"
