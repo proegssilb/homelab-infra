@@ -2,7 +2,7 @@ apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: HelmRepository
 metadata:
   name: openebs-repo
-  namespace: openebs
+  namespace: flux-system
 spec:
   interval: 6h
   url: https://openebs.github.io/charts
@@ -11,7 +11,7 @@ spec:
 kind: HelmRepository
 metadata:
   name: openebs-cstor-repo
-  namespace: openebs
+  namespace: flux-system
 spec:
   interval: 6h
   url: https://openebs.github.io/cstor-operators

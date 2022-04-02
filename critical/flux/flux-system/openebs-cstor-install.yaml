@@ -2,7 +2,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
   name: cstor
-  namespace: openebs
+  namespace: flux-system
 spec:
   interval: 12h
   chart:
