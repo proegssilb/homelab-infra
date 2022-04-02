@@ -2,6 +2,7 @@ apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: HelmRepository
 metadata:
   name: cstor-repo
+  namespace: openebs
 spec:
   interval: 30m0s
   timeout: 30m0s
