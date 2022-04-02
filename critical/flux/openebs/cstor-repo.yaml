@@ -4,7 +4,7 @@ metadata:
   name: cstor-repo
   namespace: openebs
 spec:
-  interval: 30m0s
-  timeout: 30m0s
+  interval: 6h
+  timeout: 6h
   url: https://openebs.github.io/cstor-operators
 
