@@ -1,0 +1,19 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: cstor
+  namespace: flux-system
+spec:
+  interval: 12h
+  chart:
+    spec:
+      chart: cstor
+      version: '>=3.0.0 <4.0.0'
+      sourceRef:
+        kind: HelmRepository
+        name: openebs-cstor-repo
+        namespace: openebs
+      interval: 6h
+  values:
+    openebsNDM:
+      enabled: false
