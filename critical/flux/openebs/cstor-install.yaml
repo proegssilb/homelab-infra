@@ -12,6 +12,6 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: cstor-repo
-        namespace: flux-system
+        namespace: openebs
       interval: 6h
   values: {}
