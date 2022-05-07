@@ -17,15 +17,15 @@ spec:
         kubernetes.io/hostname: "crit02"
       dataRaidGroups:
       - blockDevices:
-          - blockDeviceName: "blockdevice-19f8dbe7b25be043d49da77118dad882"
-          - blockDeviceName: "blockdevice-a4224eaa174feada47014cb0dd7317a8"
+          - blockDeviceName: "blockdevice-5f2d8a4ed33d3db94161fb81aae9e99f"
+          - blockDeviceName: "blockdevice-eff82fe8682bc5e58c8f77cd4e966117"
       poolConfig:
         dataRaidGroupType: "stripe"
     - nodeSelector:
         kubernetes.io/hostname: "crit03"
       dataRaidGroups:
       - blockDevices:
-          - blockDeviceName: "blockdevice-5f2d8a4ed33d3db94161fb81aae9e99f"
-          - blockDeviceName: "blockdevice-eff82fe8682bc5e58c8f77cd4e966117"
+          - blockDeviceName: "blockdevice-19f8dbe7b25be043d49da77118dad882"
+          - blockDeviceName: "blockdevice-a4224eaa174feada47014cb0dd7317a8"
       poolConfig:
         dataRaidGroupType: "stripe"
