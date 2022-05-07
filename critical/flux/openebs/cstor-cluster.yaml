@@ -6,7 +6,7 @@ metadata:
 spec:
   pools:
     - nodeSelector:
-        kubernetes.io/hostname: "aware-husky"
+        kubernetes.io/hostname: "crit01"
       dataRaidGroups:
       - blockDevices:
           - blockDeviceName: "blockdevice-9a72409b1128f1657cb8119e8d4d1679"
@@ -14,7 +14,7 @@ spec:
       poolConfig:
         dataRaidGroupType: "stripe"
     - nodeSelector:
-        kubernetes.io/hostname: "choice-sawfly"
+        kubernetes.io/hostname: "crit02"
       dataRaidGroups:
       - blockDevices:
           - blockDeviceName: "blockdevice-19f8dbe7b25be043d49da77118dad882"
@@ -22,7 +22,7 @@ spec:
       poolConfig:
         dataRaidGroupType: "stripe"
     - nodeSelector:
-        kubernetes.io/hostname: "still-chimp"
+        kubernetes.io/hostname: "crit03"
       dataRaidGroups:
       - blockDevices:
           - blockDeviceName: "blockdevice-5f2d8a4ed33d3db94161fb81aae9e99f"
