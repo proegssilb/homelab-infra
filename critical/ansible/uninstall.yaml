@@ -1,0 +1,7 @@
+ 
+- name: Uninstall rke2
+  hosts: rke2_servers
+  tasks:
+    - command:
+        cmd: /usr/local/bin/rke2-uninstall.sh
+  become: true
