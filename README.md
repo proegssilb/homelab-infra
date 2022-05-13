@@ -8,10 +8,8 @@ There's two clusters to start with:
 
 # Why should you not attempt to do things my way?
 
-I embrace the chicken-and-egg problem with open arms. You probably won't be able to just bootstrap this stuff directly.
+The end goal is to be able to manage both clusters with the instance of MAAS that is running on the critical cluster. While there will be enough in here to bootstrap the setup from scratch, most people will not have the node count to do the madness I'm doing. And if they do have the nodes, they won't be interested in some of the constraints I place on myself, either for the sake of using MAAS to handle managing OSes, or for making sure hardware is disposable.
 
-I start with a raspberry pi running a dev instance of MAAS. Then use that to deploy the "critical" cluster. This includes setting up another MAAS install. After the critical cluster is deployed, I switch over to the critical cluster's copy of MAAS, and deploy the main cluster.
+My desired setup is a chicken-and-egg problem centering on MAAS, solved by a masterless provisioning tool. If MAAS is responsible for provisioning the servers MAAS runs on, but it needs a server to start with, you clearly need something else to get that first server off the ground. This chicken-and-egg problem is not at all necessary for homelabs.
 
-The end goal is to be able to manage both clusters with the instance of MAAS that is running on the critical cluster. Meaning that if all the nodes in the critical cluster lose their drives at the same time, I'm going to have some work in front of me.
-
-This would be easier if I set up one computer manually with MAAS, and then added controllers to it to build out my critical cluster. But, that's not how I'm doing things.
+There are plenty of easier ways to do what I'm doing. You should do it one of the easier ways. One such angle is the [template the k8s-at-home crew put together](https://github.com/k8s-at-home/template-cluster-k3s).
