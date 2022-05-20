@@ -1,0 +1,40 @@
+#cloud-config
+
+users:
+  - name: minifig
+    ssh_import_id:
+      - ${pubkey}
+    groups: users, admin, sudo
+    shell: /usr/bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+bootcmd:
+  - "hostnamectl set-hostname ${fqdn}"
+runcmd:
+  - "systemctl enable qemu-guest-agent"
+  - "systemctl start qemu-guest-agent"
+  - "curl -sSL https://install.pi-hole.net > /tmp/pihole-setup.sh"
+  - "chmod +x /tmp/pihole-setup.sh"
+  - "/tmp/pihole-setup.sh --unattended"
+write_files:
+  - path: /etc/pihole/setupVars.conf
+    owner: root:users
+    permissions: '0640'
+    content: |
+      PIHOLE_INTERFACE=eth0
+      PIHOLE_DNS_1=1.1.1.1
+      PIHOLE_DNS_2=1.0.0.1
+      QUERY_LOGGING=true
+      INSTALL_WEB_SERVER=true
+      INSTALL_WEB_INTERFACE=true
+      LIGHTTPD_ENABLED=true
+      CACHE_SIZE=10000
+      DNS_FQDN_REQUIRED=true
+      DNS_BOGUS_PRIV=true
+      DNSMASQ_LISTENING=single
+      WEBPASSWORD=5b73b5ee887737e8d21ac019366ff484fd3120a2a1c521f19ae43d7b66b7780e
+      BLOCKING_ENABLED=true
+packages:
+  - unattended-upgrades
+  - qemu-guest-agent
+package_update: true
+package_upgrade: true

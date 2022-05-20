@@ -1,117 +1,79 @@
-terraform {
-  required_providers {
-    maas = {
-      source = "suchpuppet/maas"
-      version = "3.1.3"
-    }
-    flux = {
-      source = "fluxcd/flux"
-      version = "0.12.2"
-    }
+
+data "template_file" "user_data" {
+  count    = 2
+  template = file("${path.module}/files/pihole_userdata.yaml")
+  vars     = {
+    pubkey   = var.mach_pubkey
+    hostname = format("dns%02d", count.index+1)
+    fqdn     = format("dns%02d.%s", count.index+1, var.mach_domain_name)
   }
 }
 
-provider "flux" {}
-
-
-provider "maas" {
-  api_version = "2.0"
-  api_key = var.maas_apikey
-  api_url = var.maas_url
+resource "local_file" "cloud_init_user_data_file" {
+  count    = 2
+  content  = data.template_file.user_data[count.index].rendered
+  filename = "${path.module}/files/pihole_user_data_${count.index}.yaml"
 }
 
-locals {
-  cloudinit_kube_vip_config = yamlencode(base64gzip(data.template_file.kube_vip.rendered))
-  cloudinit_rke_node1_config = yamlencode(base64gzip(data.template_file.rke_node1.rendered))
-  cloudinit_rke_node2_config = yamlencode(base64gzip(data.template_file.rke_node2.rendered))
-}
-
-data "template_file" "kube_vip" {
-  template = file("./files/kube_vip.yaml")
-  
-  vars = {
-    virtual_ip = var.rke2_virtual_ip
-  }
-}
-
-data "template_file" "rke_node1" {
-  template = file("./files/rke_node1.yaml")
-  
-  vars = {
-    virtual_ip = var.rke2_virtual_ip
-    token = var.rke2_token
-  }
-}
-
-data "template_file" "rke_node2" {
-  template = file("./files/rke_node2.yaml")
-  
-  vars = {
-    virtual_ip = var.rke2_virtual_ip
-    token = var.rke2_token
-  }
-}
-
-data "template_file" "node1_cloudinit" {
-  template = file("./files/cloudconfig.yaml")
-  
-  vars = {
-    kubemanifest = local.cloudinit_kube_vip_config
-    rkeconfig = local.cloudinit_rke_node1_config
-  }
-}
-
-data "template_file" "node2_cloudinit" {
-  template = file("./files/cloudconfig.yaml")
-  
-  vars = {
-    kubemanifest = ""
-    rkeconfig = local.cloudinit_rke_node2_config
-  }
-}
-
-data "template_file" "node3_cloudinit" {
-  template = file("./files/cloudconfig.yaml")
-  
-  vars = {
-    kubemanifest = ""
-    rkeconfig = local.cloudinit_rke_node2_config
-  }
-}
-
-resource "maas_instance" "first_node" {
-  count = 1
-  tags = ["k8s-critical", "slot1"]
-  user_data = data.template_file.node1_cloudinit.rendered
-  distro_series = var.mach_distro
-  release_erase_secure = true
-  release_erase_quick = true
-}
-
-resource "maas_instance" "second_node" {
-  count = 1
-  tags = ["k8s-critical", "slot2"]
-  user_data = data.template_file.node2_cloudinit.rendered
-  distro_series = var.mach_distro
-  release_erase_secure = true
-  release_erase_quick = true
-  
-  # Until the first node is up, the VIP won't work.
+resource "null_resource" "cloud_init_config_files" {
   depends_on = [
-    maas_instance.first_node
+    local_file.cloud_init_user_data_file
   ]
+  count = 2
+  connection {
+    type     = "ssh"
+    user     = var.pve_ssh_user
+    password = var.pve_password
+    host     = var.pve_host
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/files/pihole_user_data_${count.index}.yaml"
+    destination = "/mnt/pve/cephfs/snippets/pihole_userdata.${count.index+1}.yaml"
+  }
 }
 
-resource "maas_instance" "third_node" {
-  count = 1
-  tags = ["k8s-critical", "slot3"]
-  user_data = data.template_file.node3_cloudinit.rendered
-  distro_series = var.mach_distro
-  release_erase_secure = true
-  release_erase_quick = true
-  
-  # Until the first node is up, the VIP won't work.
+resource "proxmox_vm_qemu" "piholes" {
   depends_on = [
-    maas_instance.second_node
+    null_resource.cloud_init_config_files
   ]
+
+  count = 2
+  name = format("pihole%02d", count.index+1)
+  vmid = 1100 + count.index
+  desc = "Terraform-Managed Pihole Server. Do not touch."
+  target_node = format("crit%02d", count.index + 1)
+  pool = "net-crit"
+  force_recreate_on_change_of = data.template_file.user_data[count.index].rendered
+
+  onboot = true
+  oncreate = true
+  hastate = "started"
+  hagroup = "main"
+
+  cores = 1
+  sockets = 1
+  cpu = "host"
+  memory = 2048
+  balloon = 512
+  scsihw = "virtio-scsi-pci"
+
+  network {
+    bridge = "vmbr0"
+    model = "virtio"
+  }
+
+  disk {
+    storage = "data"
+    type = "scsi"
+    size = "8G"
+  }
+
+  clone = "ubuntu-cloud-focal"
+  full_clone = true
+  os_type = "cloud-init"
+  ipconfig0 = "ip=172.16.20.${count.index + 50}/24,gw=172.16.20.1"
+  nameserver = "1.1.1.1"
+  cicustom = "user=cephfs:snippets/pihole_userdata.${count.index+1}.yaml"
+  cloudinit_cdrom_storage = "data:vm-${1100 + count.index}-cloudinit"
 }
