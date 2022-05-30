@@ -1,0 +1,3 @@
+credentials.pkr.hcl
+*.pkrvars.hcl
+*.log

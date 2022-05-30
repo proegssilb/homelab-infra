@@ -38,7 +38,7 @@ resource "proxmox_vm_qemu" "piholes" {
     null_resource.cloud_init_config_files
   ]
 
-  count = 2
+  count = 1
   name = format("pihole%02d", count.index+1)
   vmid = 1100 + count.index
   desc = "Terraform-Managed Pihole Server. Do not touch."
@@ -69,11 +69,11 @@ resource "proxmox_vm_qemu" "piholes" {
     size = "8G"
   }
 
-  clone = "ubuntu-cloud-focal"
+  clone = "ubuntu-server-focal"
   full_clone = true
+  agent = 1  # Remove this if PXE booting
   os_type = "cloud-init"
   ipconfig0 = "ip=172.16.20.${count.index + 50}/24,gw=172.16.20.1"
   nameserver = "1.1.1.1"
   cicustom = "user=cephfs:snippets/pihole_userdata.${count.index+1}.yaml"
-  cloudinit_cdrom_storage = "data:vm-${1100 + count.index}-cloudinit"
 }

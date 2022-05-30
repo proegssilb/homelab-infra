@@ -1,0 +1,41 @@
+#cloud-config
+
+autoinstall:
+  version: 1
+  locale: en_US
+  identity:
+    hostname: ubuntu-template
+    username: minifig
+    password: "$1$wu0WkWBf$xBDVOVFvozs6IRH4Lb67Z0"
+  keyboard:
+    layout: us
+  ssh:
+    install-server: true
+    allow-pw: false
+  reporting:
+    builtin:
+      type: print
+  error-commands:
+    - "echo 'Error reporting tripped. Shutting down in 10 minutes.'"
+    - "sleep 600"
+    - "shutdown -h now"
+  packages:
+    - qemu-guest-agent
+    - sudo
+  late-commands:
+    - "echo 'datasource_list: [ConfigDrive, NoCloud]' > /etc/cloud/cloud.cfg.d/99-pve.cfg"
+  storage:
+    layout:
+      name: direct
+  user-data:
+    package_update: true
+    package_upgrade: true
+    timezone: America/Chicago
+    packages:
+      - unattended-upgrades
+    users:
+      - name: minifig
+        ssh_import_id:
+          - gh:proegssilb
+        groups: [users, admin, sudo]
+        sudo: ALL=(ALL) NOPASSWD:ALL
