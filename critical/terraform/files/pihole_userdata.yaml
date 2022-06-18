@@ -7,14 +7,21 @@ users:
     groups: users, admin, sudo
     shell: /usr/bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
+  - name: sync
+    system: false
+    home: /home/sync
+    groups: users
+    shell: /usr/bin/bash
 bootcmd:
-  - "hostnamectl set-hostname ${fqdn}"
+  - "echo '127.0.0.1 ${hostname}' >> /etc/hosts"
 runcmd:
+  - "hostnamectl set-hostname ${hostname}"
   - "systemctl enable qemu-guest-agent"
   - "systemctl start qemu-guest-agent"
   - "curl -sSL https://install.pi-hole.net > /tmp/pihole-setup.sh"
   - "chmod +x /tmp/pihole-setup.sh"
   - "/tmp/pihole-setup.sh --unattended"
+  #- "curl -sSL https://gravity.vmstan.com | bash"
 write_files:
   - path: /etc/pihole/setupVars.conf
     owner: root:users
@@ -33,6 +40,29 @@ write_files:
       DNSMASQ_LISTENING=single
       WEBPASSWORD=5b73b5ee887737e8d21ac019366ff484fd3120a2a1c521f19ae43d7b66b7780e
       BLOCKING_ENABLED=true
+  #- path: /etc/gravity-sync/gravity-sync.conf
+    #owner: pihole:users
+    #permissions: '0640'
+    #content: |
+      #REMOTE_HOST=${syncip}
+      #REMOTE_USER='sync'
+
+      ## CUSTOM VARIABLES ###########################
+
+      ## Pi-hole Folder/File Customization - Only need to be customized when using containers
+      ## LOCAL_PIHOLE_DIRECTORY=''                         # Local Pi-hole data directory
+      ## REMOTE_PIHOLE_DIRECTORY=''                        # Remote Pi-hole data directory
+      ## LOCAL_DNSMASQ_DIRECTORY=''                # Local DNSMASQ/FTL data directory
+      ## REMOTE_DNSMASQ_DIRECTORY=''               # Remote DNSMASQ/FTL data directory
+      ## LOCAL_FILE_OWNER=''                       # Local file owner for Pi-hole
+      ## REMOTE_FILE_OWNER=''                      # Remote file owner for Pi-hole
+
+      ## Pi-hole Docker/Podman container name - Docker will pattern match anything set below
+      ## LOCAL_DOCKER_CONTAINER=''                                 # Local Pi-hole container name
+      ## REMOTE_DOCKER_CONTAINER=''                            # Remote Pi-hole container name
+
+      ## HIDDEN FIGURES #############################
+      ## See https://github.com/vmstan/gravity-sync/wiki/Hidden-Figures
 packages:
   - unattended-upgrades
   - qemu-guest-agent

@@ -39,3 +39,18 @@ variable "mach_domain_name" {
   type = string
   nullable = false
 }
+
+# Kubernetes Vars
+
+variable "rke2_token" {
+  description = "(Required) - A shared secret used to authenticate nodes."
+  type = string
+  sensitive = true
+  nullable = false
+}
+
+variable "rke2_virtual_ip" {
+  description = "(Required) - An IPv4 address to use for the cluster's API. It will be used as an HA Virtual IP address, so make sure DHCP won't hand it out."
+  type = string
+  nullable = false
+}

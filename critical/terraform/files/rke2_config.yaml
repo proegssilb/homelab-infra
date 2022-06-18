@@ -7,7 +7,10 @@ users:
     groups: users, admin, sudo
     shell: /usr/bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
+bootcmd:
+  - "echo '127.0.0.1 ${hostname}' >> /etc/hosts"
 runcmd:
+  - "hostnamectl set-hostname ${hostname}"
   - "curl -sfL https://get.rke2.io | sh -"
   - "systemctl enable rke2-server.service"
   - "systemctl start rke2-server.service"
@@ -23,5 +26,8 @@ write_files:
     owner: root:root
     encoding: gz+b64
     content: ${rkeconfig}
+packages:
+  - unattended-upgrades
+  - qemu-guest-agent
 package_update: true
 package_upgrade: true
