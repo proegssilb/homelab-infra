@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
 - https://raw.githubusercontent.com/rook/rook/release-1.9/deploy/examples/crds.yaml
 - https://raw.githubusercontent.com/rook/rook/release-1.9/deploy/examples/common.yaml
+- operator.yaml
