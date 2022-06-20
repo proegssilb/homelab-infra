@@ -16,11 +16,8 @@ spec:
   # optionally, the ceph-mgr IP address can be passed to gather metric from the prometheus exporter
   monitoring:
     enabled: true
-    rulesNamespace: rook-ceph
+    externalMgrPrometheusPort: 9283
     externalMgrEndpoints:
       - ip: 172.16.20.16
-        externalMgrPrometheusPort: 9283
       - ip: 172.16.20.17
-        externalMgrPrometheusPort: 9283
       - ip: 172.16.20.18
-        externalMgrPrometheusPort: 9283
