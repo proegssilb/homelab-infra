@@ -5,20 +5,14 @@ data:
   maxMonId: "2"
 kind: ConfigMap
 metadata:
-  creationTimestamp: "2022-06-20T00:48:56Z"
   name: rook-ceph-mon-endpoints
   namespace: rook-ceph
-  resourceVersion: "857790"
-  uid: 7e2bc572-f2d0-48ae-8410-6c75a9c6c4eb
 ---
 allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  creationTimestamp: "2022-06-20T00:48:57Z"
   name: ceph-rbd
-  resourceVersion: "857807"
-  uid: b2493141-f906-4494-b4f4-b6a21c3ec371
 parameters:
   clusterID: rook-ceph
   csi.storage.k8s.io/controller-expand-secret-name: csi-rbd-provisioner
@@ -39,10 +33,7 @@ allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  creationTimestamp: "2022-06-20T00:48:58Z"
   name: cephfs
-  resourceVersion: "857808"
-  uid: 31a27046-9aed-44ef-9a79-8593675f9377
 parameters:
   clusterID: rook-ceph
   csi.storage.k8s.io/controller-expand-secret-name: csi-cephfs-provisioner
