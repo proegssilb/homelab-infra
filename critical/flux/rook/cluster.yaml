@@ -1,0 +1,58 @@
+apiVersion: v1
+data:
+  data: crit02=172.16.20.17:6789
+  mapping: '{}'
+  maxMonId: "2"
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2022-06-20T00:48:56Z"
+  name: rook-ceph-mon-endpoints
+  namespace: rook-ceph
+  resourceVersion: "857790"
+  uid: 7e2bc572-f2d0-48ae-8410-6c75a9c6c4eb
+---
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  creationTimestamp: "2022-06-20T00:48:57Z"
+  name: ceph-rbd
+  resourceVersion: "857807"
+  uid: b2493141-f906-4494-b4f4-b6a21c3ec371
+parameters:
+  clusterID: rook-ceph
+  csi.storage.k8s.io/controller-expand-secret-name: csi-rbd-provisioner
+  csi.storage.k8s.io/controller-expand-secret-namespace: rook-ceph
+  csi.storage.k8s.io/fstype: ext4
+  csi.storage.k8s.io/node-stage-secret-name: csi-rbd-node
+  csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+  csi.storage.k8s.io/provisioner-secret-name: csi-rbd-provisioner
+  csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+  imageFeatures: layering
+  imageFormat: "2"
+  pool: data
+provisioner: rook-ceph.rbd.csi.ceph.com
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+---
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  creationTimestamp: "2022-06-20T00:48:58Z"
+  name: cephfs
+  resourceVersion: "857808"
+  uid: 31a27046-9aed-44ef-9a79-8593675f9377
+parameters:
+  clusterID: rook-ceph
+  csi.storage.k8s.io/controller-expand-secret-name: csi-cephfs-provisioner
+  csi.storage.k8s.io/controller-expand-secret-namespace: rook-ceph
+  csi.storage.k8s.io/node-stage-secret-name: csi-cephfs-node
+  csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+  csi.storage.k8s.io/provisioner-secret-name: csi-cephfs-provisioner
+  csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+  fsName: cephfs
+  pool: cephfs_data
+provisioner: rook-ceph.cephfs.csi.ceph.com
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
