@@ -35,6 +35,8 @@ spec:
       type: "ClusterIP"
     tls:
       force: True
+    persistence:
+      storageClass: "ceph-rbd"
     ingress:
       enabled: True
       ingressClassName: "nginx"
