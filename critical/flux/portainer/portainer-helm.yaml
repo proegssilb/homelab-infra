@@ -42,4 +42,5 @@ spec:
         nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
       hosts:
         - host: "crit.i.xenrelay.com"
-          path: "/portainer"
+          paths:
+            - "/portainer"
