@@ -12,4 +12,6 @@ The end goal is to be able to manage both clusters with the instance of MAAS tha
 
 My desired setup is a chicken-and-egg problem centering on MAAS, solved by a masterless provisioning tool. If MAAS is responsible for provisioning the servers MAAS runs on, but it needs a server to start with, you clearly need something else to get that first server off the ground. This chicken-and-egg problem is not at all necessary for homelabs.
 
-There are plenty of easier ways to do what I'm doing. You should do it one of the easier ways. One such angle is the [template the k8s-at-home crew put together](https://github.com/k8s-at-home/template-cluster-k3s).
+There are plenty of easier ways to do what I'm doing. You should do it one of the easier ways. Here's some that I've found:
+- [Onedr0p's flux template](https://github.com/onedr0p/flux-cluster-template).
+- [Traefik Turkey](https://github.com/traefikturkey/onramp), maintained by members of [TechnoTim](https://www.technotim.live/)'s community
