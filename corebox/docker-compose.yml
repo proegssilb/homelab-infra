@@ -30,4 +30,4 @@ services:
             - HEALTHCHECK_PORT=8080
 secrets:
     dbpassword:
-        external: true
+        environment: DB_PASSWORD
