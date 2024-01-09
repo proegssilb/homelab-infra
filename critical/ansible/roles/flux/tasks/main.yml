@@ -1,7 +1,0 @@
-
-
-- name: Create kubernetes resources
-  k8s:
-    definition: "{{ lookup('kubernetes.core.kustomize', dir=role_path + '/files/kustomize') }}"
-    kubeconfig: "~/.kube/crit"
-
