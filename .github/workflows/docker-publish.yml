@@ -35,7 +35,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: nextcloud
+          - image: ${{ github.repository_owner }}/nextcloud
             context: images/nextcloud
             dockerfile: images/nextcloud/Dockerfile    
     steps:
