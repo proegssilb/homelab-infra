@@ -1,0 +1,25 @@
+# OpenTofu — local working files, never commit these
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+*.tfvars.json
+terraform.tfstate
+terraform.tfstate.backup
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ansible — vault password file and any locally generated secrets
+ansible/.vault-password
+ansible/*.retry
+
+# Local env file (if you source credentials from a file instead of your shell rc)
+.env
+*.env
+
+# Editor / OS
+.DS_Store
+*.swp
+*~

@@ -1,0 +1,22 @@
+---
+# Network interface the VRRP instance and VIP ride on.
+keepalived_interface: eth0
+
+# Virtual IP address in CIDR notation (e.g. 192.168.42.69/24).
+# Set in group_vars — must be the same on both nodes.
+keepalived_vip: ""
+
+# VRRP virtual router ID — must be unique per VRRP instance on the subnet.
+keepalived_router_id: 51
+
+# VRRP state for this node: MASTER or BACKUP.
+# Override per host in host_vars.
+keepalived_state: BACKUP
+
+# VRRP election priority — higher wins. MASTER typically 100, BACKUP 90.
+# Override per host in host_vars.
+keepalived_priority: 90
+
+# VRRP authentication password (up to 8 chars).
+# Vault-encrypt in group_vars so both nodes share the same value.
+keepalived_auth_pass: ""

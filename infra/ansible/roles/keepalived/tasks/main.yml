@@ -1,0 +1,33 @@
+---
+- name: Install keepalived
+  ansible.builtin.package:
+    name: keepalived
+    state: present
+
+# nginx binds to the VIP address at startup, before keepalived has brought
+# the VIP up on this node. ip_nonlocal_bind allows the bind to succeed
+# regardless of whether the VIP is currently assigned to this interface.
+# Required for both VMs and privileged LXC containers (each has its own
+# network namespace).
+- name: Allow non-local IP binding (ip_nonlocal_bind)
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_nonlocal_bind
+    value: "1"
+    state: present
+    sysctl_file: /etc/sysctl.d/99-keepalived.conf
+    reload: true
+
+- name: Template keepalived configuration
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Restart keepalived
+
+- name: Enable and start keepalived
+  ansible.builtin.systemd:
+    name: keepalived
+    enabled: true
+    state: started

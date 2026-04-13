@@ -1,0 +1,11 @@
+---
+is_lxc: "{{ proxmox_vmtype | default('lxc') == 'lxc' }}"
+base_packages:
+  - curl
+  - wget
+  - git
+  - vim
+  - htop
+  - jq
+  - unzip
+  - ca-certificates

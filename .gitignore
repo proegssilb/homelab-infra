@@ -29,4 +29,15 @@ override.tf.json
 *tfplan*
 .terraform.lock.hcl
 
+# Local env file (if you source credentials from a file instead of your shell rc)
+.env
+*.env
 
+# Ansible vault password file (gitignored at infra level too, but belt-and-suspenders)
+.vault-password
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+.envrc

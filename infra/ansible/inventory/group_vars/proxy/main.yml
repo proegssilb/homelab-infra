@@ -1,0 +1,51 @@
+---
+# Vars shared by all hosts in the 'proxy' group (proxy01, proxy02).
+# Extend with host_vars for per-node overrides (e.g. keepalived state/priority).
+#
+# Site-specific values (homelab_domain, homelab_proxmox_nodes, certbot_email)
+# live in local.yml alongside this file — see local.yml.example.
+
+# ── keepalived ────────────────────────────────────────────────────────────────
+
+# Network interface the VIP and VRRP hellos are sent on.
+keepalived_interface: eth0
+
+# VRRP authentication passphrase — same on both nodes.
+# Generate: openssl rand -base64 6 | head -c 8
+# Encrypt:  ansible-vault encrypt_string '<value>' --name keepalived_auth_pass
+keepalived_auth_pass: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          66363330366638653738633336663963306466383265626138363262323635663832366237623434
+          3536363239383661323233656434363132376266666431620a636131356537376636373563616430
+          36616634643531323964333836323265396633356362616636303833363330306663353431633330
+          3631623031316462370a393636653139376164376432636532326530363463306162353937373162
+          6135
+
+# ── nginx ─────────────────────────────────────────────────────────────────────
+
+nginx_vhosts:
+  - name: proxmox
+    server_name: "proxmox.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key: "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: https
+    upstream_servers: "{{ homelab_proxmox_nodes | map('regex_replace', '$', '.' + homelab_domain + ':8006') | list }}"
+    sticky_cookie: PVEAuthCookie
+
+# ── certbot ───────────────────────────────────────────────────────────────────
+
+certbot_domains:
+  - "*.{{ homelab_domain }}"
+  - "{{ homelab_domain }}"
+
+# Cloudflare API token (Zone → DNS → Edit for the appropriate zone).
+# Encrypt: ansible-vault encrypt_string '<token>' --name certbot_cloudflare_api_token
+certbot_cloudflare_api_token: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          31376336613336376437653435373361633236323661303536343435623835633564623631633438
+          3939353537366432316332323238663366373535366565660a656535383863363236323165336539
+          35303448306138346638333861393330323439653134643037383931616236376337316264626537
+          3166646239613363620a333236613966313234343832666134323034316665663230326133653038
+          61316336306432656634623732626465653531626463356362353533636532623730333863326130
+          34646131613939643731383635303162616161363431613862383534663138393034336436306131
+          313761383661313431626261393365616261

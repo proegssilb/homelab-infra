@@ -1,0 +1,5 @@
+---
+# Vars common to all platform (2xx) hosts.
+# Extend as platform VMs are defined.
+
+extra_packages: []

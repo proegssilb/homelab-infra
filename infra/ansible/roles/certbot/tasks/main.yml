@@ -1,0 +1,72 @@
+---
+- name: Install certbot and Cloudflare DNS plugin
+  ansible.builtin.package:
+    name:
+      - certbot
+      - python3-certbot-dns-cloudflare
+    state: present
+
+- name: Create /etc/letsencrypt directory
+  ansible.builtin.file:
+    path: /etc/letsencrypt
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Template Cloudflare credentials file
+  ansible.builtin.template:
+    src: cloudflare.ini.j2
+    dest: "{{ certbot_cloudflare_credentials_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+# certbot names the live directory after the first domain, stripping any wildcard prefix.
+# e.g. "*.internal.example.com" → /etc/letsencrypt/live/internal.example.com/
+- name: Set cert live directory fact
+  ansible.builtin.set_fact:
+    _certbot_live_dir: "/etc/letsencrypt/live/{{ certbot_domains[0] | regex_replace('^\\*\\.', '') }}"
+
+- name: Create cert live directory
+  ansible.builtin.file:
+    path: "{{ _certbot_live_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Generate bootstrap self-signed cert (replaced by certbot on first timer run)
+  ansible.builtin.command:
+    cmd: >
+      openssl req -x509 -newkey rsa:2048 -nodes
+      -keyout {{ _certbot_live_dir }}/privkey.pem
+      -out {{ _certbot_live_dir }}/fullchain.pem
+      -days 1
+      -subj "/CN=placeholder"
+    creates: "{{ _certbot_live_dir }}/fullchain.pem"
+
+- name: Template certbot systemd service
+  ansible.builtin.template:
+    src: certbot-renew.service.j2
+    dest: /etc/systemd/system/certbot-renew.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Template certbot systemd timer
+  ansible.builtin.template:
+    src: certbot-renew.timer.j2
+    dest: /etc/systemd/system/certbot-renew.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable and start certbot timer
+  ansible.builtin.systemd:
+    name: certbot-renew.timer
+    enabled: true
+    state: started
+    daemon_reload: true

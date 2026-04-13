@@ -1,0 +1,28 @@
+---
+# site.yml — apply all roles to their respective host groups.
+#
+# To add a new role: define roles/<name>/, then add a play here targeting the right group.
+# Limit to a host or group at the CLI: ansible-playbook site.yml -l <host-or-group>
+
+- name: OS baseline — all hosts
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - os_baseline
+
+- name: Garage — bootstrap node
+  hosts: bootstrap
+  become: true
+  gather_facts: true
+  roles:
+    - garage
+
+- name: Proxy — keepalived + nginx reverse proxy + certbot
+  hosts: proxy
+  become: true
+  gather_facts: true
+  roles:
+    - keepalived
+    - certbot
+    - nginx_reverse_proxy

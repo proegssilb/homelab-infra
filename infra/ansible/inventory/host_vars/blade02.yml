@@ -1,0 +1,35 @@
+---
+# blade02 — permanent management/bootstrap node (Raspberry Pi).
+# Hosts Garage (S3-compatible OpenTofu remote state backend).
+# Must not be destroyed or managed by any tofu state directory.
+
+# Garage S3 API listen address (all interfaces, port 3900).
+garage_s3_bind_addr: "0.0.0.0:3900"
+
+# Garage RPC listen address (internal cluster coordination).
+garage_rpc_bind_addr: "0.0.0.0:3901"
+
+# Garage data and metadata directories.
+garage_data_dir: /var/lib/garage/data
+garage_meta_dir: /var/lib/garage/meta
+
+# Garage version to install.
+garage_version: "1.0.1"
+
+# Architecture of the Raspberry Pi binary (aarch64 for Pi 4/5, armv6l for older).
+garage_arch: aarch64
+
+# Garage RPC secret — required by Garage even for single-node deployments.
+# Generate with: openssl rand -hex 32
+# Then vault-encrypt: ansible-vault encrypt_string '<value>' --name garage_rpc_secret
+garage_rpc_secret: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          31303636623464636161626138323264303538663833316231306463613132656463346561303737
+          6164626133306364636532626235333139646164303464640a353835646363646439336464616131
+          30393330373862356632646439656535376535303538376164363962383235336139653432303839
+          6462303731663837350a623530626139373835346233376533383762336137336432313563333836
+          30626234393237623231663435393765633437656564376464353432643832383666353139346433
+          63353235343436633063373636626562666432323339336434383631666136316666373161656336
+          35316262653762346530633366666636643962613165383538313532643466326434343037663362
+          34356666336166656538
+  # replace this block with the output of the ansible-vault command above

@@ -1,0 +1,19 @@
+---
+# List of virtual host definitions to render into /etc/nginx/conf.d/.
+# Each entry supports:
+#
+#   name               — filename stem (conf.d/<name>.conf) and upstream name
+#   server_name        — nginx server_name directive value
+#   ssl_cert           — path to TLS certificate (fullchain)
+#   ssl_key            — path to TLS private key
+#   upstream_protocol  — 'https' or 'http' (use 'https' for Proxmox :8006)
+#   upstream_servers   — list of backend host:port strings
+#   sticky_cookie      — cookie name to hash for sticky routing
+#                        (use 'PVEAuthCookie' for Proxmox)
+#   extra_proxy_params — (optional) raw nginx directives injected inside
+#                        the main location {} block
+#   extra_location_blocks — (optional) raw nginx location blocks appended
+#                           after the main location block
+#
+# Override this variable in group_vars or host_vars to customise per role/task.
+nginx_vhosts: []

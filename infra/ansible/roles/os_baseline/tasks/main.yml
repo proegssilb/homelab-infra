@@ -1,0 +1,56 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Install base packages
+  ansible.builtin.package:
+    name: "{{ base_packages + (extra_packages | default([])) }}"
+    state: present
+
+- name: Install qemu-guest-agent
+  ansible.builtin.package:
+    name: qemu-guest-agent
+    state: present
+  when: not is_lxc
+
+- name: Enable and start qemu-guest-agent
+  ansible.builtin.systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+  when: not is_lxc
+
+- name: Set timezone to UTC
+  community.general.timezone:
+    name: UTC
+
+- name: Configure SSH — disable password authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PasswordAuthentication"
+    line: "PasswordAuthentication no"
+    state: present
+  notify: Restart sshd
+
+- name: Configure SSH — disable root login
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PermitRootLogin"
+    line: "PermitRootLogin no"
+    state: present
+  notify: Restart sshd
+  when: not is_lxc
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Persist hostname in /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: "^127\\.0\\.1\\.1"
+    line: "127.0.1.1 {{ inventory_hostname }}"
+    state: present

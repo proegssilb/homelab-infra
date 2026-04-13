@@ -1,0 +1,79 @@
+# infra/justfile — public interface for homelab IaC operations.
+#
+# Requires: opentofu, ansible, just
+# All secrets via environment variables — see tofu/*/versions.tf for the list.
+#
+# Usage:
+#   just --list          show all public targets
+#   just bootstrap       day-1: bring up everything from nothing
+
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# ── Internal helpers ───────────────────────────────────────────────────────────
+
+# Init a tofu state directory, injecting the Garage endpoint from the environment.
+# GARAGE_ENDPOINT must be set (e.g. http://blade02.home.domain:3900).
+_tofu-init state:
+    cd tofu/{{state}} && tofu init -backend-config="endpoint=${GARAGE_ENDPOINT}"
+
+# ── Day 1 ──────────────────────────────────────────────────────────────────────
+
+# Bring up everything from nothing, in dependency order. Also idempotent —
+# safe to rerun against a partially-up lab.
+bootstrap:
+    just garage
+    just cluster-up platform
+    just cluster-up pets
+
+# Bring up all VMs in a named cluster/group.
+cluster-up cluster:
+    just _tofu-init {{cluster}}
+    cd tofu/{{cluster}} && tofu apply -auto-approve
+    just tune-all {{cluster}}
+
+# ── Day 2 ──────────────────────────────────────────────────────────────────────
+
+# Rebuild a single node within a cluster.
+node-rebuild vm cluster:
+    cd tofu/{{cluster}} && tofu apply -auto-approve -target=module.vm["{{vm}}"]
+    just tune {{vm}}
+
+# Rebuild a lone VM (no join step).
+vm-rebuild vm state="pets":
+    cd tofu/{{state}} && tofu apply -auto-approve -target=module.vm["{{vm}}"]
+    just tune {{vm}}
+
+# ── OS tuning ──────────────────────────────────────────────────────────────────
+
+# Run baseline OS tuning against a single host.
+tune host:
+    cd ansible && ansible-playbook -l {{host}} site.yml
+
+# Run baseline OS tuning against all hosts in a group.
+tune-all group:
+    cd ansible && ansible-playbook -l {{group}} site.yml
+
+# Configure Garage on blade02 (run before tofu init).
+garage:
+    cd ansible && ansible-playbook -l bootstrap site.yml
+
+# ── Tofu helpers ───────────────────────────────────────────────────────────────
+
+# Run tofu plan for a state group (no changes applied).
+plan state:
+    just _tofu-init {{state}}
+    cd tofu/{{state}} && tofu plan
+
+# Destroy all VMs in a state group. Requires confirmation.
+destroy state:
+    cd tofu/{{state}} && tofu destroy
+
+# ── Inventory ──────────────────────────────────────────────────────────────────
+
+# List hosts visible via the dynamic inventory.
+_inventory-list:
+    ansible-inventory --list | jq 'keys'
+
+# Graph the inventory groups.
+_inventory-graph:
+    ansible-inventory --graph

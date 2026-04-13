@@ -1,0 +1,27 @@
+# Managed by Ansible — do not edit by hand.
+# Role: certbot
+#
+# Issues the certificate on first run (--keep-until-expiring skips re-issuance
+# when the cert is still valid) and renews it when expiry is within 30 days.
+# Triggered by certbot-renew.timer twice daily.
+
+[Unit]
+Description=Certbot certificate issuance and renewal (Cloudflare DNS-01)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/certbot certonly \
+  --non-interactive \
+  --agree-tos \
+  --email {{ certbot_email }} \
+  --dns-cloudflare \
+  --dns-cloudflare-credentials {{ certbot_cloudflare_credentials_path }} \
+  --keep-until-expiring \
+{% for domain in certbot_domains %}
+  -d {{ domain }}{% if not loop.last %} \{% endif %}
+
+{% endfor %}
+ExecStartPost=/bin/systemctl reload nginx
+PrivateTmp=true

@@ -1,0 +1,21 @@
+# Managed by Ansible — do not edit by hand.
+# Role: certbot
+#
+# Fires certbot-renew.service twice daily with a randomized delay to avoid
+# Let's Encrypt rate-limit collisions when multiple hosts renew at once.
+
+[Unit]
+Description=Certbot certificate issuance/renewal timer
+Requires=certbot-renew.service
+
+[Timer]
+# First run: 5 minutes after boot (time for network to stabilise).
+OnBootSec=5min
+# Subsequent runs: every 12 hours.
+OnUnitActiveSec=12h
+# Spread runs randomly within ±1 hour to avoid thundering herd.
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,1 +1,4 @@
-terraform 1.13.2
+opentofu 1.10.6
+ansible 10.7.0
+just 1.36.0
+pre-commit 4.3.0

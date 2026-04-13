@@ -1,0 +1,66 @@
+# Managed by Ansible — do not edit by hand.
+# Role: nginx_reverse_proxy  vhost: {{ item.name }}
+
+# Upstream pool — sticky routing keyed on {{ item.sticky_cookie | default('') }}.
+upstream {{ item.name }}_backend {
+{% if item.sticky_cookie is defined and item.sticky_cookie %}
+  hash $cookie_{{ item.sticky_cookie }} consistent;
+{% else %}
+  least_conn;
+{% endif %}
+{% for server in item.upstream_servers %}
+  server {{ server }};
+{% endfor %}
+}
+
+# HTTP — redirect all traffic to HTTPS.
+server {
+  listen 80;
+  server_name {{ item.server_name }};
+
+  location / {
+    return 301 https://$host$request_uri;
+  }
+}
+
+# HTTPS — TLS termination + reverse proxy.
+server {
+  listen 443 ssl;
+  server_name {{ item.server_name }};
+
+  ssl_certificate     {{ item.ssl_cert }};
+  ssl_certificate_key {{ item.ssl_key }};
+
+  # Pass to the upstream pool.
+  location / {
+    proxy_pass {{ item.upstream_protocol | default('https') }}://{{ item.name }}_backend;
+
+    # Required for Proxmox WebSocket connections (noVNC / SPICE terminals).
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade    $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+    # Preserve original client information.
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Proxmox uses self-signed certificates on each node — skip backend TLS verify.
+    proxy_ssl_verify off;
+
+    # Prevent proxy from rewriting Location headers in 301/302 responses
+    # (Proxmox issues redirects using its own hostname).
+    proxy_redirect off;
+
+{% if item.extra_proxy_params is defined and item.extra_proxy_params %}
+    # Custom directives (from extra_proxy_params).
+    {{ item.extra_proxy_params | indent(4) }}
+{% endif %}
+  }
+{% if item.extra_location_blocks is defined and item.extra_location_blocks %}
+
+  # Custom location blocks (from extra_location_blocks).
+  {{ item.extra_location_blocks | indent(2) }}
+{% endif %}
+}

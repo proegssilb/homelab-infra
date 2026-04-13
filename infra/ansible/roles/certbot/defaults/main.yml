@@ -1,0 +1,18 @@
+---
+# Email address for Let's Encrypt account registration and expiry notices.
+certbot_email: ""
+
+# Domains to include in the certificate.
+# Wildcards require DNS-01 challenge (enforced by this role).
+# Example:
+#   certbot_domains:
+#     - "*.i.example.com"
+#     - "i.example.com"
+certbot_domains: []
+
+# Path where the Cloudflare credentials file will be written.
+certbot_cloudflare_credentials_path: /etc/letsencrypt/cloudflare.ini
+
+# Cloudflare API token with Zone:DNS:Edit permission.
+# Vault-encrypt this value in group_vars.
+certbot_cloudflare_api_token: ""

@@ -1,0 +1,15 @@
+---
+- name: Write Garage config
+  ansible.builtin.template:
+    src: garage.toml.j2
+    dest: /etc/garage.toml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Garage
+
+- name: Enable and start Garage
+  ansible.builtin.systemd:
+    name: garage
+    enabled: true
+    state: started

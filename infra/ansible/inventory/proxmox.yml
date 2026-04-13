@@ -1,0 +1,38 @@
+# Proxmox dynamic inventory plugin.
+# Credentials are read from environment variables — nothing sensitive here.
+#
+# Required env vars:
+#   PROXMOX_URL          e.g. https://proxmox.home.domain:8006
+#   PROXMOX_USER         e.g. ansible@pam  (or use token auth below)
+#   PROXMOX_TOKEN_ID     e.g. ansible@pam!inventory
+#   PROXMOX_TOKEN_SECRET <the token secret>
+#
+# Install the collection before use:
+#   ansible-galaxy collection install community.proxmox
+
+plugin: community.proxmox.proxmox
+
+# URL, user, token_id, and token_secret are all read from the env vars
+# listed above — no need to set them explicitly in this file.
+
+validate_certs: false
+
+# Return full VM facts so group_by filters and host_vars have data to work with.
+want_facts: true
+
+# Group VMs by their Proxmox tags. A VM tagged "cluster-dev" lands in the
+# cluster-dev Ansible group, matching the tofu/ state directory name.
+keyed_groups:
+  - key: proxmox_tags_parsed
+    separator: ""
+    prefix: ""
+
+# Only surface running VMs to Ansible.
+filters:
+  - proxmox_status == "running"
+
+# Ansible connects by hostname. Cloud-init sets the hostname from the VM
+# name in Proxmox, which OpenTofu sets deterministically — so the hostname
+# Ansible resolves is always the VM name in Proxmox.
+compose:
+  ansible_host: proxmox_name
