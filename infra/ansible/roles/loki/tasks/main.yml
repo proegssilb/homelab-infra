@@ -1,0 +1,91 @@
+---
+- name: Install loki
+  ansible.builtin.apt:
+    name: loki
+    state: present
+    update_cache: true
+
+- name: Check if data disk is already mounted
+  ansible.builtin.command:
+    cmd: mountpoint -q {{ loki_data_dir }}
+  register: _data_mounted
+  failed_when: false
+  changed_when: false
+
+- name: Stop loki before first-time data disk setup
+  ansible.builtin.systemd:
+    name: loki
+    state: stopped
+  when: _data_mounted.rc != 0
+
+- name: Settle udev events before touching data disk
+  ansible.builtin.command:
+    cmd: udevadm settle
+  changed_when: false
+
+- name: Create ext4 filesystem on data disk
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ loki_data_disk }}"
+
+- name: Mount loki data disk
+  ansible.posix.mount:
+    path: "{{ loki_data_dir }}"
+    src: "{{ loki_data_disk }}"
+    fstype: ext4
+    state: mounted
+    opts: defaults,noatime
+
+- name: Set ownership on data directory after mount
+  ansible.builtin.file:
+    path: "{{ loki_data_dir }}"
+    state: directory
+    owner: loki
+    group: root
+    mode: "0700"
+
+- name: Create loki config directory
+  ansible.builtin.file:
+    path: "{{ loki_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Template loki config
+  ansible.builtin.template:
+    src: loki.yml.j2
+    dest: "{{ loki_config_dir }}/config.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart loki
+
+- name: Create systemd override directory for loki
+  ansible.builtin.file:
+    path: /etc/systemd/system/loki.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install loki systemd override
+  ansible.builtin.copy:
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/loki -config.file={{ loki_config_dir }}/config.yml
+    dest: /etc/systemd/system/loki.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart loki
+
+- name: Enable and start loki
+  ansible.builtin.systemd:
+    name: loki
+    enabled: true
+    state: started
+    daemon_reload: true

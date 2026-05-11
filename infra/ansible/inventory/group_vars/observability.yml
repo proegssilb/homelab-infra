@@ -1,0 +1,3 @@
+---
+loki_url: "http://obs02.i.xenrelay.com:3100"
+prometheus_url: "http://obs01.i.xenrelay.com:9090"

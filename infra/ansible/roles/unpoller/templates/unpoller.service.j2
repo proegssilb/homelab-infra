@@ -1,0 +1,13 @@
+[Unit]
+Description=UniFi Poller
+After=network.target
+
+[Service]
+Type=simple
+User=unpoller
+ExecStart={{ unpoller_install_dir }}/unpoller --config {{ unpoller_config_dir }}/up.conf
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

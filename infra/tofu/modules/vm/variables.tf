@@ -70,3 +70,12 @@ variable "ansible_ssh_key" {
   description = "SSH public key injected via cloud-init for the ansible user."
   type        = string
 }
+
+variable "data_disks" {
+  description = "Additional data disks beyond the root. Each entry: {size (GiB), datastore (storage pool ID)}."
+  type = list(object({
+    size      = number
+    datastore = string
+  }))
+  default = []
+}

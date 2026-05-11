@@ -1,0 +1,15 @@
+[Unit]
+Description=Graphite Exporter
+After=network.target
+
+[Service]
+Type=simple
+User=graphite_exporter
+ExecStart={{ graphite_exporter_install_dir }}/graphite_exporter \
+  --graphite.listen-address={{ graphite_exporter_graphite_listen }} \
+  --web.listen-address={{ graphite_exporter_http_listen }}
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

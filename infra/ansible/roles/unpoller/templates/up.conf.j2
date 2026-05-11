@@ -1,0 +1,18 @@
+[poller]
+  debug = false
+  quiet = false
+
+[prometheus]
+  http_listen = "{{ unpoller_http_listen }}"
+  report_errors = false
+
+[[unifi.controller]]
+  url = "{{ unpoller_unifi_url }}"
+  user = "{{ unpoller_unifi_user }}"
+  pass = "{{ unpoller_unifi_pass }}"
+  verify_ssl = false
+  save_ids = true
+  save_events = true
+  save_alarms = true
+  save_anomalies = true
+  save_dpi = true

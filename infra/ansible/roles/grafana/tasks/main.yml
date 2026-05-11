@@ -1,0 +1,101 @@
+---
+- name: Install Grafana OSS
+  ansible.builtin.apt:
+    name: grafana
+    state: present
+
+- name: Check if data disk is already mounted
+  ansible.builtin.command:
+    cmd: mountpoint -q {{ grafana_data_dir }}
+  register: _data_mounted
+  failed_when: false
+  changed_when: false
+
+- name: Stop Grafana before first-time data disk setup
+  ansible.builtin.systemd:
+    name: grafana-server
+    state: stopped
+  when: _data_mounted.rc != 0
+
+- name: Settle udev events before touching data disk
+  ansible.builtin.command:
+    cmd: udevadm settle
+  changed_when: false
+
+- name: Create ext4 filesystem on data disk
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ grafana_data_disk }}"
+
+- name: Mount grafana data disk
+  ansible.posix.mount:
+    path: "{{ grafana_data_dir }}"
+    src: "{{ grafana_data_disk }}"
+    fstype: ext4
+    state: mounted
+    opts: defaults,noatime
+
+- name: Set ownership on data directory after mount
+  ansible.builtin.file:
+    path: "{{ grafana_data_dir }}"
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: "0750"
+
+- name: Create dashboards directory
+  ansible.builtin.file:
+    path: "{{ grafana_dashboards_dir }}"
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: "0750"
+
+- name: Template grafana.ini
+  ansible.builtin.template:
+    src: grafana.ini.j2
+    dest: /etc/grafana/grafana.ini
+    owner: root
+    group: grafana
+    mode: "0640"
+  notify: Restart grafana
+
+- name: Template datasource provisioning
+  ansible.builtin.template:
+    src: datasources.yml.j2
+    dest: /etc/grafana/provisioning/datasources/obs.yml
+    owner: root
+    group: grafana
+    mode: "0640"
+  notify: Restart grafana
+
+- name: Template dashboard provisioning config
+  ansible.builtin.template:
+    src: dashboards.yml.j2
+    dest: /etc/grafana/provisioning/dashboards/default.yml
+    owner: root
+    group: grafana
+    mode: "0640"
+  notify: Restart grafana
+
+- name: Download Node Exporter Full dashboard
+  ansible.builtin.get_url:
+    url: "https://grafana.com/api/dashboards/1860/revisions/latest/download"
+    dest: "{{ grafana_dashboards_dir }}/node-exporter-full.json"
+    owner: grafana
+    group: grafana
+    mode: "0644"
+
+- name: Install Grafana plugins
+  ansible.builtin.command:
+    cmd: grafana-cli --homepath /usr/share/grafana plugins install {{ item }}
+    creates: "{{ grafana_data_dir }}/plugins/{{ item }}"
+  loop: "{{ grafana_plugins }}"
+  notify: Restart grafana
+
+- name: Enable and start Grafana
+  ansible.builtin.systemd:
+    name: grafana-server
+    enabled: true
+    state: started
+    daemon_reload: true

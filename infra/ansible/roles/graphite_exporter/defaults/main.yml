@@ -1,0 +1,6 @@
+---
+# https://github.com/prometheus/graphite_exporter/releases — update as needed
+graphite_exporter_version: "0.15.1"
+graphite_exporter_install_dir: /usr/local/bin
+graphite_exporter_graphite_listen: "0.0.0.0:2003"
+graphite_exporter_http_listen: "0.0.0.0:9108"

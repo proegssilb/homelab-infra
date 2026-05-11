@@ -1,0 +1,26 @@
+// Ship systemd journal to Loki.
+
+loki.source.journal "default" {
+  forward_to    = [loki.write.endpoint.receiver]
+  relabel_rules = loki.relabel.journal.rules
+
+  labels = {
+    job  = "systemd-journal",
+    host = "{{ inventory_hostname }}",
+  }
+}
+
+loki.relabel "journal" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+}
+
+loki.write "endpoint" {
+  endpoint {
+    url = "{{ loki_url }}/loki/api/v1/push"
+  }
+}

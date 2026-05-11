@@ -1,0 +1,9 @@
+[Unit]
+Description=Prometheus Proxmox service discovery timer
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=5m
+
+[Install]
+WantedBy=timers.target

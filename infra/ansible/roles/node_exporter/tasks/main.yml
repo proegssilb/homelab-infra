@@ -1,0 +1,21 @@
+---
+- name: Install node_exporter
+  ansible.builtin.package:
+    name: prometheus-node-exporter
+    state: present
+
+- name: Configure node_exporter flags
+  ansible.builtin.copy:
+    content: |
+      ARGS="--collector.processes"
+    dest: /etc/default/prometheus-node-exporter
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart node_exporter
+
+- name: Enable and start node_exporter
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter
+    enabled: true
+    state: started

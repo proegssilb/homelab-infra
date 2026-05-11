@@ -28,7 +28,7 @@ bootstrap:
 # Bring up all VMs in a named cluster/group.
 cluster-up cluster:
     just _tofu-init {{cluster}}
-    cd tofu/{{cluster}} && tofu apply -auto-approve
+    cd tofu/{{cluster}} && tofu apply -auto-approve -parallelism=2
     just tune-all {{cluster}}
 
 # ── Day 2 ──────────────────────────────────────────────────────────────────────
@@ -62,11 +62,11 @@ garage:
 # Run tofu plan for a state group (no changes applied).
 plan state:
     just _tofu-init {{state}}
-    cd tofu/{{state}} && tofu plan
+    cd tofu/{{state}} && tofu plan -parallelism=2
 
 # Destroy all VMs in a state group. Requires confirmation.
 destroy state:
-    cd tofu/{{state}} && tofu destroy
+    cd tofu/{{state}} && tofu destroy -parallelism=2
 
 # ── Inventory ──────────────────────────────────────────────────────────────────
 

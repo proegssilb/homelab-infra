@@ -4,12 +4,14 @@
 # To add a new role: define roles/<name>/, then add a play here targeting the right group.
 # Limit to a host or group at the CLI: ansible-playbook site.yml -l <host-or-group>
 
-- name: OS baseline — all hosts
+- name: OS baseline + observability agents — all hosts
   hosts: all
   become: true
   gather_facts: true
   roles:
     - os_baseline
+    - node_exporter
+    - alloy
 
 - name: Garage — bootstrap node
   hosts: bootstrap
@@ -26,3 +28,27 @@
     - keepalived
     - certbot
     - nginx_reverse_proxy
+
+- name: Loki — log aggregation
+  hosts: obs_loki
+  become: true
+  gather_facts: true
+  roles:
+    - loki
+
+- name: Prometheus — metrics + alertmanager
+  hosts: obs_prometheus
+  become: true
+  gather_facts: true
+  roles:
+    - prometheus
+    - alertmanager
+    - graphite_exporter
+    - unpoller
+
+- name: Grafana — dashboards
+  hosts: obs_grafana
+  become: true
+  gather_facts: true
+  roles:
+    - grafana

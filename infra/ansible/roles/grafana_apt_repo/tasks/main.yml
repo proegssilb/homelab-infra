@@ -1,0 +1,31 @@
+---
+- name: Create /etc/apt/keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install gpg
+  ansible.builtin.package:
+    name: gpg
+    state: present
+
+- name: Download Grafana APT signing key
+  ansible.builtin.get_url:
+    url: https://apt.grafana.com/gpg.key
+    dest: /tmp/grafana.gpg.key
+    mode: "0644"
+
+- name: Dearmor Grafana APT signing key
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /etc/apt/keyrings/grafana.gpg /tmp/grafana.gpg.key
+    creates: /etc/apt/keyrings/grafana.gpg
+
+- name: Add Grafana APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main"
+    state: present
+    filename: grafana
+    update_cache: true

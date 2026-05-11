@@ -1,0 +1,3 @@
+---
+dependencies:
+  - role: grafana_apt_repo

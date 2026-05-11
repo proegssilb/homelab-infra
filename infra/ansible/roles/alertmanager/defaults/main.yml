@@ -1,0 +1,6 @@
+---
+# https://github.com/prometheus/alertmanager/releases — update as needed
+alertmanager_version: "0.27.0"
+alertmanager_install_dir: /usr/local/bin
+alertmanager_config_dir: /etc/alertmanager
+alertmanager_data_dir: /var/lib/alertmanager

@@ -1,0 +1,28 @@
+---
+- name: Install alloy
+  ansible.builtin.apt:
+    name: alloy
+    state: present
+    update_cache: true
+
+- name: Add alloy user to systemd-journal group
+  ansible.builtin.user:
+    name: alloy
+    groups: systemd-journal
+    append: true
+  notify: Restart alloy
+
+- name: Template alloy config
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: "{{ alloy_config_dir }}/config.alloy"
+    owner: root
+    group: alloy
+    mode: "0640"
+  notify: Restart alloy
+
+- name: Enable and start alloy
+  ansible.builtin.systemd:
+    name: alloy
+    enabled: true
+    state: started

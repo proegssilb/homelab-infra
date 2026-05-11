@@ -1,0 +1,11 @@
+---
+# https://github.com/unpoller/unpoller/releases — update as needed
+unpoller_version: "2.39.0"
+unpoller_install_dir: /usr/local/bin
+unpoller_config_dir: /etc/unpoller
+unpoller_http_listen: "0.0.0.0:9130"
+# Set in host_vars:
+#   unpoller_unifi_url: https://unifi.home.example.com
+# Set in group_vars (vault-encrypted):
+#   unpoller_unifi_user: unpoller
+#   unpoller_unifi_pass: <vault>

@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Query Proxmox API and write a Prometheus file_sd JSON targets file."""
+import json, os, ssl, sys, urllib.request
+
+PROXMOX_URL   = "{{ prometheus_proxmox_url }}"
+TOKEN_ID      = "{{ prometheus_proxmox_token_id }}"
+TOKEN_SECRET  = "{{ prometheus_proxmox_token_secret }}"
+OUTPUT_FILE   = "{{ prometheus_config_dir }}/targets/proxmox.json"
+EXPORTER_PORT = 9100
+
+_ctx = ssl.create_default_context()
+_ctx.check_hostname = False
+_ctx.verify_mode = ssl.CERT_NONE
+
+def api_get(path):
+    req = urllib.request.Request(
+        f"{PROXMOX_URL}/api2/json{path}",
+        headers={"Authorization": f"PVEAPIToken={TOKEN_ID}={TOKEN_SECRET}"},
+    )
+    with urllib.request.urlopen(req, context=_ctx) as r:
+        return json.loads(r.read())["data"]
+
+targets = []
+for node in api_get("/nodes"):
+    node_name = node["node"]
+    for vm_type in ("qemu", "lxc"):
+        try:
+            vms = api_get(f"/nodes/{node_name}/{vm_type}")
+        except Exception as e:
+            print(f"warning: {node_name}/{vm_type}: {e}", file=sys.stderr)
+            continue
+        for vm in vms:
+            if vm.get("status") != "running":
+                continue
+            if "observe" not in vm.get("tags", ""):
+                continue
+            name = vm["name"]
+            targets.append({
+                "targets": [f"{name}:{EXPORTER_PORT}"],
+                "labels": {"instance": name, "proxmox_node": node_name},
+            })
+
+tmp = OUTPUT_FILE + ".tmp"
+with open(tmp, "w") as f:
+    json.dump(targets, f, indent=2)
+os.replace(tmp, OUTPUT_FILE)
+print(f"wrote {len(targets)} targets to {OUTPUT_FILE}")

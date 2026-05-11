@@ -1,0 +1,3 @@
+---
+alloy_config_dir: /etc/alloy
+loki_url: "http://obs02:3100"

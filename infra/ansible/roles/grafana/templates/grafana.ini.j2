@@ -1,0 +1,15 @@
+[server]
+domain = obs03
+
+[security]
+admin_user = {{ grafana_admin_user }}
+admin_password = {{ grafana_admin_password }}
+
+[paths]
+data = {{ grafana_data_dir }}
+logs = /var/log/grafana
+plugins = {{ grafana_data_dir }}/plugins
+
+[analytics]
+reporting_enabled = false
+check_for_updates = false

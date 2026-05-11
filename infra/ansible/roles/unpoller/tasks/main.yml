@@ -1,0 +1,71 @@
+---
+- name: Create unpoller system user
+  ansible.builtin.user:
+    name: unpoller
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Create unpoller config directory
+  ansible.builtin.file:
+    path: "{{ unpoller_config_dir }}"
+    state: directory
+    owner: root
+    group: unpoller
+    mode: "0750"
+
+- name: Download unpoller archive
+  ansible.builtin.get_url:
+    url: "https://github.com/unpoller/unpoller/releases/download/v{{ unpoller_version }}/unpoller_{{ unpoller_version }}_linux_amd64.tar.gz"
+    dest: "/tmp/unpoller_{{ unpoller_version }}_linux_amd64.tar.gz"
+    mode: "0644"
+
+- name: Create unpoller extract directory
+  ansible.builtin.file:
+    path: "/tmp/unpoller_{{ unpoller_version }}_linux_amd64"
+    state: directory
+    mode: "0755"
+
+- name: Extract unpoller archive
+  ansible.builtin.unarchive:
+    src: "/tmp/unpoller_{{ unpoller_version }}_linux_amd64.tar.gz"
+    dest: /tmp/unpoller_{{ unpoller_version }}_linux_amd64/
+    remote_src: true
+    creates: "/tmp/unpoller_{{ unpoller_version }}_linux_amd64/unpoller"
+
+- name: Install unpoller binary
+  ansible.builtin.copy:
+    src: "/tmp/unpoller_{{ unpoller_version }}_linux_amd64/unpoller"
+    dest: "{{ unpoller_install_dir }}/unpoller"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart unpoller
+
+- name: Template unpoller config
+  ansible.builtin.template:
+    src: up.conf.j2
+    dest: "{{ unpoller_config_dir }}/up.conf"
+    owner: root
+    group: unpoller
+    mode: "0640"
+  notify: Restart unpoller
+
+- name: Install unpoller systemd unit
+  ansible.builtin.template:
+    src: unpoller.service.j2
+    dest: /etc/systemd/system/unpoller.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart unpoller
+
+- name: Enable and start unpoller
+  ansible.builtin.systemd:
+    name: unpoller
+    enabled: true
+    state: started
+    daemon_reload: true

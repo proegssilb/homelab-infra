@@ -20,26 +20,40 @@ resource "proxmox_virtual_environment_vm" "vm" {
   # Clone from a cloud-init-enabled template. Full clone so the VM is
   # fully independent — no shared base disk.
   clone {
-    vm_id     = var.template_id
-    full      = true
-    node_name = var.template_node != "" ? var.template_node : var.node_name
+    vm_id        = var.template_id
+    full         = true
+    node_name    = var.template_node != "" ? var.template_node : var.node_name
+    datastore_id = var.datastore
   }
 
   cpu {
     cores = var.cores
-    type  = "x86-64-v2-AES"
+    type  = "host"
   }
 
   memory {
     dedicated = var.memory
   }
 
+  # The Proxmox template's OS disk is scsi1.
   disk {
     datastore_id = var.datastore
     size         = var.disk_size
-    interface    = "scsi0"
+    interface    = "scsi1"
     file_format  = "raw"
     discard      = "on"
+  }
+
+  # The Proxmox template's OS disk is scsi1.
+  dynamic "disk" {
+    for_each = { for i, d in var.data_disks : i => d }
+    content {
+      datastore_id = disk.value.datastore
+      size         = disk.value.size
+      interface    = "scsi${disk.key + 2}"
+      file_format  = "raw"
+      discard      = "on"
+    }
   }
 
   network_device {
