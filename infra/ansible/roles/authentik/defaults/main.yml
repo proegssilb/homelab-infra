@@ -1,0 +1,8 @@
+---
+authentik_version: "2025.4.1"
+authentik_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
+authentik_data_dir: /opt/authentik
+
+# Override both in group_vars/auth.yml (ansible-vault)
+authentik_secret_key: "changeme-use-vault"
+authentik_pg_pass: "changeme-use-vault"

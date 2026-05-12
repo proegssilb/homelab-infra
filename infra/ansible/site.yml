@@ -52,3 +52,10 @@
   gather_facts: true
   roles:
     - grafana
+
+- name: Authentik — identity provider
+  hosts: auth
+  become: true
+  gather_facts: true
+  roles:
+    - authentik

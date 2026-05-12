@@ -1,0 +1,77 @@
+---
+# Managed by Ansible — do not edit manually
+services:
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - {{ authentik_data_dir }}/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: {{ authentik_pg_pass }}
+      POSTGRES_USER: authentik
+      POSTGRES_DB: authentik
+
+  redis:
+    image: docker.io/library/redis:alpine
+    command: --save 60 1 --loglevel warning
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    volumes:
+      - {{ authentik_data_dir }}/redis:/data
+
+  server:
+    image: ghcr.io/goauthentik/server:{{ authentik_version }}
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: {{ authentik_pg_pass }}
+      AUTHENTIK_SECRET_KEY: {{ authentik_secret_key }}
+    volumes:
+      - {{ authentik_data_dir }}/media:/media
+      - {{ authentik_data_dir }}/templates:/templates
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: ghcr.io/goauthentik/server:{{ authentik_version }}
+    restart: unless-stopped
+    command: worker
+    user: root
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: {{ authentik_pg_pass }}
+      AUTHENTIK_SECRET_KEY: {{ authentik_secret_key }}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - {{ authentik_data_dir }}/media:/media
+      - {{ authentik_data_dir }}/certs:/certs
+      - {{ authentik_data_dir }}/templates:/templates
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

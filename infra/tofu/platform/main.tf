@@ -18,6 +18,9 @@ locals {
     obs01 = { vmid = 210, cores = 4, memory = 4096, tags = ["platform", "observability", "obs_prometheus", "observe"], node = "pxmx01", data_disks = [{ size = 60, datastore = "ceph-ssd-pool" }] }
     obs02 = { vmid = 211, cores = 4, memory = 4096, tags = ["platform", "observability", "obs_loki", "observe"],       node = "pxmx02", data_disks = [{ size = 80, datastore = "ceph-hdd-pool" }] }
     obs03 = { vmid = 212, cores = 2, memory = 2048, tags = ["platform", "observability", "obs_grafana", "observe"],    node = "pxmx03", data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }] }
+
+    # Identity provider — Authentik
+    auth = { vmid = 220, cores = 2, memory = 4096, tags = ["platform", "auth", "observe"], node = "pxmx02", data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }] }
   }
 }
 
