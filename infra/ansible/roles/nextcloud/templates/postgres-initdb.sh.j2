@@ -1,0 +1,9 @@
+#!/bin/bash
+# Grant schema privileges to the nextcloud role.
+# When POSTGRES_USER != 'postgres', initdb creates that user as the initial superuser
+# and no 'postgres' role exists. Connect as nextcloud via local Unix socket (trust auth).
+set -euo pipefail
+
+psql -v ON_ERROR_STOP=1 --username nextcloud --dbname nextcloud <<-EOSQL
+    GRANT ALL PRIVILEGES ON SCHEMA public TO nextcloud;
+EOSQL

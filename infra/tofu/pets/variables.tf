@@ -9,6 +9,12 @@ variable "template_id" {
   type        = number
 }
 
+variable "template_node" {
+  description = "Proxmox node that hosts the template. Required when the template lives on a different node than var.proxmox_node."
+  type        = string
+  default     = ""
+}
+
 variable "datastore" {
   description = "Proxmox storage ID for VM disks."
   type        = string

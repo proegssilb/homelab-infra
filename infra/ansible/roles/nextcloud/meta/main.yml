@@ -1,0 +1,8 @@
+---
+galaxy_info:
+  role_name: nextcloud
+  author: proegssilb
+  description: Deploy Nextcloud via Docker Compose
+  min_ansible_version: "2.14"
+collections:
+  - community.docker

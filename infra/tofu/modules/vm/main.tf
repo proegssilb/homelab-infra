@@ -66,6 +66,8 @@ resource "proxmox_virtual_environment_vm" "vm" {
   # Hostname comes from the VM name field above via Proxmox metadata service.
   # All other config (packages, etc.) is handled by Ansible post-provision.
   initialization {
+    datastore_id = var.datastore
+
     user_account {
       username = var.ansible_user
       keys     = [var.ansible_ssh_key]

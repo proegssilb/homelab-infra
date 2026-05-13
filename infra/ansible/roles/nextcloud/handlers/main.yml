@@ -1,0 +1,5 @@
+---
+- name: Restart nextcloud
+  community.docker.docker_compose_v2:
+    project_src: "{{ nextcloud_data_dir }}"
+    state: restarted

@@ -1,0 +1,85 @@
+---
+- name: Install Docker prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+    state: present
+    update_cache: true
+
+- name: Add Docker GPG key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Add Docker apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/debian
+      {{ ansible_distribution_release }} stable
+    filename: docker
+    state: present
+
+- name: Install Docker Engine and Compose plugin
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+
+- name: Enable and start Docker
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Create nextcloud directories
+  ansible.builtin.file:
+    path: "{{ nextcloud_data_dir }}/{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - postgres
+    - redis
+    - html
+    - config
+
+- name: Create postgres initdb directory
+  ansible.builtin.file:
+    path: "{{ nextcloud_data_dir }}/postgres-initdb.d"
+    state: directory
+    mode: "0755"
+
+- name: Template postgres init script
+  ansible.builtin.template:
+    src: postgres-initdb.sh.j2
+    dest: "{{ nextcloud_data_dir }}/postgres-initdb.d/01-grants.sh"
+    mode: "0755"
+
+- name: Template nextcloud custom config
+  ansible.builtin.template:
+    src: nextcloud.config.php.j2
+    dest: "{{ nextcloud_data_dir }}/config/custom.config.php"
+    mode: "0644"
+  notify: Restart nextcloud
+
+- name: Template docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ nextcloud_data_dir }}/docker-compose.yml"
+    mode: "0640"
+  notify: Restart nextcloud
+
+- name: Pull Nextcloud images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ nextcloud_data_dir }}"
+
+- name: Start Nextcloud stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ nextcloud_data_dir }}"
+    state: present

@@ -1,0 +1,10 @@
+---
+nextcloud_version: "31"
+nextcloud_data_dir: /opt/nextcloud
+nextcloud_trusted_domains:
+  - localhost
+
+# Override in host_vars/nextcloud.yml (ansible-vault)
+nextcloud_admin_user: "admin"
+nextcloud_admin_pass: "changeme-use-vault"
+nextcloud_db_pass: "changeme-use-vault"

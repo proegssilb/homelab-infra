@@ -1,0 +1,9 @@
+<?php
+// Managed by Ansible — do not edit manually
+$CONFIG = [
+  'trusted_domains' => [
+{% for domain in nextcloud_trusted_domains %}
+    '{{ domain }}',
+{% endfor %}
+  ],
+];

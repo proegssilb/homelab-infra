@@ -1,0 +1,54 @@
+---
+# Managed by Ansible — do not edit manually
+services:
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - {{ nextcloud_data_dir }}/postgres:/var/lib/postgresql/data
+      - {{ nextcloud_data_dir }}/postgres-initdb.d:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_PASSWORD: {{ nextcloud_db_pass }}
+      POSTGRES_USER: nextcloud
+      POSTGRES_DB: nextcloud
+
+  redis:
+    image: docker.io/library/redis:alpine
+    command: --save 60 1 --loglevel warning
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    volumes:
+      - {{ nextcloud_data_dir }}/redis:/data
+
+  nextcloud:
+    image: docker.io/library/nextcloud:{{ nextcloud_version }}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - {{ nextcloud_data_dir }}/html:/var/www/html
+      - {{ nextcloud_data_dir }}/config/custom.config.php:/var/www/html/config/custom.config.php:ro
+    environment:
+      POSTGRES_HOST: postgresql
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: {{ nextcloud_db_pass }}
+      NEXTCLOUD_ADMIN_USER: {{ nextcloud_admin_user }}
+      NEXTCLOUD_ADMIN_PASSWORD: {{ nextcloud_admin_pass }}
+      REDIS_HOST: redis
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
