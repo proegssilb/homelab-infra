@@ -17,3 +17,10 @@
 #
 # Override this variable in group_vars or host_vars to customise per role/task.
 nginx_vhosts: []
+
+# DNS resolver for runtime upstream hostname resolution (defers lookup to request
+# time so nginx starts cleanly even when backend VMs are not yet provisioned).
+# Override in group_vars to a known-stable resolver (e.g. the LAN gateway) rather
+# than relying on auto-discovery, which may return a stub that varies by OS/config.
+# Multiple space-separated IPs are accepted for redundancy.
+nginx_resolver: "{{ ansible_dns.nameservers | first }}"

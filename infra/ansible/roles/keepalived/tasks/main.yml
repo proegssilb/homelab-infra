@@ -17,6 +17,14 @@
     sysctl_file: /etc/sysctl.d/99-keepalived.conf
     reload: true
 
+- name: Deploy keepalived notify script
+  ansible.builtin.template:
+    src: keepalived-notify.sh.j2
+    dest: /etc/keepalived/notify.sh
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Template keepalived configuration
   ansible.builtin.template:
     src: keepalived.conf.j2

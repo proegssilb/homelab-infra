@@ -23,6 +23,11 @@ keepalived_auth_pass: !vault |
 
 # ── nginx ─────────────────────────────────────────────────────────────────────
 
+# Explicit resolver for upstream hostname resolution at request time.
+# Using the LAN DNS directly rather than auto-discovery from resolv.conf,
+# because on Debian 13 the stub address is not guaranteed to be 127.0.0.53.
+nginx_resolver: "192.168.20.1"
+
 nginx_vhosts:
   - name: proxmox
     server_name: "proxmox.{{ homelab_domain }}"
@@ -31,6 +36,14 @@ nginx_vhosts:
     upstream_protocol: https
     upstream_servers: "{{ homelab_proxmox_nodes | map('regex_replace', '$', '.' + homelab_domain + ':8006') | list }}"
     sticky_cookie: PVEAuthCookie
+
+  - name: forgejo
+    server_name: "code.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key: "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "forgejo.{{ homelab_domain }}:3000"
 
 # ── certbot ───────────────────────────────────────────────────────────────────
 

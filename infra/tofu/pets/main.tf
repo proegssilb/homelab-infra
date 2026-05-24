@@ -18,6 +18,9 @@ locals {
 
     # File-sync and collaboration — Nextcloud (storage via TrueNAS NFS, to be wired later)
     nextcloud = { vmid = 103, cores = 2, memory = 8192, node = "pxmx05", tags = ["observe", "pets", "nextcloud_app"] }
+
+    # Git forge — Forgejo (mirrors to Codeberg; backed up via Proxmox VM snapshots)
+    forgejo = { vmid = 106, cores = 4, memory = 8192, disk_size = 50, node = "pxmx04", tags = ["observe", "pets", "forgejo_app"], data_disks = [{ size = 100, datastore = "ceph-hdd-pool" }] }
   }
 }
 
@@ -32,8 +35,9 @@ module "vm" {
   template_node = var.template_node
   datastore     = var.datastore
 
-  cores  = lookup(each.value, "cores", 2)
-  memory = lookup(each.value, "memory", 2048)
+  cores     = lookup(each.value, "cores", 2)
+  memory    = lookup(each.value, "memory", 2048)
+  disk_size = lookup(each.value, "disk_size", 20)
 
   data_disks = try(each.value.data_disks, [])
 

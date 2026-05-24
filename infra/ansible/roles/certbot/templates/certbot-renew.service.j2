@@ -18,10 +18,11 @@ ExecStart=/usr/bin/certbot certonly \
   --email {{ certbot_email }} \
   --dns-cloudflare \
   --dns-cloudflare-credentials {{ certbot_cloudflare_credentials_path }} \
+  --cert-name {{ certbot_domains[0] | regex_replace('^\*\.', '') }} \
   --keep-until-expiring \
+  --deploy-hook 'systemctl reload nginx' \
 {% for domain in certbot_domains %}
   -d {{ domain }}{% if not loop.last %} \{% endif %}
 
 {% endfor %}
-ExecStartPost=/bin/systemctl reload nginx
 PrivateTmp=true

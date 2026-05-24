@@ -1,0 +1,48 @@
+---
+# Managed by Ansible — do not edit manually
+services:
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - {{ forgejo_data_dir }}/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: {{ forgejo_db_pass }}
+      POSTGRES_USER: forgejo
+      POSTGRES_DB: forgejo
+
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:{{ forgejo_version }}
+    restart: unless-stopped
+    environment:
+      USER_UID: "1000"
+      USER_GID: "1000"
+      FORGEJO__database__DB_TYPE: postgres
+      FORGEJO__database__HOST: postgresql:5432
+      FORGEJO__database__NAME: forgejo
+      FORGEJO__database__USER: forgejo
+      FORGEJO__database__PASSWD: {{ forgejo_db_pass }}
+      FORGEJO__security__SECRET_KEY: {{ forgejo_secret_key }}
+      FORGEJO__security__INTERNAL_TOKEN: {{ forgejo_internal_token }}
+      FORGEJO__security__LFS_JWT_SECRET: {{ forgejo_lfs_jwt_secret }}
+      FORGEJO__server__DOMAIN: {{ forgejo_domain }}
+      FORGEJO__server__ROOT_URL: https://{{ forgejo_domain }}/
+      FORGEJO__server__HTTP_PORT: "{{ forgejo_http_port }}"
+      FORGEJO__server__SSH_DOMAIN: {{ forgejo_domain }}
+      FORGEJO__server__SSH_PORT: "{{ forgejo_ssh_port }}"
+      FORGEJO__server__SSH_LISTEN_PORT: "22"
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+    volumes:
+      - {{ forgejo_data_dir }}/data:/data
+    ports:
+      - "{{ forgejo_http_port }}:{{ forgejo_http_port }}"
+      - "{{ forgejo_ssh_port }}:22"
+    depends_on:
+      postgresql:
+        condition: service_healthy

@@ -24,6 +24,7 @@
   hosts: proxy
   become: true
   gather_facts: true
+  serial: 1
   roles:
     - keepalived
     - certbot
@@ -54,7 +55,7 @@
     - grafana
 
 - name: Authentik — identity provider
-  hosts: auth
+  hosts: auth_app
   become: true
   gather_facts: true
   roles:
@@ -66,3 +67,10 @@
   gather_facts: true
   roles:
     - nextcloud
+
+- name: Forgejo — git forge
+  hosts: forgejo_app
+  become: true
+  gather_facts: true
+  roles:
+    - forgejo

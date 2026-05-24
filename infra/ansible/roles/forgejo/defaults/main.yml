@@ -1,0 +1,19 @@
+---
+forgejo_version: "9.0"
+forgejo_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
+forgejo_data_dir: /opt/forgejo
+forgejo_ssh_port: 2222
+forgejo_http_port: 3000
+
+# Set in host_vars/code.yml
+forgejo_domain: "code.example.com"
+
+# Override in host_vars/code.yml (ansible-vault)
+# Generate: openssl rand -hex 20
+forgejo_db_pass: "changeme-use-vault"
+# Generate: openssl rand -hex 32
+forgejo_secret_key: "changeme-use-vault"
+# Generate: openssl rand -hex 32
+forgejo_internal_token: "changeme-use-vault"
+# Generate: openssl rand -hex 32
+forgejo_lfs_jwt_secret: "changeme-use-vault"

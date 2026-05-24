@@ -1,0 +1,14 @@
+#!/bin/sh
+# Managed by Ansible — do not edit by hand.
+# Role: keepalived
+#
+# Called by keepalived on every VRRP state transition.
+# Args: <TYPE> <NAME> <STATE>  (e.g. INSTANCE VI_1 MASTER)
+# Logs the event to journald so it appears in `journalctl -u keepalived`.
+
+TYPE=$1
+NAME=$2
+STATE=$3
+
+echo "keepalived: ${NAME} transitioned to ${STATE} on $(hostname)" \
+  | systemd-cat -t keepalived -p info
