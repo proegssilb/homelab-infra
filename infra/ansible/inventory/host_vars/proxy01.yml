@@ -1,5 +1,0 @@
----
-# proxy01 — keepalived MASTER (preferred VIP holder).
-
-keepalived_state: MASTER
-keepalived_priority: 100

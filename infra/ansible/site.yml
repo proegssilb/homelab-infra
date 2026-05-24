@@ -20,13 +20,11 @@
   roles:
     - garage
 
-- name: Proxy — keepalived + nginx reverse proxy + certbot
+- name: Proxy — nginx reverse proxy + certbot
   hosts: proxy
   become: true
   gather_facts: true
-  serial: 1
   roles:
-    - keepalived
     - certbot
     - nginx_reverse_proxy
 

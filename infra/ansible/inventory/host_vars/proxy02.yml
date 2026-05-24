@@ -1,5 +1,0 @@
----
-# proxy02 — keepalived BACKUP (takes VIP if proxy01 fails).
-
-keepalived_state: BACKUP
-keepalived_priority: 90

@@ -31,3 +31,8 @@ variable "ansible_ssh_key" {
   description = "SSH public key injected via cloud-init for the ansible user."
   type        = string
 }
+
+variable "lxc_template_file_id" {
+  description = "Proxmox storage path to the LXC template, e.g. local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst"
+  type        = string
+}

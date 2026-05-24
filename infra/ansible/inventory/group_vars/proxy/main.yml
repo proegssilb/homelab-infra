@@ -1,25 +1,11 @@
 ---
-# Vars shared by all hosts in the 'proxy' group (proxy01, proxy02).
-# Extend with host_vars for per-node overrides (e.g. keepalived state/priority).
+# Vars shared by all hosts in the 'proxy' group.
 #
 # Site-specific values (homelab_domain, homelab_proxmox_nodes, certbot_email)
 # live in local.yml alongside this file — see local.yml.example.
 
-# ── keepalived ────────────────────────────────────────────────────────────────
-
-# Network interface the VIP and VRRP hellos are sent on.
-keepalived_interface: eth0
-
-# VRRP authentication passphrase — same on both nodes.
-# Generate: openssl rand -base64 6 | head -c 8
-# Encrypt:  ansible-vault encrypt_string '<value>' --name keepalived_auth_pass
-keepalived_auth_pass: !vault |
-          $ANSIBLE_VAULT;1.1;AES256
-          66363330366638653738633336663963306466383265626138363262323635663832366237623434
-          3536363239383661323233656434363132376266666431620a636131356537376636373563616430
-          36616634643531323964333836323265396633356362616636303833363330306663353431633330
-          3631623031316462370a393636653139376164376432636532326530363463306162353937373162
-          6135
+# LXC containers SSH as root (no cloud-init user; key goes into root's authorized_keys).
+ansible_user: root
 
 # ── nginx ─────────────────────────────────────────────────────────────────────
 
