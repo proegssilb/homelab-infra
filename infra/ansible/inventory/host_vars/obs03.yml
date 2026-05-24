@@ -1,2 +1,3 @@
 ---
 grafana_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
+grafana_domain: "grafana.i.xenrelay.com"

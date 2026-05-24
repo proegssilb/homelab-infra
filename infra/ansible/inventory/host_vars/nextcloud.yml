@@ -1,8 +1,10 @@
 ---
 nextcloud_trusted_domains:
+  - nc.i.xenrelay.com
   - nextcloud.i.xenrelay.com
   - nextcloud
   - localhost
+nextcloud_overwrite_cli_url: "https://nc.i.xenrelay.com"
 nextcloud_admin_pass: !vault |
           $ANSIBLE_VAULT;1.1;AES256
           38353061643338663935316230393461643435313164623465313961626439643437393262323739

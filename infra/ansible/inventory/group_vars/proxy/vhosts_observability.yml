@@ -1,0 +1,9 @@
+---
+_nginx_vhosts_observability:
+  - name: grafana
+    server_name: "grafana.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "obs03.{{ homelab_domain }}:3000"

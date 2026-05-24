@@ -5,6 +5,7 @@ grafana_admin_user: admin
 # Override in group_vars/obs_grafana.yml using ansible-vault
 grafana_admin_password: "admin"
 grafana_data_disk: /dev/sdb
+grafana_domain: "obs03"
 grafana_plugins:
   - grafana-piechart-panel
   - grafana-clock-panel

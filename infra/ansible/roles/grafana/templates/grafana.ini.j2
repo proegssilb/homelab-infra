@@ -1,5 +1,6 @@
 [server]
-domain = obs03
+domain = {{ grafana_domain }}
+root_url = https://{{ grafana_domain }}
 
 [security]
 admin_user = {{ grafana_admin_user }}

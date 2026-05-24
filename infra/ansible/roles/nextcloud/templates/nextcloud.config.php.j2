@@ -6,4 +6,8 @@ $CONFIG = [
     '{{ domain }}',
 {% endfor %}
   ],
+{% if nextcloud_overwrite_cli_url %}
+  'overwrite.cli.url' => '{{ nextcloud_overwrite_cli_url }}',
+  'overwriteprotocol' => 'https',
+{% endif %}
 ];

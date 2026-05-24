@@ -3,6 +3,7 @@ nextcloud_version: "31"
 nextcloud_data_dir: /opt/nextcloud
 nextcloud_trusted_domains:
   - localhost
+nextcloud_overwrite_cli_url: ""
 
 # Override in host_vars/nextcloud.yml (ansible-vault)
 nextcloud_admin_user: "admin"
