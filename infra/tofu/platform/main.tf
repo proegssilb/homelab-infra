@@ -11,17 +11,17 @@
 locals {
   lxcs = {
     # Reverse proxy — single nginx LXC, Proxmox HA for auto-restart
-    proxy01 = { vmid = 200, cores = 1, memory = 512, tags = ["platform", "proxy", "observe"], node = "pxmx01", privileged = false }
+    proxy01 = { vmid = 200, cores = 1, memory = 512, tags = ["platform", "proxy", "observe"], node = "pxmx01", privileged = false, ha = true }
   }
 
   vms = {
     # Observability stack — Prometheus + Alertmanager + Loki + Grafana
-    obs01 = { vmid = 210, cores = 4, memory = 4096, tags = ["platform", "observability", "obs_prometheus", "observe"], node = "pxmx01", data_disks = [{ size = 60, datastore = "ceph-ssd-pool" }] }
-    obs02 = { vmid = 211, cores = 4, memory = 4096, tags = ["platform", "observability", "obs_loki", "observe"],       node = "pxmx02", data_disks = [{ size = 80, datastore = "ceph-hdd-pool" }] }
-    obs03 = { vmid = 212, cores = 2, memory = 2048, tags = ["platform", "observability", "obs_grafana", "observe"],    node = "pxmx03", data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }] }
+    obs01 = { vmid = 210, cores = 4, memory = 4096, tags = ["platform", "observability", "obs_prometheus", "observe"], node = "pxmx01", data_disks = [{ size = 60, datastore = "ceph-ssd-pool" }], ha = true }
+    obs02 = { vmid = 211, cores = 4, memory = 4096, tags = ["platform", "observability", "obs_loki", "observe"],       node = "pxmx02", data_disks = [{ size = 80, datastore = "ceph-hdd-pool" }], ha = true }
+    obs03 = { vmid = 212, cores = 2, memory = 2048, tags = ["platform", "observability", "obs_grafana", "observe"],    node = "pxmx03", data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }], ha = true }
 
     # Identity provider — Authentik
-    authentik = { vmid = 220, cores = 2, memory = 4096, tags = ["platform", "auth_app", "observe"], node = "pxmx02", data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }] }
+    authentik = { vmid = 220, cores = 2, memory = 4096, tags = ["platform", "auth_app", "observe"], node = "pxmx02", data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }], ha = true }
   }
 }
 
@@ -46,8 +46,20 @@ module "lxc" {
   ansible_ssh_key  = var.ansible_ssh_key
 }
 
-resource "proxmox_haresource" "proxy01" {
-  resource_id = "ct:200"
+moved {
+  from = proxmox_haresource.proxy01
+  to   = proxmox_haresource.lxc["proxy01"]
+}
+
+resource "proxmox_haresource" "lxc" {
+  for_each    = { for k, v in local.lxcs : k => v if try(v.ha, false) }
+  resource_id = "ct:${each.value.vmid}"
+  state       = "started"
+}
+
+resource "proxmox_haresource" "vm" {
+  for_each    = { for k, v in local.vms : k => v if try(v.ha, false) }
+  resource_id = "vm:${each.value.vmid}"
   state       = "started"
 }
 

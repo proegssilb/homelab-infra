@@ -17,11 +17,17 @@ locals {
     #   data_disks — list of {size (GiB), datastore} for extra disks beyond the root (default [])
 
     # File-sync and collaboration — Nextcloud (storage via TrueNAS NFS, to be wired later)
-    nextcloud = { vmid = 103, cores = 2, memory = 8192, node = "pxmx05", tags = ["observe", "pets", "nextcloud_app"] }
+    nextcloud = { vmid = 103, cores = 2, memory = 8192, node = "pxmx05", tags = ["observe", "pets", "nextcloud_app"], ha = true }
 
     # Git forge — Forgejo (mirrors to Codeberg; backed up via Proxmox VM snapshots)
-    forgejo = { vmid = 106, cores = 4, memory = 8192, disk_size = 50, node = "pxmx04", tags = ["observe", "pets", "forgejo_app"], data_disks = [{ size = 100, datastore = "ceph-hdd-pool" }] }
+    forgejo = { vmid = 106, cores = 4, memory = 8192, disk_size = 50, node = "pxmx04", tags = ["observe", "pets", "forgejo_app"], data_disks = [{ size = 100, datastore = "ceph-hdd-pool" }], ha = true }
   }
+}
+
+resource "proxmox_haresource" "vm" {
+  for_each    = { for k, v in local.vms : k => v if try(v.ha, false) }
+  resource_id = "vm:${each.value.vmid}"
+  state       = "started"
 }
 
 module "vm" {
