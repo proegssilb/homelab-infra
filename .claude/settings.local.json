@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "WebFetch(domain:search.opentofu.org)"
+      "WebFetch(domain:search.opentofu.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.goauthentik.io)",
+      "WebFetch(domain:goauthentik.io)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

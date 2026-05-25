@@ -63,7 +63,6 @@
     mode: "0750"
   loop:
     - postgres
-    - redis
 
 - name: Create authentik sub-directories (authentik-owned)
   ansible.builtin.file:
@@ -73,9 +72,21 @@
     group: "1000"
     mode: "0750"
   loop:
-    - media
-    - templates
+    - data
+    - data/media
+    - custom-templates
     - certs
+
+- name: Check for legacy media directory (pre-2025.12 layout)
+  ansible.builtin.stat:
+    path: "{{ authentik_data_dir }}/media"
+  register: legacy_media
+
+- name: Migrate media to data/media (2025.12 path change)
+  ansible.builtin.command:
+    cmd: mv {{ authentik_data_dir }}/media {{ authentik_data_dir }}/data/media
+  when: legacy_media.stat.exists and legacy_media.stat.isdir
+  changed_when: true
 
 - name: Template docker-compose.yml
   ansible.builtin.template:

@@ -1,5 +1,5 @@
 ---
-authentik_version: "2025.4.1"
+authentik_version: "2026.5.0"
 authentik_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 authentik_data_dir: /opt/authentik
 
