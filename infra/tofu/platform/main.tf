@@ -22,6 +22,9 @@ locals {
 
     # Identity provider — Authentik
     authentik = { vmid = 220, cores = 2, memory = 4096, tags = ["platform", "auth_app", "observe"], node = "pxmx02", data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }], ha = true }
+
+    # Shared PostgreSQL — all pet apps connect here
+    pg01 = { vmid = 221, cores = 4, memory = 8192, tags = ["platform", "postgres_primary", "observe"], node = "pxmx03", data_disks = [{ size = 40, datastore = "ceph-ssd-pool" }], ha = true }
   }
 }
 

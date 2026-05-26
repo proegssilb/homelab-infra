@@ -1,0 +1,13 @@
+---
+mealie_version: "latest"
+mealie_data_disk: /dev/sdb
+mealie_data_dir: /opt/mealie
+mealie_port: 9000
+mealie_db_host: ""
+mealie_db_name: mealie
+mealie_db_user: mealie
+mealie_db_pass: ""
+mealie_oidc_client_id: mealie
+mealie_oidc_client_secret: ""
+mealie_oidc_configuration_url: ""
+mealie_oidc_admin_group: homelab-admins

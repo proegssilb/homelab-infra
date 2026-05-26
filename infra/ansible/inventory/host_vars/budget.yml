@@ -1,0 +1,4 @@
+---
+# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --name actual_budget_oidc_client_secret
+# Must match TF_VAR_oidc_client_secrets["budget"] in .env
+actual_budget_oidc_client_secret: "changeme-use-vault"

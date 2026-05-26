@@ -1,0 +1,16 @@
+---
+immich_version: "release"
+immich_data_disk: /dev/sdb
+immich_data_dir: /opt/immich
+immich_server_port: 2283
+immich_db_host: ""
+immich_db_name: immich
+immich_db_user: immich
+immich_db_pass: ""
+immich_redis_password: ""
+immich_oauth_client_id: immich
+immich_oauth_client_secret: ""
+immich_oauth_issuer_url: ""
+immich_library_nfs_server: ""
+immich_library_nfs_path: ""
+immich_library_nfs_enabled: false

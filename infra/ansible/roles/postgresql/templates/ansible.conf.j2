@@ -1,0 +1,15 @@
+# Managed by Ansible — do not edit manually
+max_connections = {{ postgresql_max_connections }}
+shared_buffers = {{ postgresql_shared_buffers }}
+effective_cache_size = {{ postgresql_effective_cache_size }}
+work_mem = {{ postgresql_work_mem }}
+maintenance_work_mem = {{ postgresql_maintenance_work_mem }}
+wal_buffers = {{ postgresql_wal_buffers }}
+checkpoint_completion_target = {{ postgresql_checkpoint_completion_target }}
+min_wal_size = {{ postgresql_min_wal_size }}
+max_wal_size = {{ postgresql_max_wal_size }}
+random_page_cost = {{ postgresql_random_page_cost }}
+effective_io_concurrency = {{ postgresql_effective_io_concurrency }}
+log_min_duration_statement = {{ postgresql_log_min_duration_statement }}
+listen_addresses = '*'
+port = {{ postgresql_port }}

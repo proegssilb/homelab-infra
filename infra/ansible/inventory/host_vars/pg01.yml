@@ -1,0 +1,4 @@
+---
+# Shared PostgreSQL server — no secrets here.
+# DB passwords live in each app's host_vars and are pulled via hostvars[].
+# NFS backup auth is handled at the network layer (tn01 allows pg01's IP).

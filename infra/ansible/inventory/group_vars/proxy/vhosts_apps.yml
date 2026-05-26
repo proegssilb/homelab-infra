@@ -23,3 +23,35 @@ _nginx_vhosts_apps:
     upstream_protocol: http
     upstream_servers:
       - "nextcloud.{{ homelab_domain }}:80"
+
+  - name: budget
+    server_name: "budget.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "budget.{{ homelab_domain }}:5006"
+
+  - name: mealie
+    server_name: "mealie.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "mealie.{{ homelab_domain }}:9000"
+
+  - name: freshrss
+    server_name: "rss.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "freshrss.{{ homelab_domain }}:8080"
+
+  - name: immich
+    server_name: "photos.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "immich.{{ homelab_domain }}:2283"

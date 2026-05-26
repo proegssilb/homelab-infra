@@ -7,12 +7,26 @@
 #
 #   export AWS_ACCESS_KEY_ID="<garage-key-id>"
 #   export AWS_SECRET_ACCESS_KEY="<garage-secret>"
+#
+# Authentik provider credentials (token created once in Authentik admin UI):
+#
+#   export AUTHENTIK_URL="https://auth.<domain>"
+#   export AUTHENTIK_TOKEN="<api-token>"
+#
+# OIDC client secrets (one per app, must match Ansible host_vars):
+#
+#   export TF_VAR_domain="<base-domain>"
+#   export TF_VAR_oidc_client_secrets='{"mealie":"...","freshrss":"...","immich":"...","budget":"..."}'
 
 terraform {
   required_providers {
     proxmox = {
       source  = "bpg/proxmox"
       version = "~> 0.101.0"
+    }
+    authentik = {
+      source  = "goauthentik/authentik"
+      version = "~> 2024.8"
     }
   }
   required_version = ">= 1.8"

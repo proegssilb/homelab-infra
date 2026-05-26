@@ -1,0 +1,13 @@
+---
+freshrss_version: "latest"
+freshrss_data_disk: /dev/sdb
+freshrss_data_dir: /opt/freshrss
+freshrss_port: 8080
+freshrss_db_host: ""
+freshrss_db_name: freshrss
+freshrss_db_user: freshrss
+freshrss_db_pass: ""
+freshrss_oidc_client_id: freshrss
+freshrss_oidc_client_secret: ""
+freshrss_oidc_issuer_url: ""
+freshrss_base_url: ""

@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: mealie
+  author: homelab
+  description: Mealie recipe manager with PostgreSQL and OIDC via Authentik
+  min_ansible_version: "2.15"
+dependencies: []

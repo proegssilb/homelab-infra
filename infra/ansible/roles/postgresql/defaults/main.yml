@@ -1,0 +1,24 @@
+---
+postgresql_version: "16"
+postgresql_data_disk: /dev/sdb
+postgresql_data_dir: /var/lib/postgresql
+postgresql_port: 5432
+postgresql_max_connections: 200
+postgresql_shared_buffers: "2GB"
+postgresql_effective_cache_size: "6GB"
+postgresql_work_mem: "10MB"
+postgresql_maintenance_work_mem: "512MB"
+postgresql_wal_buffers: "16MB"
+postgresql_checkpoint_completion_target: "0.9"
+postgresql_min_wal_size: "1GB"
+postgresql_max_wal_size: "4GB"
+postgresql_random_page_cost: "1.1"
+postgresql_effective_io_concurrency: 200
+postgresql_log_min_duration_statement: 1000
+postgresql_allowed_subnet: "192.168.0.0/16"
+postgresql_databases: []
+postgresql_users: []
+postgresql_extensions: []
+postgresql_backup_nfs_server: ""
+postgresql_backup_nfs_path: ""
+postgresql_backup_mount: /mnt/pg-backups

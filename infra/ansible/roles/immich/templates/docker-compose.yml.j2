@@ -1,0 +1,53 @@
+---
+# Managed by Ansible — do not edit manually
+# https://immich.app/docs/install/docker-compose
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION}
+    restart: unless-stopped
+    ports:
+      - "{{ immich_server_port }}:2283"
+    volumes:
+      - ${UPLOAD_LOCATION}:/usr/src/app/upload/library
+      - ${THUMBS_LOCATION}:/usr/src/app/upload/thumbs
+      - ${ENCODED_VIDEO_LOCATION}:/usr/src/app/upload/encoded-video
+      - ${PROFILE_LOCATION}:/usr/src/app/upload/profile
+      - ${BACKUP_LOCATION}:/usr/src/app/upload/backups
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    environment:
+      OAUTH_ENABLED: "true"
+      OAUTH_ISSUER_URL: "{{ immich_oauth_issuer_url }}"
+      OAUTH_CLIENT_ID: "{{ immich_oauth_client_id }}"
+      OAUTH_CLIENT_SECRET: "{{ immich_oauth_client_secret }}"
+      OAUTH_SCOPE: "openid email profile"
+      OAUTH_BUTTON_TEXT: "Sign in with Authentik"
+      OAUTH_AUTO_REGISTER: "true"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:2283/api/server/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION}
+    restart: unless-stopped
+    volumes:
+      - {{ immich_data_dir }}/model-cache:/cache
+    env_file:
+      - .env
+
+  redis:
+    image: docker.io/redis:6-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

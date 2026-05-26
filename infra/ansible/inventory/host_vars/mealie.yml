@@ -1,0 +1,7 @@
+---
+# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --name mealie_db_pass
+mealie_db_pass: "changeme-use-vault"
+
+# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --name mealie_oidc_client_secret
+# Must match TF_VAR_oidc_client_secrets["mealie"] in .env
+mealie_oidc_client_secret: "changeme-use-vault"
