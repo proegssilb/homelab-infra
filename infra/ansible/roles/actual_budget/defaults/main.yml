@@ -1,0 +1,10 @@
+---
+actual_budget_version: "latest"
+actual_budget_data_disk: /dev/sdb
+actual_budget_data_dir: /opt/actual_budget
+actual_budget_port: 5006
+actual_budget_oidc_discovery_url: ""
+actual_budget_oidc_client_id: budget
+actual_budget_oidc_client_secret: ""
+actual_budget_server_hostname: ""
+actual_budget_oidc_enforce: "true"

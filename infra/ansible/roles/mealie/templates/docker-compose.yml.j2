@@ -1,0 +1,22 @@
+---
+# Managed by Ansible — do not edit manually
+services:
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:{{ mealie_version }}
+    restart: unless-stopped
+    ports:
+      - "{{ mealie_port }}:9000"
+    volumes:
+      - {{ mealie_data_dir }}/data:/app/data
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: UTC
+      DB_ENGINE: postgres
+      POSTGRES_URL_OVERRIDE: "postgresql://{{ mealie_db_user }}:{{ mealie_db_pass }}@{{ mealie_db_host }}/{{ mealie_db_name }}"
+      OIDC_AUTH_ENABLED: "true"
+      OIDC_CONFIGURATION_URL: "{{ mealie_oidc_configuration_url }}"
+      OIDC_CLIENT_ID: "{{ mealie_oidc_client_id }}"
+      OIDC_CLIENT_SECRET: "{{ mealie_oidc_client_secret }}"
+      OIDC_ADMIN_GROUP: "{{ mealie_oidc_admin_group }}"
+      OIDC_AUTO_REDIRECT: "false"

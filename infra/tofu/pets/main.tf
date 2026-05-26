@@ -21,6 +21,18 @@ locals {
 
     # Git forge — Forgejo (mirrors to Codeberg; backed up via Proxmox VM snapshots)
     forgejo = { vmid = 106, cores = 4, memory = 8192, disk_size = 50, node = "pxmx04", tags = ["observe", "pets", "forgejo_app"], data_disks = [{ size = 100, datastore = "ceph-hdd-pool" }], ha = true }
+
+    # Personal finance tracker — Actual Budget (file-based storage, OIDC via Authentik)
+    budget = { vmid = 107, cores = 1, memory = 1024, node = "pxmx01", tags = ["observe", "pets", "budget_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true }
+
+    # Recipe manager — Mealie (PostgreSQL on pg01, OIDC via Authentik)
+    mealie = { vmid = 108, cores = 2, memory = 2048, node = "pxmx02", tags = ["observe", "pets", "mealie_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true }
+
+    # RSS aggregator — FreshRSS (PostgreSQL on pg01, OIDC via Authentik)
+    freshrss = { vmid = 109, cores = 1, memory = 1024, node = "pxmx04", tags = ["observe", "pets", "freshrss_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true }
+
+    # Photo management — Immich (PostgreSQL + pgvector on pg01, photos on TrueNAS NFS)
+    immich = { vmid = 110, cores = 4, memory = 8192, node = "pxmx05", tags = ["observe", "pets", "immich_app"], data_disks = [{ size = 200, datastore = "ceph-hdd-pool" }], ha = true }
   }
 }
 

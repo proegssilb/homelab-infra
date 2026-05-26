@@ -72,3 +72,38 @@
   gather_facts: true
   roles:
     - forgejo
+
+- name: PostgreSQL — shared database server
+  hosts: postgres_primary
+  become: true
+  gather_facts: true
+  roles:
+    - postgresql
+
+- name: Actual Budget — personal finance
+  hosts: budget_app
+  become: true
+  gather_facts: true
+  roles:
+    - actual_budget
+
+- name: Mealie — recipe manager
+  hosts: mealie_app
+  become: true
+  gather_facts: true
+  roles:
+    - mealie
+
+- name: FreshRSS — RSS aggregator
+  hosts: freshrss_app
+  become: true
+  gather_facts: true
+  roles:
+    - freshrss
+
+- name: Immich — photo management
+  hosts: immich_app
+  become: true
+  gather_facts: true
+  roles:
+    - immich

@@ -1,0 +1,14 @@
+#!/bin/bash
+# Managed by Ansible — do not edit manually
+set -euo pipefail
+
+BACKUP_ROOT="{{ postgresql_backup_mount }}"
+DATE=$(date +%Y-%m-%d)
+KEEP_DAYS=14
+
+{% for db in postgresql_databases %}
+DB="{{ db.name }}"
+mkdir -p "${BACKUP_ROOT}/${DB}"
+pg_dump "${DB}" | gzip > "${BACKUP_ROOT}/${DB}/${DATE}.sql.gz"
+find "${BACKUP_ROOT}/${DB}" -name "*.sql.gz" -mtime +${KEEP_DAYS} -delete
+{% endfor %}

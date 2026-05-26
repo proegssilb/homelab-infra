@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: postgresql
+  author: homelab
+  description: Shared PostgreSQL server with NFS backup to TrueNAS
+  min_ansible_version: "2.15"
+dependencies: []

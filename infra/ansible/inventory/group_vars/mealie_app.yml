@@ -1,0 +1,3 @@
+---
+mealie_db_host: "pg01.{{ homelab_domain }}"
+mealie_oidc_configuration_url: "https://auth.{{ homelab_domain }}/application/o/mealie/.well-known/openid-configuration"

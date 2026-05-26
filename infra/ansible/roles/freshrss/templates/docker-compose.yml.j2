@@ -1,0 +1,29 @@
+---
+# Managed by Ansible — do not edit manually
+services:
+  freshrss:
+    image: freshrss/freshrss:{{ freshrss_version }}
+    restart: unless-stopped
+    ports:
+      - "{{ freshrss_port }}:80"
+    volumes:
+      - {{ freshrss_data_dir }}/data:/var/www/FreshRSS/data
+      - {{ freshrss_data_dir }}/extensions:/var/www/FreshRSS/extensions
+    environment:
+      TZ: UTC
+      CRON_MIN: "*/15"
+      FRESHRSS_INSTALL: |-
+        --api-enabled
+        --base-url {{ freshrss_base_url }}
+        --db-host {{ freshrss_db_host }}
+        --db-name {{ freshrss_db_name }}
+        --db-user {{ freshrss_db_user }}
+        --db-password {{ freshrss_db_pass }}
+        --db-type pgsql
+      FRESHRSS_USER: |-
+        --oidc-enabled 1
+        --oidc-provider-metadata-url {{ freshrss_oidc_issuer_url }}.well-known/openid-configuration
+        --oidc-client-id {{ freshrss_oidc_client_id }}
+        --oidc-client-secret {{ freshrss_oidc_client_secret }}
+        --oidc-scopes "openid email profile"
+        --oidc-user-id-claim preferred_username

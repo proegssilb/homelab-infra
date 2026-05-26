@@ -1,0 +1,10 @@
+---
+# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --name immich_db_pass
+immich_db_pass: "changeme-use-vault"
+
+# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --name immich_oauth_client_secret
+# Must match TF_VAR_oidc_client_secrets["immich"] in .env
+immich_oauth_client_secret: "changeme-use-vault"
+
+# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --name immich_redis_password
+immich_redis_password: "changeme-use-vault"

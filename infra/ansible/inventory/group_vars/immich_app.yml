@@ -1,0 +1,6 @@
+---
+immich_db_host: "pg01.{{ homelab_domain }}"
+immich_oauth_issuer_url: "https://auth.{{ homelab_domain }}/application/o/immich/"
+immich_library_nfs_server: "tn01.{{ homelab_domain }}"
+immich_library_nfs_path: "/mnt/pool/immich-library"
+immich_library_nfs_enabled: false

@@ -1,0 +1,4 @@
+---
+freshrss_db_host: "pg01.{{ homelab_domain }}"
+freshrss_oidc_issuer_url: "https://auth.{{ homelab_domain }}/application/o/freshrss/"
+freshrss_base_url: "https://rss.{{ homelab_domain }}"

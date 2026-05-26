@@ -1,0 +1,16 @@
+---
+# Managed by Ansible — do not edit manually
+services:
+  actual:
+    image: docker.io/actualbudget/actual-server:{{ actual_budget_version }}
+    restart: unless-stopped
+    ports:
+      - "{{ actual_budget_port }}:5006"
+    volumes:
+      - {{ actual_budget_data_dir }}/data:/data
+    environment:
+      ACTUAL_OPENID_DISCOVERY_URL: "{{ actual_budget_oidc_discovery_url }}"
+      ACTUAL_OPENID_CLIENT_ID: "{{ actual_budget_oidc_client_id }}"
+      ACTUAL_OPENID_CLIENT_SECRET: "{{ actual_budget_oidc_client_secret }}"
+      ACTUAL_OPENID_SERVER_HOSTNAME: "{{ actual_budget_server_hostname }}"
+      ACTUAL_OPENID_ENFORCE: "{{ actual_budget_oidc_enforce }}"

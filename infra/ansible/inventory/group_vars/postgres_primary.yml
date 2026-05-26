@@ -1,0 +1,17 @@
+---
+postgresql_allowed_subnet: "192.168.0.0/16"
+postgresql_backup_nfs_server: "tn01.{{ homelab_domain }}"
+postgresql_backup_nfs_path: "/mnt/pool/pg-backups"
+
+postgresql_databases:
+  - { name: mealie,   owner: mealie   }
+  - { name: freshrss, owner: freshrss }
+  - { name: immich,   owner: immich   }
+
+postgresql_users:
+  - { name: mealie,   password: "{{ hostvars['mealie']['mealie_db_pass'] }}",     db: mealie   }
+  - { name: freshrss, password: "{{ hostvars['freshrss']['freshrss_db_pass'] }}", db: freshrss }
+  - { name: immich,   password: "{{ hostvars['immich']['immich_db_pass'] }}",     db: immich   }
+
+postgresql_extensions:
+  - { db: immich, name: vector }
