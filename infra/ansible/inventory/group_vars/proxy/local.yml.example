@@ -2,14 +2,8 @@
 # Copy this file to local.yml and fill in your values.
 # local.yml is gitignored — never commit it.
 
-# Virtual IP for the keepalived VRRP instance (CIDR, e.g. 192.168.1.10/24).
-# Must match PROXMOX_KEEPALIVED_VIP in .env.
-keepalived_vip: "192.168.1.10/24"
-
-# Base domain for all homelab services (e.g. home.example.com).
-homelab_domain: i.example.com
-
 # Short hostnames of the Proxmox cluster nodes (no domain suffix).
+# (homelab_domain is site-wide — set it in group_vars/all/local.yml instead.)
 homelab_proxmox_nodes:
   - pxmx01
   - pxmx02

@@ -1,0 +1,13 @@
+---
+postgresql_databases:
+  - { name: mealie,   owner: mealie   }
+  - { name: freshrss, owner: freshrss }
+  - { name: immich,   owner: immich   }
+
+postgresql_users:
+  - { name: mealie,   password: "{{ mealie_db_pass | trim }}",   db: mealie   }
+  - { name: freshrss, password: "{{ freshrss_db_pass | trim }}", db: freshrss }
+  - { name: immich,   password: "{{ immich_db_pass | trim }}",   db: immich   }
+
+postgresql_extensions:
+  - { db: immich, name: vector }

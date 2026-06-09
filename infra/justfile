@@ -68,6 +68,14 @@ plan state:
 destroy state:
     cd tofu/{{state}} && tofu destroy -parallelism=2
 
+# ── Database ───────────────────────────────────────────────────────────────────
+
+# Force-reset all app DB user passwords to current vault values.
+# Use when 'just tune pg01' doesn't fix a credential mismatch.
+# Prereq: roles must already exist — run 'just tune pg01' first if they don't.
+fix-db-passwords:
+    cd ansible && ansible-playbook fix-db-passwords.yml
+
 # ── Inventory ──────────────────────────────────────────────────────────────────
 
 # List hosts visible via the dynamic inventory.

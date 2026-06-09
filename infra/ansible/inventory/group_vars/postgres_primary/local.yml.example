@@ -1,0 +1,10 @@
+---
+# Copy this file to local.yml and fill in your values.
+# local.yml is gitignored — never commit it.
+
+# Subnet allowed to connect to PostgreSQL.
+postgresql_allowed_subnet: "192.168.0.0/16"
+
+# NFS server and path for PostgreSQL backups.
+postgresql_backup_nfs_server: "nfs.i.example.com"
+postgresql_backup_nfs_path: "/mnt/pool/pg-backups"
