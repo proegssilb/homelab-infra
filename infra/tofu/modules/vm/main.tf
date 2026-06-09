@@ -44,7 +44,7 @@ resource "proxmox_virtual_environment_vm" "vm" {
     discard      = "on"
   }
 
-  # The Proxmox template's OS disk is scsi1.
+  # Data disks start at scsi2, which the kernel enumerates as it will.
   dynamic "disk" {
     for_each = { for i, d in var.data_disks : i => d }
     content {

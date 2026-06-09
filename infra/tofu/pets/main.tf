@@ -26,7 +26,7 @@ locals {
     budget = { vmid = 107, cores = 1, memory = 1024, node = "pxmx01", tags = ["observe", "pets", "budget_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true }
 
     # Recipe manager — Mealie (PostgreSQL on pg01, OIDC via Authentik)
-    mealie = { vmid = 108, cores = 2, memory = 2048, node = "pxmx02", tags = ["observe", "pets", "mealie_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true }
+    mealie = { vmid = 108, cores = 2, memory = 2048, disk_size = 40, node = "pxmx02", tags = ["observe", "pets", "mealie_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true }
 
     # RSS aggregator — FreshRSS (PostgreSQL on pg01, OIDC via Authentik)
     freshrss = { vmid = 109, cores = 1, memory = 1024, node = "pxmx04", tags = ["observe", "pets", "freshrss_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true }
@@ -38,8 +38,10 @@ locals {
 
 resource "proxmox_haresource" "vm" {
   for_each    = { for k, v in local.vms : k => v if try(v.ha, false) }
-  resource_id = "vm:${each.value.vmid}"
+  resource_id = "vm:${module.vm[each.key].vmid}"
   state       = "started"
+
+  depends_on = [module.vm]
 }
 
 module "vm" {
