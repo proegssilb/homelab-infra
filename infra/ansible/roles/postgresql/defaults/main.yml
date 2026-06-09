@@ -1,6 +1,6 @@
 ---
-postgresql_version: "16"
-postgresql_data_disk: /dev/sdb
+postgresql_version: "17"
+postgresql_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 postgresql_data_dir: /var/lib/postgresql
 postgresql_port: 5432
 postgresql_max_connections: 200
@@ -22,3 +22,4 @@ postgresql_extensions: []
 postgresql_backup_nfs_server: ""
 postgresql_backup_nfs_path: ""
 postgresql_backup_mount: /mnt/pg-backups
+postgresql_backup_nfs_opts: "nofail,noatime"

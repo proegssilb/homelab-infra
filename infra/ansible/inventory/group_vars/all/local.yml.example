@@ -1,0 +1,7 @@
+---
+# Copy this file to local.yml and fill in your values.
+# local.yml is gitignored — never commit it.
+
+# Base domain for all homelab services (e.g. home.example.com).
+# Referenced by proxy vhosts, app configs, pg01 NFS backup target, and more.
+homelab_domain: home.example.com
