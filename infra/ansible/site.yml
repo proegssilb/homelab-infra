@@ -107,3 +107,11 @@
   gather_facts: true
   roles:
     - immich
+
+- name: Tailscale subnet routers
+  hosts: tailscale_router
+  become: true
+  gather_facts: true
+  roles:
+    - tailscale_router   # writes /etc/default/tailscaled before the service is installed
+    - artis3n.tailscale.machine  # installs package and starts daemon (reads FLAGS from defaults file)

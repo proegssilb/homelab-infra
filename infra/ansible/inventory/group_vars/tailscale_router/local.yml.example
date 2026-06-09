@@ -1,0 +1,13 @@
+---
+# Copy to local.yml and fill in your values. local.yml is gitignored — never commit it.
+
+# All subnets to advertise into the Tailscale network.
+tailscale_subnets:
+  - "192.168.XX.0/24"   # LAN
+  # - "10.XX.XX.0/24"   # additional subnets as needed
+
+# OAuth client secret from the Tailscale admin console (tskey-client-...).
+# No client ID needed — artis3n.tailscale passes this directly to tailscale up --authkey
+# and the Tailscale CLI handles the token exchange internally.
+# Encrypt with: ansible-vault encrypt_string 'tskey-client-...' --name tailscale_authkey
+tailscale_authkey: ""

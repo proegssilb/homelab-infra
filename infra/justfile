@@ -21,9 +21,14 @@ _tofu-init state:
 # Bring up everything from nothing, in dependency order. Also idempotent —
 # safe to rerun against a partially-up lab.
 bootstrap:
+    just galaxy-install
     just garage
     just cluster-up platform
     just cluster-up pets
+
+# Install Ansible Galaxy collections declared in requirements.yml into galaxy/ (vendored).
+galaxy-install:
+    cd ansible && ansible-galaxy collection install -r requirements.yml -p galaxy/
 
 # Bring up all VMs in a named cluster/group.
 cluster-up cluster:

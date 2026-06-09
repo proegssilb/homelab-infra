@@ -34,5 +34,21 @@ filters:
 # Ansible connects by hostname. Cloud-init sets the hostname from the VM
 # name in Proxmox, which OpenTofu sets deterministically — so the hostname
 # Ansible resolves is always the VM name in Proxmox.
+#
+# For LXC containers (and VMs without guest agent), the hostname can resolve
+# via Tailscale MagicDNS to an old dead Tailscale IP if the node was recently
+# rebuilt. Use the actual LAN IP from the Proxmox interfaces API instead when
+# available; fall back to the hostname for VMs where that data isn't exposed.
 compose:
-  ansible_host: proxmox_name
+  ansible_host: >-
+    ((proxmox_interfaces | default([]))
+     | selectattr('name', 'equalto', 'eth0')
+     | map(attribute='inet', default='')
+     | select
+     | map('regex_replace', '/.*', '')
+     | list | first) if
+    ((proxmox_interfaces | default([]))
+     | selectattr('name', 'equalto', 'eth0')
+     | map(attribute='inet', default='')
+     | select | list | length > 0)
+    else proxmox_name

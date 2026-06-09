@@ -1,0 +1,38 @@
+---
+# Pre-configure tailscaled to use userspace networking before artis3n.tailscale
+# installs the package and starts the service. The LXC containers do not have
+# /dev/net/tun — userspace-networking avoids the kernel TUN module entirely.
+#
+# The tailscale Debian package ships /etc/default/tailscaled as a conffile.
+# Creating it here before package install causes dpkg to keep our version
+# (non-interactive mode preserves an existing conffile that differs from the
+# package default).
+
+# The official Tailscale install.sh writes a deb822 .sources file with the
+# keyring at /etc/apt/keyrings/tailscale.gpg. artis3n.tailscale writes a
+# separate .list file with the keyring at
+# /usr/share/keyrings/tailscale-archive-keyring.gpg. APT treats both as the
+# same repo URL with conflicting Signed-By values and refuses to run. Remove
+# the install.sh artifacts so artis3n owns the only source entry.
+- name: Remove official-installer Tailscale apt sources file
+  become: true
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/tailscale.sources
+    state: absent
+
+- name: Remove official-installer Tailscale keyring
+  become: true
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/tailscale.gpg
+    state: absent
+
+- name: Configure tailscaled for userspace networking
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/default/tailscaled
+    content: |
+      PORT="41641"
+      FLAGS="--tun=userspace-networking"
+    owner: root
+    group: root
+    mode: "0644"

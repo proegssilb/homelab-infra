@@ -11,7 +11,10 @@
 locals {
   lxcs = {
     # Reverse proxy — single nginx LXC, Proxmox HA for auto-restart
-    proxy01 = { vmid = 200, cores = 1, memory = 512, tags = ["platform", "proxy", "observe"], node = "pxmx01", privileged = false, ha = true }
+    proxy01    = { vmid = 200, cores = 1, memory = 512, tags = ["platform", "proxy", "observe"],        node = "pxmx01", privileged = false, ha = true }
+    # Tailscale subnet routers — HA pair on separate nodes, anti-affinity enforced by proxmox_harule below
+    tsrouter01 = { vmid = 201, cores = 1, memory = 512, tags = ["platform", "tailscale_router"], node = "pxmx01", privileged = false, ha = true }
+    tsrouter02 = { vmid = 202, cores = 1, memory = 512, tags = ["platform", "tailscale_router"], node = "pxmx02", privileged = false, ha = true }
   }
 
   vms = {
@@ -66,6 +69,17 @@ resource "proxmox_haresource" "vm" {
   resource_id = "vm:${module.vm[each.key].vmid}"
   state       = "started"
   depends_on  = [module.vm]
+}
+
+resource "proxmox_harule" "tsrouter_anti_affinity" {
+  rule      = "tsrouter-separate"
+  type      = "resource-affinity"
+  affinity  = "negative"
+  resources = toset([
+    "ct:${module.lxc["tsrouter01"].vmid}",
+    "ct:${module.lxc["tsrouter02"].vmid}",
+  ])
+  depends_on = [proxmox_haresource.lxc]
 }
 
 module "vm" {
