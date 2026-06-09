@@ -1,42 +1,7 @@
 ---
-- name: Install Docker prerequisites
-  ansible.builtin.apt:
-    name:
-      - ca-certificates
-      - curl
-    state: present
-    update_cache: true
-
-- name: Add Docker GPG key
-  ansible.builtin.get_url:
-    url: https://download.docker.com/linux/debian/gpg
-    dest: /etc/apt/keyrings/docker.asc
-    mode: "0644"
-
-- name: Add Docker apt repository
-  ansible.builtin.apt_repository:
-    repo: >-
-      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
-      https://download.docker.com/linux/debian
-      {{ ansible_distribution_release }} stable
-    filename: docker
-    state: present
-
-- name: Install Docker Engine and Compose plugin
-  ansible.builtin.apt:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-compose-plugin
-    state: present
-    update_cache: true
-
-- name: Enable and start Docker
-  ansible.builtin.systemd:
-    name: docker
-    enabled: true
-    state: started
+- name: Install Docker
+  ansible.builtin.import_role:
+    name: docker_install
 
 - name: Create nextcloud directories
   ansible.builtin.file:
