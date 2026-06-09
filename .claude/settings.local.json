@@ -6,7 +6,15 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.goauthentik.io)",
       "WebFetch(domain:goauthentik.io)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:registry.terraform.io)",
+      "mcp__terraform__get_latest_provider_version",
+      "mcp__terraform__get_provider_capabilities",
+      "mcp__terraform__search_providers",
+      "mcp__terraform__get_provider_details",
+      "WebFetch(domain:codeberg.org)",
+      "WebFetch(domain:forgejo.org)",
+      "WebFetch(domain:docs.immich.app)"
     ]
   }
 }
