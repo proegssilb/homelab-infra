@@ -1,42 +1,7 @@
 ---
-- name: Install Docker prerequisites
-  ansible.builtin.apt:
-    name:
-      - ca-certificates
-      - curl
-    state: present
-    update_cache: true
-
-- name: Add Docker GPG key
-  ansible.builtin.get_url:
-    url: https://download.docker.com/linux/debian/gpg
-    dest: /etc/apt/keyrings/docker.asc
-    mode: "0644"
-
-- name: Add Docker apt repository
-  ansible.builtin.apt_repository:
-    repo: >-
-      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
-      https://download.docker.com/linux/debian
-      {{ ansible_distribution_release }} stable
-    filename: docker
-    state: present
-
-- name: Install Docker Engine and Compose plugin
-  ansible.builtin.apt:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-compose-plugin
-    state: present
-    update_cache: true
-
-- name: Enable and start Docker
-  ansible.builtin.systemd:
-    name: docker
-    enabled: true
-    state: started
+- name: Install Docker
+  ansible.builtin.import_role:
+    name: docker_install
 
 - name: Settle udev events before touching data disk
   ansible.builtin.command:
@@ -89,3 +54,71 @@
   community.docker.docker_compose_v2:
     project_src: "{{ forgejo_data_dir }}"
     state: present
+
+- name: Wait for Forgejo to be ready
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - --user
+      - "1000"
+      - forgejo-forgejo-1
+      - forgejo
+      - admin
+      - auth
+      - list
+  register: forgejo_auth_list
+  changed_when: false
+  retries: 10
+  delay: 5
+  until: forgejo_auth_list.rc == 0
+
+- name: Add Authentik OAuth2 source to Forgejo
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - --user
+      - "1000"
+      - forgejo-forgejo-1
+      - forgejo
+      - admin
+      - auth
+      - add-oauth
+      - --name
+      - Authentik
+      - --provider
+      - openidConnect
+      - --key
+      - "{{ forgejo_oidc_client_id }}"
+      - --secret
+      - "{{ forgejo_oidc_client_secret | trim }}"
+      - --auto-discover-url
+      - "{{ forgejo_oidc_discovery_url }}"
+      - --scopes
+      - "profile email"
+  when: "'Authentik' not in forgejo_auth_list.stdout"
+
+- name: Get Authentik auth source ID
+  ansible.builtin.set_fact:
+    forgejo_authentik_auth_id: "{{ forgejo_auth_list.stdout | regex_search('(\\d+)\\s+Authentik', '\\1') | first }}"
+  when: "'Authentik' in forgejo_auth_list.stdout"
+
+- name: Update Authentik OAuth2 source scopes
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - --user
+      - "1000"
+      - forgejo-forgejo-1
+      - forgejo
+      - admin
+      - auth
+      - update-oauth
+      - --id
+      - "{{ forgejo_authentik_auth_id }}"
+      - --scopes
+      - "profile email"
+  when: "'Authentik' in forgejo_auth_list.stdout"
+  changed_when: false

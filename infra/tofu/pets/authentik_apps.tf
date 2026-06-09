@@ -8,20 +8,26 @@ data "authentik_flow" "default_authorization" {
   slug = "default-provider-authorization-implicit-consent"
 }
 
-data "authentik_scope_mapping" "openid" {
+data "authentik_flow" "default_invalidation" {
+  slug = "default-provider-invalidation-flow"
+}
+
+data "authentik_property_mapping_provider_scope" "openid" {
   scope_name = "openid"
 }
 
-data "authentik_scope_mapping" "email" {
+data "authentik_property_mapping_provider_scope" "email" {
   scope_name = "email"
 }
 
-data "authentik_scope_mapping" "profile" {
+data "authentik_property_mapping_provider_scope" "profile" {
   scope_name = "profile"
 }
 
-data "authentik_scope_mapping" "groups" {
-  scope_name = "goauthentik.io/providers/oauth2/scope-groups"
+resource "authentik_property_mapping_provider_scope" "groups" {
+  name       = "authentik default OAuth Mapping: OpenID 'groups'"
+  scope_name = "groups"
+  expression = "return list(request.user.ak_groups.values_list(\"name\", flat=True))"
 }
 
 # ── Actual Budget ──────────────────────────────────────────────────────────────
@@ -31,11 +37,14 @@ resource "authentik_provider_oauth2" "budget" {
   client_id          = "budget"
   client_secret      = var.oidc_client_secrets["budget"]
   authorization_flow = data.authentik_flow.default_authorization.id
-  redirect_uris      = ["https://budget.${var.domain}/openid/callback"]
+  invalidation_flow  = data.authentik_flow.default_invalidation.id
+  allowed_redirect_uris = [
+    { matching_mode = "strict", url = "https://budget.${var.domain}/openid/callback" },
+  ]
   property_mappings = [
-    data.authentik_scope_mapping.openid.id,
-    data.authentik_scope_mapping.email.id,
-    data.authentik_scope_mapping.profile.id,
+    data.authentik_property_mapping_provider_scope.openid.id,
+    data.authentik_property_mapping_provider_scope.email.id,
+    data.authentik_property_mapping_provider_scope.profile.id,
   ]
 }
 
@@ -53,12 +62,15 @@ resource "authentik_provider_oauth2" "mealie" {
   client_id          = "mealie"
   client_secret      = var.oidc_client_secrets["mealie"]
   authorization_flow = data.authentik_flow.default_authorization.id
-  redirect_uris      = ["https://mealie.${var.domain}/login"]
+  invalidation_flow  = data.authentik_flow.default_invalidation.id
+  allowed_redirect_uris = [
+    { matching_mode = "strict", url = "https://mealie.${var.domain}/login" },
+  ]
   property_mappings = [
-    data.authentik_scope_mapping.openid.id,
-    data.authentik_scope_mapping.email.id,
-    data.authentik_scope_mapping.profile.id,
-    data.authentik_scope_mapping.groups.id,
+    data.authentik_property_mapping_provider_scope.openid.id,
+    data.authentik_property_mapping_provider_scope.email.id,
+    data.authentik_property_mapping_provider_scope.profile.id,
+    authentik_property_mapping_provider_scope.groups.id,
   ]
 }
 
@@ -76,11 +88,14 @@ resource "authentik_provider_oauth2" "freshrss" {
   client_id          = "freshrss"
   client_secret      = var.oidc_client_secrets["freshrss"]
   authorization_flow = data.authentik_flow.default_authorization.id
-  redirect_uris      = ["https://rss.${var.domain}/i/"]
+  invalidation_flow  = data.authentik_flow.default_invalidation.id
+  allowed_redirect_uris = [
+    { matching_mode = "strict", url = "https://rss.${var.domain}/i/" },
+  ]
   property_mappings = [
-    data.authentik_scope_mapping.openid.id,
-    data.authentik_scope_mapping.email.id,
-    data.authentik_scope_mapping.profile.id,
+    data.authentik_property_mapping_provider_scope.openid.id,
+    data.authentik_property_mapping_provider_scope.email.id,
+    data.authentik_property_mapping_provider_scope.profile.id,
   ]
 }
 
@@ -91,6 +106,31 @@ resource "authentik_application" "freshrss" {
   meta_launch_url   = "https://rss.${var.domain}"
 }
 
+# ── Forgejo ────────────────────────────────────────────────────────────────────
+
+resource "authentik_provider_oauth2" "forgejo" {
+  name               = "Forgejo"
+  client_id          = "forgejo"
+  client_secret      = var.oidc_client_secrets["forgejo"]
+  authorization_flow = data.authentik_flow.default_authorization.id
+  invalidation_flow  = data.authentik_flow.default_invalidation.id
+  allowed_redirect_uris = [
+    { matching_mode = "strict", url = "https://code.${var.domain}/user/oauth2/Authentik/callback" },
+  ]
+  property_mappings = [
+    data.authentik_property_mapping_provider_scope.openid.id,
+    data.authentik_property_mapping_provider_scope.email.id,
+    data.authentik_property_mapping_provider_scope.profile.id,
+  ]
+}
+
+resource "authentik_application" "forgejo" {
+  name              = "Forgejo"
+  slug              = "forgejo"
+  protocol_provider = authentik_provider_oauth2.forgejo.id
+  meta_launch_url   = "https://code.${var.domain}/user/oauth2/Authentik"
+}
+
 # ── Immich ─────────────────────────────────────────────────────────────────────
 
 resource "authentik_provider_oauth2" "immich" {
@@ -98,15 +138,16 @@ resource "authentik_provider_oauth2" "immich" {
   client_id          = "immich"
   client_secret      = var.oidc_client_secrets["immich"]
   authorization_flow = data.authentik_flow.default_authorization.id
-  redirect_uris = [
-    "https://photos.${var.domain}/auth/login",
-    "app.immich:/",
+  invalidation_flow  = data.authentik_flow.default_invalidation.id
+  allowed_redirect_uris = [
+    { matching_mode = "strict", url = "https://photos.${var.domain}/auth/login" },
+    { matching_mode = "strict", url = "app.immich:/" },
   ]
   property_mappings = [
-    data.authentik_scope_mapping.openid.id,
-    data.authentik_scope_mapping.email.id,
-    data.authentik_scope_mapping.profile.id,
-    data.authentik_scope_mapping.groups.id,
+    data.authentik_property_mapping_provider_scope.openid.id,
+    data.authentik_property_mapping_provider_scope.email.id,
+    data.authentik_property_mapping_provider_scope.profile.id,
+    authentik_property_mapping_provider_scope.groups.id,
   ]
 }
 
