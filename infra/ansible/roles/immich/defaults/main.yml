@@ -1,13 +1,12 @@
 ---
 immich_version: "release"
-immich_data_disk: /dev/sdb
+immich_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 immich_data_dir: /opt/immich
 immich_server_port: 2283
 immich_db_host: ""
 immich_db_name: immich
 immich_db_user: immich
 immich_db_pass: ""
-immich_redis_password: ""
 immich_oauth_client_id: immich
 immich_oauth_client_secret: ""
 immich_oauth_issuer_url: ""

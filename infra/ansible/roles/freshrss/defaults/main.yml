@@ -1,6 +1,6 @@
 ---
 freshrss_version: "latest"
-freshrss_data_disk: /dev/sdb
+freshrss_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 freshrss_data_dir: /opt/freshrss
 freshrss_port: 8080
 freshrss_db_host: ""
@@ -11,3 +11,5 @@ freshrss_oidc_client_id: freshrss
 freshrss_oidc_client_secret: ""
 freshrss_oidc_issuer_url: ""
 freshrss_base_url: ""
+# Must match the user's preferred_username claim from Authentik so OIDC login maps correctly.
+freshrss_admin_user: "admin"

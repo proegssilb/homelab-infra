@@ -1,6 +1,6 @@
 ---
 mealie_version: "latest"
-mealie_data_disk: /dev/sdb
+mealie_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 mealie_data_dir: /opt/mealie
 mealie_port: 9000
 mealie_db_host: ""
