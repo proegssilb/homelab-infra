@@ -4,6 +4,13 @@
     name: nginx
     state: present
 
+- name: Install nginx stream module
+  ansible.builtin.package:
+    name: libnginx-mod-stream
+    state: present
+  when: nginx_stream_proxies | length > 0
+  notify: Restart nginx
+
 - name: Template nginx.conf
   ansible.builtin.template:
     src: nginx.conf.j2

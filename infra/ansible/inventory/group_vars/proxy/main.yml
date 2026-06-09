@@ -1,8 +1,9 @@
 ---
 # Vars shared by all hosts in the 'proxy' group.
 #
-# Site-specific values (homelab_domain, homelab_proxmox_nodes, certbot_email)
-# live in local.yml alongside this file — see local.yml.example.
+# Site-specific values (homelab_proxmox_nodes, certbot_email) live in local.yml
+# alongside this file — see local.yml.example.
+# homelab_domain lives in group_vars/all/local.yml (needed by non-proxy groups too).
 
 # LXC containers SSH as root (no cloud-init user; key goes into root's authorized_keys).
 ansible_user: root
@@ -15,6 +16,11 @@ ansible_user: root
 nginx_resolver: "192.168.20.1"
 
 nginx_vhosts: "{{ _nginx_vhosts_platform + _nginx_vhosts_apps + _nginx_vhosts_observability }}"
+
+nginx_stream_proxies:
+  - name: forgejo_ssh
+    listen_port: 2222
+    upstream: "forgejo.{{ homelab_domain }}:2222"
 
 # ── certbot ───────────────────────────────────────────────────────────────────
 

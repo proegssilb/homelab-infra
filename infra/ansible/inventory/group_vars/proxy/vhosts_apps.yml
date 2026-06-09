@@ -55,3 +55,4 @@ _nginx_vhosts_apps:
     upstream_protocol: http
     upstream_servers:
       - "immich.{{ homelab_domain }}:2283"
+    extra_proxy_params: "client_max_body_size 10g;"
