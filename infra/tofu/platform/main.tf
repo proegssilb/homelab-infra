@@ -56,14 +56,16 @@ moved {
 
 resource "proxmox_haresource" "lxc" {
   for_each    = { for k, v in local.lxcs : k => v if try(v.ha, false) }
-  resource_id = "ct:${each.value.vmid}"
+  resource_id = "ct:${module.lxc[each.key].vmid}"
   state       = "started"
+  depends_on  = [module.lxc]
 }
 
 resource "proxmox_haresource" "vm" {
   for_each    = { for k, v in local.vms : k => v if try(v.ha, false) }
-  resource_id = "vm:${each.value.vmid}"
+  resource_id = "vm:${module.vm[each.key].vmid}"
   state       = "started"
+  depends_on  = [module.vm]
 }
 
 module "vm" {
