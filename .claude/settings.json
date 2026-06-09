@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(jq -r '.tool_input.file_path // empty'); [ -z \"$file\" ] && exit 0; if git check-ignore -q -- \"$file\" 2>/dev/null; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked: %s is gitignored and may contain plaintext secrets. Edit it outside Claude Code.\"}}\n' \"$file\"; fi",
+            "statusMessage": "Checking file is not gitignored..."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -102,7 +102,7 @@ Roles apply to groups, not individual hosts. Key assignments:
 ### Platform topology
 
 ```
-LAN Clients → keepalived VIP (proxy01/proxy02 HA pair)
+LAN Clients → keepalived VIP (proxy01 HA LXC)
                └─ nginx → Proxmox nodes / internal services
 blade02     → Garage S3 (stores all Tofu remote state) — NOT automated, manual pet
 ```
@@ -117,6 +117,30 @@ Raspberry Pi nodes: blade01-blade04. Each is a Raspberry Pi 4 with a consumer-gr
 2. Run `just plan <state>` then `just cluster-up <state>` to provision.
 3. Ansible picks it up automatically via dynamic inventory on next run — no inventory file edits needed, as long as tags match existing groups.
 4. If a new role is needed, add it to `site.yml` and create the role under `ansible/roles/`.
+
+### proxmox_haresource dependency trap
+
+`proxmox_haresource` references a VM by its integer ID (`"vm:107"`). When that value comes from a local constant rather than a resource attribute, Tofu sees **no implicit dependency** on the VM actually existing and will create the HA resource in parallel — which fails or races.
+
+**Always** wire the resource ID through the module output and add an explicit `depends_on`:
+
+```hcl
+resource "proxmox_haresource" "vm" {
+  for_each    = { for k, v in local.vms : k => v if try(v.ha, false) }
+  resource_id = "vm:${module.vm[each.key].vmid}"   # not each.value.vmid
+  state       = "started"
+
+  depends_on = [module.vm]
+}
+```
+
+This pattern has burned the codebase twice. Do not revert to `each.value.vmid`.
+
+### Disk device references
+
+Always use `/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsiN` instead of `/dev/sdX` when referencing disks in Ansible roles or scripts. The `sdX` name depends on PCI probe order at boot and is not stable — this project has directly observed the same `scsi2` data disk mapping to `sda` on some VMs and `sdb` on others depending on which PCI SCSI controller the kernel enumerated first.
+
+In the VM module, the OS disk is `scsi1` and data disks start at `scsi2`, so the first (and usually only) data disk is always `/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2`.
 
 ### Secrets
 
