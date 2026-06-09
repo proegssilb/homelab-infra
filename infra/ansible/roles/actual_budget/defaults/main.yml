@@ -1,6 +1,6 @@
 ---
 actual_budget_version: "latest"
-actual_budget_data_disk: /dev/sdb
+actual_budget_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 actual_budget_data_dir: /opt/actual_budget
 actual_budget_port: 5006
 actual_budget_oidc_discovery_url: ""

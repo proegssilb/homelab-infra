@@ -4,7 +4,7 @@ grafana_dashboards_dir: /var/lib/grafana/dashboards
 grafana_admin_user: admin
 # Override in group_vars/obs_grafana.yml using ansible-vault
 grafana_admin_password: "admin"
-grafana_data_disk: /dev/sdb
+grafana_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 grafana_domain: "obs03"
 grafana_plugins:
   - grafana-piechart-panel

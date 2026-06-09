@@ -5,4 +5,4 @@ prometheus_install_dir: /usr/local/bin
 prometheus_config_dir: /etc/prometheus
 prometheus_data_dir: /var/lib/prometheus
 prometheus_retention: "30d"
-prometheus_data_disk: /dev/sdb
+prometheus_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2

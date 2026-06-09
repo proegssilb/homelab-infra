@@ -2,4 +2,4 @@
 loki_config_dir: /etc/loki
 loki_data_dir: /var/lib/loki
 loki_retention: "720h"
-loki_data_disk: /dev/sdb
+loki_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
