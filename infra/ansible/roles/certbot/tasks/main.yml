@@ -22,29 +22,19 @@
     group: root
     mode: "0600"
 
-# certbot names the live directory after the first domain, stripping any wildcard prefix.
-# e.g. "*.internal.example.com" → /etc/letsencrypt/live/internal.example.com/
-- name: Set cert live directory fact
-  ansible.builtin.set_fact:
-    _certbot_live_dir: "/etc/letsencrypt/live/{{ certbot_domains[0] | regex_replace('^\\*\\.', '') }}"
-
-- name: Create cert live directory
-  ansible.builtin.file:
-    path: "{{ _certbot_live_dir }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Generate bootstrap self-signed cert (replaced by certbot on first timer run)
+- name: Issue or renew certificate (no-op when cert has >30 days remaining)
   ansible.builtin.command:
     cmd: >
-      openssl req -x509 -newkey rsa:2048 -nodes
-      -keyout {{ _certbot_live_dir }}/privkey.pem
-      -out {{ _certbot_live_dir }}/fullchain.pem
-      -days 1
-      -subj "/CN=placeholder"
-    creates: "{{ _certbot_live_dir }}/fullchain.pem"
+      certbot certonly
+      --non-interactive
+      --agree-tos
+      --email {{ certbot_email }}
+      --dns-cloudflare
+      --dns-cloudflare-credentials {{ certbot_cloudflare_credentials_path }}
+      --cert-name {{ certbot_domains[0] | regex_replace('^\*\.', '') }}
+      --keep-until-expiring
+      {% for domain in certbot_domains %}-d {{ domain }} {% endfor %}
+  changed_when: false
 
 - name: Template certbot systemd service
   ansible.builtin.template:
