@@ -45,3 +45,21 @@ http {
   # Include per-vhost config files.
   include /etc/nginx/conf.d/*.conf;
 }
+{% if nginx_stream_proxies %}
+
+stream {
+  resolver {{ nginx_resolver }} valid=30s ipv6=off;
+
+{% for proxy in nginx_stream_proxies %}
+  upstream {{ proxy.name }}_stream {
+    server {{ proxy.upstream }};
+  }
+
+  server {
+    listen {{ proxy.listen_port }};
+    proxy_pass {{ proxy.name }}_stream;
+  }
+
+{% endfor %}
+}
+{% endif %}
