@@ -1,42 +1,7 @@
 ---
-- name: Install Docker prerequisites
-  ansible.builtin.apt:
-    name:
-      - ca-certificates
-      - curl
-    state: present
-    update_cache: true
-
-- name: Add Docker GPG key
-  ansible.builtin.get_url:
-    url: https://download.docker.com/linux/debian/gpg
-    dest: /etc/apt/keyrings/docker.asc
-    mode: "0644"
-
-- name: Add Docker apt repository
-  ansible.builtin.apt_repository:
-    repo: >-
-      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
-      https://download.docker.com/linux/debian
-      {{ ansible_distribution_release }} stable
-    filename: docker
-    state: present
-
-- name: Install Docker Engine and Compose plugin
-  ansible.builtin.apt:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-compose-plugin
-    state: present
-    update_cache: true
-
-- name: Enable and start Docker
-  ansible.builtin.systemd:
-    name: docker
-    enabled: true
-    state: started
+- name: Install Docker
+  ansible.builtin.import_role:
+    name: docker_install
 
 - name: Settle udev events before touching data disk
   ansible.builtin.command:
@@ -103,3 +68,39 @@
   community.docker.docker_compose_v2:
     project_src: "{{ authentik_data_dir }}"
     state: present
+
+- name: Wait for Authentik server to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:9000/-/health/ready/"
+    status_code: [200, 204]
+  register: _authentik_health
+  until: _authentik_health.status in [200, 204]
+  retries: 30
+  delay: 10
+
+- name: Assert AUTHENTIK_TOKEN is set
+  ansible.builtin.assert:
+    that: lookup('env', 'AUTHENTIK_TOKEN') | length > 0
+    fail_msg: "AUTHENTIK_TOKEN is not set — source .env before running Ansible."
+
+- name: Ensure bootstrap API token exists in Authentik
+  ansible.builtin.shell:
+    cmd: |
+      docker compose exec -T -e AUTHENTIK_TOKEN server ak shell -c "
+      from authentik.core.models import Token, TokenIntents, User
+      import os
+      u = User.objects.get(username='akadmin')
+      Token.objects.get_or_create(
+          identifier='tofu-bootstrap',
+          defaults={
+              'user': u,
+              'intent': TokenIntents.INTENT_API,
+              'expiring': False,
+              'key': os.environ['AUTHENTIK_TOKEN'],
+          }
+      )
+      "
+    chdir: "{{ authentik_data_dir }}"
+  environment:
+    AUTHENTIK_TOKEN: "{{ lookup('env', 'AUTHENTIK_TOKEN') }}"
+  changed_when: false

@@ -37,7 +37,12 @@ services:
       FORGEJO__server__SSH_DOMAIN: {{ forgejo_domain }}
       FORGEJO__server__SSH_PORT: "{{ forgejo_ssh_port }}"
       FORGEJO__server__SSH_LISTEN_PORT: "22"
-      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__service__DISABLE_REGISTRATION: "false"
+      FORGEJO__service__ALLOW_ONLY_EXTERNAL_REGISTRATION: "true"
+      FORGEJO__service__SHOW_REGISTRATION_BUTTON: "false"
+      FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION: "true"
+      FORGEJO__oauth2_client__ACCOUNT_LINKING: "auto"
+      FORGEJO__oauth2_client__OPENID_CONNECT_SCOPES: "profile email"
     volumes:
       - {{ forgejo_data_dir }}/data:/data
     ports:

@@ -33,7 +33,7 @@ variable "ansible_ssh_key" {
 }
 
 variable "domain" {
-  description = "Base domain for OIDC redirect URIs and application launch URLs (e.g. i.xenrelay.com)."
+  description = "Base domain for OIDC redirect URIs and application launch URLs (e.g. i.example.com)."
   type        = string
 }
 
