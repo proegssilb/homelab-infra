@@ -1,0 +1,8 @@
+---
+# Managed by Ansible — do not edit manually
+services:
+  ittools:
+    image: corentinth/it-tools:{{ ittools_version }}
+    restart: unless-stopped
+    ports:
+      - "{{ ittools_port }}:80"

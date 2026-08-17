@@ -108,6 +108,20 @@
   roles:
     - immich
 
+- name: SearXNG — privacy-preserving metasearch
+  hosts: searxng_app
+  become: true
+  gather_facts: true
+  roles:
+    - searxng
+
+- name: IT Tools — developer utility collection
+  hosts: ittools_app
+  become: true
+  gather_facts: true
+  roles:
+    - ittools
+
 - name: Tailscale subnet routers
   hosts: tailscale_router
   become: true

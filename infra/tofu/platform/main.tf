@@ -11,9 +11,9 @@
 locals {
   lxcs = {
     # Reverse proxy — single nginx LXC, Proxmox HA for auto-restart
-    proxy01    = { vmid = 200, cores = 1, memory = 512, tags = ["platform", "proxy", "observe"],        node = "pxmx01", privileged = false, ha = true }
+    proxy01    = { vmid = 200, cores = 1, memory = 512, tags = ["platform", "proxy", "observe"],        node = "pxmx03", privileged = false, ha = true }
     # Tailscale subnet routers — HA pair on separate nodes, anti-affinity enforced by proxmox_harule below
-    tsrouter01 = { vmid = 201, cores = 1, memory = 512, tags = ["platform", "tailscale_router"], node = "pxmx01", privileged = false, ha = true }
+    tsrouter01 = { vmid = 201, cores = 1, memory = 512, tags = ["platform", "tailscale_router"], node = "pxmx04", privileged = false, ha = true }
     tsrouter02 = { vmid = 202, cores = 1, memory = 512, tags = ["platform", "tailscale_router"], node = "pxmx02", privileged = false, ha = true }
   }
 

@@ -1,0 +1,4 @@
+---
+ittools_version: "2024.10.22-7ca5933"
+ittools_data_dir: /opt/ittools
+ittools_port: 8080

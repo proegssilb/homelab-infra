@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: searxng
+  author: homelab
+  description: SearXNG privacy-preserving metasearch engine with Redis cache
+  min_ansible_version: "2.15"
+dependencies: []

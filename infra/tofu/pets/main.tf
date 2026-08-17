@@ -33,6 +33,12 @@ locals {
 
     # Photo management — Immich (PostgreSQL + pgvector on pg01, photos on TrueNAS NFS)
     immich = { vmid = 110, cores = 4, memory = 8192, node = "pxmx05", tags = ["observe", "pets", "immich_app"], data_disks = [{ size = 200, datastore = "ceph-hdd-pool" }], ha = true }
+
+    # Privacy-preserving metasearch — SearXNG (Docker + Redis, no external accounts)
+    searxng = { vmid = 111, cores = 2, memory = 2048, node = "pxmx03", tags = ["observe", "pets", "searxng_app"], data_disks = [{ size = 5, datastore = "ceph-ssd-pool" }], ha = true }
+
+    # Developer tools collection — IT Tools (stateless Docker, no persistence)
+    ittools = { vmid = 112, cores = 1, memory = 1024, node = "pxmx01", tags = ["observe", "pets", "ittools_app"], ha = true }
   }
 }
 

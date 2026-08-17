@@ -16,5 +16,8 @@
       "WebFetch(domain:forgejo.org)",
       "WebFetch(domain:docs.immich.app)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "terraform"
+  ]
 }

@@ -1,0 +1,19 @@
+---
+# Managed by Ansible — do not edit manually
+services:
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+
+  searxng:
+    image: searxng/searxng:{{ searxng_version }}
+    restart: unless-stopped
+    ports:
+      - "{{ searxng_port }}:8080"
+    volumes:
+      - {{ searxng_data_dir }}/config:/etc/searxng:rw
+    environment:
+      SEARXNG_REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis

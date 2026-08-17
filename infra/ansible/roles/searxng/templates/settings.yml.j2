@@ -1,0 +1,12 @@
+# Managed by Ansible — do not edit manually
+use_default_settings: true
+
+server:
+  secret_key: "{{ searxng_secret_key | trim }}"
+  base_url: "{{ searxng_base_url }}"
+  limiter: true
+  image_proxy: true
+
+ui:
+  default_locale: en
+  default_theme: simple

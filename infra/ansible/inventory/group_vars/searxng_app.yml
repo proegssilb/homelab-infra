@@ -1,0 +1,2 @@
+---
+searxng_base_url: "https://search.{{ homelab_domain }}"

@@ -66,4 +66,15 @@ resource "proxmox_virtual_environment_container" "lxc" {
   # Start on boot so the VIP comes back automatically after a node reboot.
   started      = true
   start_on_boot = true
+
+  # Proxmox's container API doesn't expose the source template or the
+  # injected root SSH key after creation, so `tofu import` can never
+  # populate these two fields — every plan after an import shows them as
+  # forces-replacement drift against a real, unchanged container.
+  lifecycle {
+    ignore_changes = [
+      operating_system,
+      initialization[0].user_account,
+    ]
+  }
 }

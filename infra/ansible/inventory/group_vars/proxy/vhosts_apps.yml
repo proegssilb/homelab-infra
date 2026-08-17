@@ -56,3 +56,19 @@ _nginx_vhosts_apps:
     upstream_servers:
       - "immich.{{ homelab_domain }}:2283"
     extra_proxy_params: "client_max_body_size 10g;"
+
+  - name: searxng
+    server_name: "search.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "searxng.{{ homelab_domain }}:8080"
+
+  - name: ittools
+    server_name: "tools.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "ittools.{{ homelab_domain }}:8080"

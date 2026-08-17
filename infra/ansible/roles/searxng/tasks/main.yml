@@ -1,0 +1,51 @@
+---
+- name: Install Docker
+  ansible.builtin.import_role:
+    name: docker_install
+
+- name: Settle udev events before touching data disk
+  ansible.builtin.command:
+    cmd: udevadm settle
+  changed_when: false
+
+- name: Create ext4 filesystem on data disk
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ searxng_data_disk }}"
+
+- name: Mount SearXNG data disk
+  ansible.posix.mount:
+    path: "{{ searxng_data_dir }}"
+    src: "{{ searxng_data_disk }}"
+    fstype: ext4
+    state: mounted
+    opts: defaults,noatime
+
+- name: Create config subdirectory
+  ansible.builtin.file:
+    path: "{{ searxng_data_dir }}/config"
+    state: directory
+    mode: "0755"
+
+- name: Template settings.yml
+  ansible.builtin.template:
+    src: settings.yml.j2
+    dest: "{{ searxng_data_dir }}/config/settings.yml"
+    mode: "0644"
+  notify: Restart searxng
+
+- name: Template docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ searxng_data_dir }}/docker-compose.yml"
+    mode: "0640"
+  notify: Restart searxng
+
+- name: Pull SearXNG image
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ searxng_data_dir }}"
+
+- name: Start SearXNG stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ searxng_data_dir }}"
+    state: present

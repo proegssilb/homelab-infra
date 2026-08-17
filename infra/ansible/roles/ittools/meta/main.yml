@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: ittools
+  author: homelab
+  description: IT Tools developer utility collection (stateless Docker app)
+  min_ansible_version: "2.15"
+dependencies: []
