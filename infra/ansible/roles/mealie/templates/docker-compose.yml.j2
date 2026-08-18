@@ -17,6 +17,12 @@ services:
       OIDC_AUTH_ENABLED: "true"
       OIDC_CONFIGURATION_URL: "{{ mealie_oidc_configuration_url }}"
       OIDC_CLIENT_ID: "{{ mealie_oidc_client_id }}"
-      OIDC_CLIENT_SECRET: "{{ mealie_oidc_client_secret }}"
+      OIDC_CLIENT_SECRET: "{{ mealie_oidc_client_secret | trim }}"
       OIDC_ADMIN_GROUP: "{{ mealie_oidc_admin_group }}"
       OIDC_AUTO_REDIRECT: "false"
+      # Authentik doesn't run an email-verification flow in this homelab, so
+      # its users never carry email_verified=true — mealie's default of
+      # requiring that claim would lock every SSO login out. Authentik itself
+      # is the trust root here, so relax this rather than chase a claim that
+      # will never be true.
+      OIDC_REQUIRES_EMAIL_VERIFICATION: "false"

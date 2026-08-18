@@ -11,6 +11,6 @@ services:
     environment:
       ACTUAL_OPENID_DISCOVERY_URL: "{{ actual_budget_oidc_discovery_url }}"
       ACTUAL_OPENID_CLIENT_ID: "{{ actual_budget_oidc_client_id }}"
-      ACTUAL_OPENID_CLIENT_SECRET: "{{ actual_budget_oidc_client_secret }}"
+      ACTUAL_OPENID_CLIENT_SECRET: "{{ actual_budget_oidc_client_secret | trim }}"
       ACTUAL_OPENID_SERVER_HOSTNAME: "{{ actual_budget_server_hostname }}"
       ACTUAL_OPENID_ENFORCE: "{{ actual_budget_oidc_enforce }}"

@@ -30,14 +30,18 @@ _nginx_vhosts_apps:
     ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
     upstream_protocol: http
     upstream_servers:
-      - "budget.{{ homelab_domain }}:5006"
+      # Backend VM is named "actual" (renamed from "budget") so the public
+      # alias below doesn't collide with the VM's own DHCP-registered DNS name.
+      - "actual.{{ homelab_domain }}:5006"
 
   - name: mealie
-    server_name: "mealie.{{ homelab_domain }}"
+    server_name: "meals.{{ homelab_domain }}"
     ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
     ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
     upstream_protocol: http
     upstream_servers:
+      # Public alias intentionally differs from the VM hostname (mealie) to
+      # avoid colliding with the VM's own DHCP-registered DNS name.
       - "mealie.{{ homelab_domain }}:9000"
 
   - name: freshrss

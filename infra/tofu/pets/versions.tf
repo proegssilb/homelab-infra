@@ -26,7 +26,9 @@ terraform {
     }
     authentik = {
       source  = "goauthentik/authentik"
-      version = "~> 2026.2"
+      # 2026.2.x lacks the `grant_types` argument on authentik_provider_oauth2 —
+      # it was only added in 2026.5.0.
+      version = "~> 2026.5"
     }
   }
   required_version = ">= 1.8"

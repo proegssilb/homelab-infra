@@ -14,17 +14,19 @@ services:
       CRON_MIN: "*/15"
       FRESHRSS_INSTALL: |-
         --api-enabled
+        --default-user {{ freshrss_admin_user }}
         --base-url {{ freshrss_base_url }}
         --db-host {{ freshrss_db_host }}
-        --db-name {{ freshrss_db_name }}
+        --db-base {{ freshrss_db_name }}
         --db-user {{ freshrss_db_user }}
         --db-password {{ freshrss_db_pass | trim }}
         --db-type pgsql
       FRESHRSS_USER: |-
-        --username {{ freshrss_admin_user }}
-        --oidc-enabled 1
-        --oidc-provider-metadata-url {{ freshrss_oidc_issuer_url }}.well-known/openid-configuration
-        --oidc-client-id {{ freshrss_oidc_client_id }}
-        --oidc-client-secret {{ freshrss_oidc_client_secret }}
-        --oidc-scopes "openid email profile"
-        --oidc-user-id-claim preferred_username
+        --user {{ freshrss_admin_user }}
+      OIDC_ENABLED: 1
+      OIDC_PROVIDER_METADATA_URL: "{{ freshrss_oidc_issuer_url }}.well-known/openid-configuration"
+      OIDC_CLIENT_ID: "{{ freshrss_oidc_client_id }}"
+      OIDC_CLIENT_SECRET: "{{ freshrss_oidc_client_secret }}"
+      OIDC_SCOPES: "openid email profile"
+      OIDC_REMOTE_USER_CLAIM: preferred_username
+      OIDC_X_FORWARDED_HEADERS: X-Forwarded-Proto
