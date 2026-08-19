@@ -166,10 +166,14 @@ resource "authentik_provider_oauth2" "immich" {
   client_secret      = var.oidc_client_secrets["immich"]
   authorization_flow = data.authentik_flow.default_authorization.id
   invalidation_flow  = data.authentik_flow.default_invalidation.id
-  grant_types        = ["authorization_code", "refresh_token"]
+  # Immich's OIDC client (openid-client, same as Actual Budget/Mealie) defaults
+  # to requiring an RS256-signed ID token — same JWKS fix as the other apps.
+  signing_key = data.authentik_certificate_key_pair.self_signed.id
+  grant_types = ["authorization_code", "refresh_token"]
   allowed_redirect_uris = [
     { matching_mode = "strict", redirect_uri_type = "authorization", url = "https://photos.${var.domain}/auth/login" },
-    { matching_mode = "strict", redirect_uri_type = "authorization", url = "app.immich:/" },
+    # Immich's mobile app always sends this exact custom-scheme callback.
+    { matching_mode = "strict", redirect_uri_type = "authorization", url = "app.immich:///oauth-callback" },
   ]
   property_mappings = [
     data.authentik_property_mapping_provider_scope.openid.id,

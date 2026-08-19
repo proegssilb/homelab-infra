@@ -1,0 +1,11 @@
+{
+  "oauth": {
+    "enabled": true,
+    "issuerUrl": {{ immich_oauth_issuer_url | tojson }},
+    "clientId": {{ immich_oauth_client_id | tojson }},
+    "clientSecret": {{ immich_oauth_client_secret | trim | tojson }},
+    "scope": "openid email profile",
+    "buttonText": "Sign in with Authentik",
+    "autoRegister": true
+  }
+}

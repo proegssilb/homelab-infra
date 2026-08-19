@@ -27,6 +27,7 @@
     state: directory
     mode: "0750"
   loop:
+    - upload
     - thumbs
     - encoded-video
     - profile
@@ -53,6 +54,13 @@
   ansible.builtin.template:
     src: env.j2
     dest: "{{ immich_data_dir }}/.env"
+    mode: "0640"
+  notify: Restart immich
+
+- name: Template OAuth config file
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: "{{ immich_data_dir }}/immich-config.json"
     mode: "0640"
   notify: Restart immich
 

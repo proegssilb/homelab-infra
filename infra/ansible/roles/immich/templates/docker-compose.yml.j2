@@ -8,22 +8,11 @@ services:
     ports:
       - "{{ immich_server_port }}:2283"
     volumes:
-      - ${UPLOAD_LOCATION}:/usr/src/app/upload/library
-      - ${THUMBS_LOCATION}:/usr/src/app/upload/thumbs
-      - ${ENCODED_VIDEO_LOCATION}:/usr/src/app/upload/encoded-video
-      - ${PROFILE_LOCATION}:/usr/src/app/upload/profile
-      - ${BACKUP_LOCATION}:/usr/src/app/upload/backups
+      - ${UPLOAD_LOCATION}:/data
+      - {{ immich_data_dir }}/immich-config.json:${IMMICH_CONFIG_FILE}
       - /etc/localtime:/etc/localtime:ro
     env_file:
       - .env
-    environment:
-      OAUTH_ENABLED: "true"
-      OAUTH_ISSUER_URL: "{{ immich_oauth_issuer_url }}"
-      OAUTH_CLIENT_ID: "{{ immich_oauth_client_id }}"
-      OAUTH_CLIENT_SECRET: "{{ immich_oauth_client_secret }}"
-      OAUTH_SCOPE: "openid email profile"
-      OAUTH_BUTTON_TEXT: "Sign in with Authentik"
-      OAUTH_AUTO_REGISTER: "true"
     depends_on:
       redis:
         condition: service_healthy
