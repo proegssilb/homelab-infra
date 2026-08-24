@@ -70,3 +70,9 @@ variable "ansible_ssh_key" {
   description = "SSH public key added to root's authorized_keys. LXCs don't use cloud-init user creation — Ansible connects as root."
   type        = string
 }
+
+variable "pool_id" {
+  description = "Proxmox resource pool to assign the container to (e.g. ha-prod, la-prod). Null means no pool assignment."
+  type        = string
+  default     = null
+}

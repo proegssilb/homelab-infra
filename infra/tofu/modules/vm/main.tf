@@ -16,6 +16,7 @@ resource "proxmox_virtual_environment_vm" "vm" {
   node_name = var.node_name
   vm_id     = var.vmid
   tags      = var.tags
+  pool_id   = var.pool_id
 
   # Clone from a cloud-init-enabled template. Full clone so the VM is
   # fully independent — no shared base disk.

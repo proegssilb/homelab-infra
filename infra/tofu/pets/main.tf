@@ -15,26 +15,27 @@ locals {
     #   memory     — MiB RAM (default 2048)
     #   node       — Proxmox node name (default: var.proxmox_node)
     #   data_disks — list of {size (GiB), datastore} for extra disks beyond the root (default [])
+    #   backup     — assign to the ha-prod/la-prod pool for backups (default false); pool picked by the "ha" key
 
     # File-sync and collaboration — Nextcloud (storage via TrueNAS NFS, to be wired later)
-    nextcloud = { vmid = 103, cores = 2, memory = 8192, node = "pxmx05", tags = ["observe", "pets", "nextcloud_app"], ha = true }
+    nextcloud = { vmid = 103, cores = 2, memory = 8192, node = "pxmx05", tags = ["observe", "pets", "nextcloud_app"], ha = true, backup = true }
 
     # Git forge — Forgejo (mirrors to Codeberg; backed up via Proxmox VM snapshots)
-    forgejo = { vmid = 106, cores = 4, memory = 8192, disk_size = 50, node = "pxmx04", tags = ["observe", "pets", "forgejo_app"], data_disks = [{ size = 100, datastore = "ceph-hdd-pool" }], ha = true }
+    forgejo = { vmid = 106, cores = 4, memory = 8192, disk_size = 50, node = "pxmx04", tags = ["observe", "pets", "forgejo_app"], data_disks = [{ size = 100, datastore = "ceph-hdd-pool" }], ha = true, backup = true }
 
     # Personal finance tracker — Actual Budget (file-based storage, OIDC via Authentik)
     # VM hostname is "actual" (not "budget") so it doesn't collide with the
     # public vhost alias budget.{{ homelab_domain }} — see nginx vhosts_apps.yml.
-    actual = { vmid = 107, cores = 1, memory = 1024, node = "pxmx01", tags = ["observe", "pets", "budget_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true }
+    actual = { vmid = 107, cores = 1, memory = 1024, node = "pxmx01", tags = ["observe", "pets", "budget_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
 
     # Recipe manager — Mealie (PostgreSQL on pg01, OIDC via Authentik)
-    mealie = { vmid = 108, cores = 2, memory = 2048, disk_size = 40, node = "pxmx02", tags = ["observe", "pets", "mealie_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true }
+    mealie = { vmid = 108, cores = 2, memory = 2048, disk_size = 40, node = "pxmx02", tags = ["observe", "pets", "mealie_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
 
     # RSS aggregator — FreshRSS (PostgreSQL on pg01, OIDC via Authentik)
-    freshrss = { vmid = 109, cores = 1, memory = 1024, node = "pxmx04", tags = ["observe", "pets", "freshrss_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true }
+    freshrss = { vmid = 109, cores = 1, memory = 1024, node = "pxmx04", tags = ["observe", "pets", "freshrss_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
 
     # Photo management — Immich (PostgreSQL + pgvector on pg01, photos on TrueNAS NFS)
-    immich = { vmid = 110, cores = 4, memory = 8192, node = "pxmx05", tags = ["observe", "pets", "immich_app"], data_disks = [{ size = 200, datastore = "ceph-hdd-pool" }], ha = true }
+    immich = { vmid = 110, cores = 4, memory = 8192, node = "pxmx05", tags = ["observe", "pets", "immich_app"], data_disks = [{ size = 200, datastore = "ceph-hdd-pool" }], ha = true, backup = true }
 
     # Privacy-preserving metasearch — SearXNG (Docker + Redis, no external accounts)
     searxng = { vmid = 111, cores = 2, memory = 2048, node = "pxmx03", tags = ["observe", "pets", "searxng_app"], data_disks = [{ size = 5, datastore = "ceph-ssd-pool" }], ha = true }
@@ -72,5 +73,6 @@ module "vm" {
   ansible_user    = var.ansible_user
   ansible_ssh_key = var.ansible_ssh_key
 
-  tags = lookup(each.value, "tags", ["pet"])
+  tags    = lookup(each.value, "tags", ["pet"])
+  pool_id = try(each.value.backup, false) ? (try(each.value.ha, false) ? "ha-prod" : "la-prod") : null
 }

@@ -14,6 +14,7 @@ resource "proxmox_virtual_environment_container" "lxc" {
   node_name = var.node_name
   vm_id     = var.vmid
   tags      = var.tags
+  pool_id   = var.pool_id
 
   # privileged = true is required for keepalived (CAP_NET_ADMIN, CAP_NET_RAW).
   # Set explicitly per container rather than defaulting to true.

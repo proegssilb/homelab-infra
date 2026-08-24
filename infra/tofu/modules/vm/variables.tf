@@ -79,3 +79,9 @@ variable "data_disks" {
   }))
   default = []
 }
+
+variable "pool_id" {
+  description = "Proxmox resource pool to assign the VM to (e.g. ha-prod, la-prod). Null means no pool assignment."
+  type        = string
+  default     = null
+}
