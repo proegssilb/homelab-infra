@@ -1,6 +1,12 @@
 ---
 ansible_user: root
 
+# ansible_host is deliberately NOT set here -- it would have no effect.
+# The dynamic inventory plugin composes ansible_host as an inventory *host*
+# var, which outranks inventory group_vars. The override therefore lives in
+# host_vars/tsrouter01.yml and host_vars/tsrouter02.yml; see those files for
+# why these hosts must be reached over the LAN rather than the tailnet.
+
 # Tailscale ACL tags applied to every node in this group.
 # tag:homelab      — common to all Tailscale nodes in the homelab
 # tag:homelab-router — identifies subnet routers for ACL auto-approval
