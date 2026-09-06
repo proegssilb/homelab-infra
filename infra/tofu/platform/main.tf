@@ -29,6 +29,10 @@ locals {
 
     # Shared PostgreSQL — all pet apps connect here
     pg01 = { vmid = 221, cores = 4, memory = 8192, tags = ["platform", "postgres_primary", "observe"], node = "pxmx03", data_disks = [{ size = 40, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
+
+    # General-purpose S3-compatible app blob storage — distinct from the tiny
+    # bootstrap-only Garage on blade02, which exists only to hold Tofu state.
+    "garage-apps" = { vmid = 222, cores = 2, memory = 4096, tags = ["platform", "garage_app", "observe"], node = "pxmx02", data_disks = [{ size = 50, datastore = "ceph-hdd-pool" }], ha = true, backup = true }
   }
 }
 

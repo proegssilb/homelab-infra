@@ -20,6 +20,13 @@
   roles:
     - garage
 
+- name: Garage — general-purpose app object storage
+  hosts: garage_app
+  become: true
+  gather_facts: true
+  roles:
+    - garage
+
 - name: Proxy — nginx reverse proxy + certbot
   hosts: proxy
   become: true

@@ -76,3 +76,15 @@ _nginx_vhosts_apps:
     upstream_protocol: http
     upstream_servers:
       - "ittools.{{ homelab_domain }}:8080"
+
+  - name: garage-apps-s3
+    server_name: "s3.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "garage-apps.{{ homelab_domain }}:3900"
+    # Object PUTs traverse this vhost, so nginx's 1m default would cap every
+    # upload well below what the apps behind it allow (anamnesis alone permits
+    # 40MiB). Generous but still bounded, since this endpoint is shared.
+    extra_proxy_params: "client_max_body_size 5g;"

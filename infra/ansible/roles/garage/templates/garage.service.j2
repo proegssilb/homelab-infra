@@ -1,0 +1,23 @@
+[Unit]
+Description=Garage Data Store
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment='RUST_LOG=garage=info' 'RUST_BACKTRACE=1'
+EnvironmentFile=/etc/garage.env
+ExecStart={{ garage_install_dir }}/garage server --single-node --default-bucket
+User=garage
+Group=garage
+
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths={{ garage_data_dir }} {{ garage_meta_dir }}
+LimitNOFILE=42000
+
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

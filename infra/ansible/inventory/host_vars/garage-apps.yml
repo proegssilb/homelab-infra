@@ -1,0 +1,51 @@
+---
+# garage-apps — general-purpose S3 blob storage for pet apps (starting with
+# anamnesis). Distinct from blade02's tiny bootstrap-only Garage instance,
+# which exists only to store Tofu remote state — see host_vars/blade02.yml.
+
+# Garage S3 API listen address (all interfaces, port 3900).
+garage_s3_bind_addr: "0.0.0.0:3900"
+
+# Garage RPC listen address (internal cluster coordination; single-node here).
+garage_rpc_bind_addr: "0.0.0.0:3901"
+
+# Garage data and metadata directories — live on the dedicated data disk below.
+garage_data_dir: /var/lib/garage/data
+garage_meta_dir: /var/lib/garage/meta
+
+# Dedicated ceph-hdd-pool data disk. scsi1 is the OS disk, so the first (and
+# only) data disk is always scsi2 — see CLAUDE.md's disk device convention.
+garage_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
+garage_data_disk_mount: /var/lib/garage
+
+# Garage version to install. 2.3.0+ is required for `garage server
+# --single-node --default-bucket`, which auto-creates the cluster layout, a
+# default access key, and a default bucket from the env vars below — with no
+# manual `garage key new` / `garage layout apply` step, so `just bootstrap`
+# still works from nothing.
+garage_version: "2.3.0"
+garage_arch: x86_64
+
+# Garage RPC secret — required by Garage even for single-node deployments.
+# Generate with: openssl rand -hex 32
+# Then vault-encrypt: ansible-vault encrypt_string '<value>' --name garage_rpc_secret
+garage_rpc_secret: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          65363434356630343133316132373739393437393236336435663933663834346134363065363538
+          3138346163366564383362346330656234393165333837640a303735383935373438373063383866
+          31303163613634323262333035376432343539313834396264363364616234343138663630376263
+          6133323233636239380a363765666633633933313633633636643066636136393332613639613166
+          37313765353361383235623863623463383935313832613336656663356638643131636566623739
+          38376636383137626639333338643962396666306332613562653338316631393336626336356631
+          37613263363039663736386538366531656432336335646235323861333934306162366565346664
+          31613035663230613038
+
+# Default S3 bucket + key, auto-provisioned by `garage server --default-bucket`
+# on first boot. The key material is generated ahead of time (never captured
+# from Garage's own output) — see anamnesis_s3_access_key_id /
+# anamnesis_s3_secret_access_key in group_vars/all/main.yml, which must exist
+# before this host is even created since garage-apps (platform) is brought up
+# before anamnesis (pets).
+garage_default_bucket: anamnesis
+garage_default_access_key: "{{ anamnesis_s3_access_key_id | trim }}"
+garage_default_secret_key: "{{ anamnesis_s3_secret_access_key | trim }}"
