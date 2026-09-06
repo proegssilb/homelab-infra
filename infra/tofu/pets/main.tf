@@ -9,6 +9,11 @@
 # and is NOT in this state directory — destroying pets does not touch it.
 
 locals {
+  lxcs = {
+    # Task tracker — Anamnesis (PostgreSQL on pg01, OIDC via Authentik, S3 blobs via garage-apps)
+    anamnesis = { vmid = 113, cores = 2, memory = 4096, disk_size = 8, node = "pxmx04", tags = ["observe", "pets", "anamnesis_app"], privileged = false, ha = true, backup = true }
+  }
+
   vms = {
     # Optional per-VM keys:
     #   cores      — vCPU count (default 2)
@@ -51,6 +56,35 @@ resource "proxmox_haresource" "vm" {
   state       = "started"
 
   depends_on = [module.vm]
+}
+
+resource "proxmox_haresource" "lxc" {
+  for_each    = { for k, v in local.lxcs : k => v if try(v.ha, false) }
+  resource_id = "ct:${module.lxc[each.key].vmid}"
+  state       = "started"
+
+  depends_on = [module.lxc]
+}
+
+module "lxc" {
+  for_each = local.lxcs
+  source   = "../modules/lxc"
+
+  name             = each.key
+  vmid             = each.value.vmid
+  node_name        = each.value.node
+  template_file_id = var.lxc_template_file_id
+  datastore        = var.datastore
+
+  cores      = each.value.cores
+  memory     = each.value.memory
+  disk_size  = each.value.disk_size
+  privileged = each.value.privileged
+
+  ansible_ssh_key = var.ansible_ssh_key
+
+  tags    = each.value.tags
+  pool_id = try(each.value.backup, false) ? (try(each.value.ha, false) ? "ha-prod" : "la-prod") : null
 }
 
 module "vm" {

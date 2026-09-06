@@ -1,0 +1,13 @@
+---
+# LXC containers SSH as root (no cloud-init user; key goes into root's
+# authorized_keys) — same as the proxy and tailscale_router LXC groups.
+ansible_user: root
+
+anamnesis_db_host: "pg01.{{ homelab_domain }}"
+anamnesis_oidc_issuer_url: "https://auth.{{ homelab_domain }}/application/o/anamnesis/"
+
+# Display timezone for due dates — an IANA zone, validated at startup against
+# Anamnesis's compiled-in tzdata. Independent of the host clock, which
+# os_baseline pins to UTC on every machine; change this to your local zone if
+# you'd rather not read due dates in UTC.
+anamnesis_timezone: "UTC"

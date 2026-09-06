@@ -129,6 +129,13 @@
   roles:
     - ittools
 
+- name: Anamnesis — task tracker
+  hosts: anamnesis_app
+  become: true
+  gather_facts: true
+  roles:
+    - anamnesis
+
 - name: Tailscale subnet routers
   hosts: tailscale_router
   become: true

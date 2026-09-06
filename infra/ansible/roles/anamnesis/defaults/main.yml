@@ -1,0 +1,6 @@
+---
+# https://github.com/proegssilb/anamnesis/releases — update as needed
+anamnesis_version: "1.0.0"
+anamnesis_install_dir: /usr/local/bin
+anamnesis_config_dir: /etc/anamnesis
+anamnesis_arch: x86_64

@@ -1,0 +1,12 @@
+---
+# Ansible runs handlers in the order they are DEFINED here, not the order a
+# task notifies them — so the daemon-reload must be declared first or a
+# changed unit file would be restarted before systemd has re-read it.
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart anamnesis
+  ansible.builtin.systemd:
+    name: anamnesis
+    state: restarted

@@ -1,0 +1,50 @@
+---
+- name: Create anamnesis system user
+  ansible.builtin.user:
+    name: anamnesis
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/anamnesis
+    create_home: false
+
+- name: Download anamnesis-web binary
+  ansible.builtin.get_url:
+    url: "https://github.com/proegssilb/anamnesis/releases/download/v{{ anamnesis_version }}/anamnesis-web-{{ anamnesis_arch }}-unknown-linux-gnu"
+    dest: "{{ anamnesis_install_dir }}/anamnesis-web"
+    mode: "0755"
+  notify: Restart anamnesis
+
+- name: Create anamnesis config directory
+  ansible.builtin.file:
+    path: "{{ anamnesis_config_dir }}"
+    state: directory
+    owner: root
+    group: anamnesis
+    mode: "0750"
+
+- name: Write anamnesis environment file
+  ansible.builtin.template:
+    src: anamnesis.env.j2
+    dest: "{{ anamnesis_config_dir }}/anamnesis.env"
+    owner: root
+    group: anamnesis
+    mode: "0640"
+  notify: Restart anamnesis
+
+- name: Install anamnesis systemd unit
+  ansible.builtin.template:
+    src: anamnesis.service.j2
+    dest: /etc/systemd/system/anamnesis.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart anamnesis
+
+- name: Enable and start anamnesis
+  ansible.builtin.systemd:
+    name: anamnesis
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -77,6 +77,17 @@ _nginx_vhosts_apps:
     upstream_servers:
       - "ittools.{{ homelab_domain }}:8080"
 
+  - name: anamnesis
+    server_name: "tasks.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "anamnesis.{{ homelab_domain }}:8080"
+    # Anamnesis defaults ANAMNESIS_MAX_BODY_BYTES to 40MiB; match it here so
+    # nginx doesn't reject large attachments before the app ever sees them.
+    extra_proxy_params: "client_max_body_size 40m;"
+
   - name: garage-apps-s3
     server_name: "s3.{{ homelab_domain }}"
     ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"

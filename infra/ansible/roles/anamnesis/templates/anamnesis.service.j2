@@ -1,0 +1,62 @@
+[Unit]
+Description=Anamnesis
+Documentation=https://github.com/proegssilb/anamnesis/blob/main/docs/DEPLOYMENT.md
+# Postgres is on pg01, not this host, so there is no local postgresql.service
+# to order against — the app retries its connection at startup instead.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+# A fixed system user rather than DynamicUser=yes: a dynamic uid changes
+# across reinstalls, which breaks ownership of the state directory that must
+# outlive the package.
+User=anamnesis
+Group=anamnesis
+
+# Creates and chowns /var/lib/anamnesis for free, and keeps it across
+# restarts and upgrades.
+StateDirectory=anamnesis
+WorkingDirectory=/var/lib/anamnesis
+
+# Holds ANAMNESIS_SESSION_SECRET and ANAMNESIS_OIDC_CLIENT_SECRET, so it must
+# be 0640 root:anamnesis — readable by the service, by nobody else.
+EnvironmentFile={{ anamnesis_config_dir }}/anamnesis.env
+
+ExecStart={{ anamnesis_install_dir }}/anamnesis-web
+
+# Anamnesis drains in-flight requests on SIGTERM and then exits, so stopping
+# is fast and lossless; TimeoutStopSec is a backstop, not the normal path.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=2s
+
+# --- Hardening --------------------------------------------------------------
+CapabilityBoundingSet=
+AmbientCapabilities=
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=strict
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

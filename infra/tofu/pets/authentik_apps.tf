@@ -189,3 +189,32 @@ resource "authentik_application" "immich" {
   protocol_provider = authentik_provider_oauth2.immich.id
   meta_launch_url   = "https://photos.${var.domain}"
 }
+
+# ── Anamnesis ──────────────────────────────────────────────────────────────────
+
+resource "authentik_provider_oauth2" "anamnesis" {
+  name               = "Anamnesis"
+  client_id          = "anamnesis"
+  client_secret      = var.oidc_client_secrets["anamnesis"]
+  authorization_flow = data.authentik_flow.default_authorization.id
+  invalidation_flow  = data.authentik_flow.default_invalidation.id
+  # Anamnesis (via openidconnect) fetches Authentik's JWKS to validate the ID
+  # token signature — same RS256 fix as the other apps.
+  signing_key = data.authentik_certificate_key_pair.self_signed.id
+  grant_types = ["authorization_code", "refresh_token"]
+  allowed_redirect_uris = [
+    { matching_mode = "strict", redirect_uri_type = "authorization", url = "https://tasks.${var.domain}/auth/callback" },
+  ]
+  property_mappings = [
+    data.authentik_property_mapping_provider_scope.openid.id,
+    data.authentik_property_mapping_provider_scope.email.id,
+    data.authentik_property_mapping_provider_scope.profile.id,
+  ]
+}
+
+resource "authentik_application" "anamnesis" {
+  name              = "Anamnesis"
+  slug              = "anamnesis"
+  protocol_provider = authentik_provider_oauth2.anamnesis.id
+  meta_launch_url   = "https://tasks.${var.domain}"
+}
