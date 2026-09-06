@@ -1,0 +1,20 @@
+---
+# tsrouter02 is a Tailscale subnet router. Ansible MUST reach it over the LAN,
+# never over the tailnet.
+#
+# inventory/proxmox.yml composes ansible_host from the Proxmox interfaces API
+# and falls back to the bare Proxmox name when eth0 exposes no address, which
+# is the case for these LXCs. A bare name resolves through the tailnet search
+# domain to the node's Tailscale IP -- so Ansible ends up managing the subnet
+# router *through* the subnet router. The tailscale_router play then installs
+# the tailscale package, dpkg restarts tailscaled, and the restart destroys
+# the userspace-networking netstack that was proxying the SSH connection. That
+# teardown emits no FIN and no RST, so the controller's ssh sits ESTABLISHED
+# forever and the play hangs with no timeout. Observed doing exactly this:
+# sshd accepted the connection at 15:27:27, dpkg configured tailscale 1.102.3
+# at 15:27:38, and the session never closed.
+#
+# The LAN FQDN routes over the physical network, which nothing in this play
+# can disturb. This must live in host_vars, not group_vars/tailscale_router:
+# inventory group_vars lose to the inventory plugin's composed host vars.
+ansible_host: "{{ inventory_hostname }}.{{ homelab_domain }}"
