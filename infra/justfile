@@ -81,6 +81,68 @@ destroy state:
 fix-db-passwords:
     cd ansible && ansible-playbook fix-db-passwords.yml
 
+# ── Quality ────────────────────────────────────────────────────────────────────
+
+# Optional tooling for the advisory sections. ansible-lint must be installed
+# *with* the collections it lints against — a bare install ships only
+# ansible-core and reports every community.general module as unknown:
+#   uv tool install --with ansible ansible-lint
+#   uv tool install yamllint
+#
+# Validate + lint the tree. Hard-fails only on what would break a real run.
+lint:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    rc=0
+
+    echo "── tofu validate ─────────────────────────────────────────────"
+    for d in platform pets; do
+      # -backend=false keeps this offline; `just plan` re-inits the real
+      # Garage backend on its next run, so nothing is left broken.
+      if ( cd tofu/"$d" && tofu init -backend=false -input=false >/dev/null \
+           && tofu validate ); then
+        echo "  $d: ok"
+      else
+        echo "  $d: FAILED"; rc=1
+      fi
+    done
+
+    echo "── ansible syntax-check ──────────────────────────────────────"
+    # Unmatched host patterns for not-yet-provisioned groups are expected
+    # and are warnings, not errors.
+    ( cd ansible && ansible-playbook site.yml --syntax-check ) || rc=1
+
+    echo "── tofu fmt (advisory) ───────────────────────────────────────"
+    # *.tf only, never *.tfvars — those hold plaintext secrets and -diff
+    # would print them straight to the terminal.
+    for d in platform pets; do
+      ( cd tofu/"$d" && tofu fmt -check -diff -- *.tf ) || true
+    done
+
+    echo "── ansible-lint (advisory) ───────────────────────────────────"
+    if command -v ansible-lint >/dev/null; then
+      ( cd ansible && ansible-lint --offline --format=pep8 site.yml ) || true
+    else
+      echo "  skipped: ansible-lint not installed"
+    fi
+
+    echo "── yamllint (advisory) ───────────────────────────────────────"
+    if command -v yamllint >/dev/null; then
+      ( cd ansible && yamllint -f parsable site.yml inventory/ roles/ ) || true
+    else
+      echo "  skipped: yamllint not installed"
+    fi
+
+    if [ "$rc" -ne 0 ]; then echo; echo "lint: FAILED"; else echo; echo "lint: ok"; fi
+    exit "$rc"
+
+# Idempotent: vars already holding real ciphertext are never rotated, so this
+# is safe to rerun. Run after adding new wiring, before the first bootstrap.
+#
+# Generate + vault-encrypt every REPLACE_ME secret stub in the inventory.
+fill-vault-stubs:
+    ./scripts/fill-vault-stubs.py
+
 # ── Inventory ──────────────────────────────────────────────────────────────────
 
 # List hosts visible via the dynamic inventory.
