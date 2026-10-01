@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: homeassistant
+  author: homelab
+  description: Home Assistant Container with Zigbee2MQTT + Mosquitto, recorder on PostgreSQL, OIDC via Authentik
+  min_ansible_version: "2.15"
+dependencies: []

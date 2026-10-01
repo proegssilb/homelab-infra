@@ -47,6 +47,10 @@ locals {
 
     # Developer tools collection — IT Tools (stateless Docker, no persistence)
     ittools = { vmid = 112, cores = 1, memory = 1024, node = "pxmx01", tags = ["observe", "pets", "ittools_app"], ha = true }
+
+    # Home automation — Home Assistant Container + Zigbee2MQTT/Mosquitto (recorder on pg01, OIDC via Authentik).
+    # Zigbee radio is the LAN-attached network coordinator; no USB passthrough, so the VM can HA-migrate freely.
+    homeassistant = { vmid = 114, cores = 2, memory = 4096, node = "pxmx03", tags = ["observe", "pets", "homeassistant_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
   }
 }
 

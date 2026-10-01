@@ -1,0 +1,36 @@
+{#- Z2M wants the network key and extended PAN ID as byte arrays and the PAN ID as a number;
+    vault stores them as hex strings. -#}
+{%- macro hex_bytes(hex) -%}
+[{% for i in range(0, hex | length, 2) %}{{ hex[i:i + 2] | int(base=16) }}{{ ", " if not loop.last }}{% endfor %}]
+{%- endmacro -%}
+# Managed by Ansible — do not edit manually.
+# Settings changed in the Z2M frontend are reverted on the next Ansible run;
+# per-device names/options go to devices.yaml/groups.yaml, which Ansible leaves alone.
+version: 5
+
+homeassistant:
+  enabled: true
+
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://127.0.0.1:1883
+
+serial:
+  port: "tcp://{{ homeassistant_zigbee_coordinator_host | trim }}:{{ homeassistant_z2m_port }}"
+  adapter: {{ homeassistant_z2m_adapter }}
+
+advanced:
+  channel: {{ homeassistant_z2m_channel }}
+  network_key: {{ hex_bytes(homeassistant_z2m_network_key | trim) }}
+  pan_id: {{ homeassistant_z2m_pan_id | trim | int(base=16) }}
+  ext_pan_id: {{ hex_bytes(homeassistant_z2m_ext_pan_id | trim) }}
+  log_output:
+    - console
+
+frontend:
+  enabled: true
+  port: {{ homeassistant_z2m_frontend_port }}
+  auth_token: "{{ homeassistant_z2m_frontend_auth_token | trim }}"
+
+devices: devices.yaml
+groups: groups.yaml

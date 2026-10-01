@@ -1,0 +1,27 @@
+# Managed by Ansible — do not edit manually
+#
+# UI-managed state (integrations, dashboards, users) lives in .storage/, and
+# automations/scripts/scenes in their own files, so this file stays static.
+
+default_config:
+
+# No http: block — since 2026.x HA keeps HTTP settings in .storage/http and
+# ignores YAML after a one-shot migration. Reverse-proxy trust is managed in
+# that store by the role (see "HTTP config store" in tasks/main.yml).
+
+recorder:
+  db_url: !secret recorder_db_url
+
+# Authentik SSO (custom_components/auth_oidc, installed by Ansible). No
+# auth_providers override, so HA's own login remains available as break-glass.
+auth_oidc:
+  client_id: {{ homeassistant_oidc_client_id }}
+  client_secret: !secret oidc_client_secret
+  discovery_url: "{{ homeassistant_oidc_discovery_url }}"
+  display_name: Authentik
+  roles:
+    admin: {{ homeassistant_oidc_admin_group }}
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml

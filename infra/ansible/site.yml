@@ -136,6 +136,13 @@
   roles:
     - anamnesis
 
+- name: Home Assistant — home automation
+  hosts: homeassistant_app
+  become: true
+  gather_facts: true
+  roles:
+    - homeassistant
+
 - name: Tailscale subnet routers
   hosts: tailscale_router
   become: true

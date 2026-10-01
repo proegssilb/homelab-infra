@@ -1,0 +1,360 @@
+---
+- name: Require Zigbee coordinator host
+  ansible.builtin.assert:
+    that:
+      - homeassistant_zigbee_coordinator_host | trim | length > 0
+    fail_msg: >-
+      homeassistant_zigbee_coordinator_host is unset. Add it (vault-encrypted) to
+      inventory/host_vars/{{ inventory_hostname }}.yml.
+
+- name: Install Docker
+  ansible.builtin.import_role:
+    name: docker_install
+
+- name: Settle udev events before touching data disk
+  ansible.builtin.command:
+    cmd: udevadm settle
+  changed_when: false
+
+- name: Create ext4 filesystem on data disk
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ homeassistant_data_disk }}"
+
+- name: Mount Home Assistant data disk
+  ansible.posix.mount:
+    path: "{{ homeassistant_data_dir }}"
+    src: "{{ homeassistant_data_disk }}"
+    fstype: ext4
+    state: mounted
+    opts: defaults,noatime
+
+- name: Create config, Zigbee2MQTT and Mosquitto config subdirectories
+  ansible.builtin.file:
+    path: "{{ homeassistant_data_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - config
+    - config/custom_components
+    - zigbee2mqtt
+    - mosquitto
+    - mosquitto/config
+
+# The eclipse-mosquitto image runs the broker as uid/gid 1883.
+- name: Create Mosquitto data subdirectory
+  ansible.builtin.file:
+    path: "{{ homeassistant_data_dir }}/mosquitto/data"
+    state: directory
+    owner: "1883"
+    group: "1883"
+    mode: "0750"
+
+# ── hass-oidc-auth (Authentik SSO) ────────────────────────────────────────────
+# Installed from a pinned release instead of HACS so the component version is a
+# deliberate choice. Uses the release's hass-oidc-auth.zip asset, not GitHub's source
+# tarball: the source lacks static/style.css (built by Tailwind at release time), so
+# the login pages render unstyled. The marker records version + checksum, so any
+# change to either replaces the whole directory (no stale files from the previous
+# install).
+
+- name: Read installed hass-oidc-auth version
+  ansible.builtin.slurp:
+    src: "{{ homeassistant_data_dir }}/config/custom_components/auth_oidc/.ansible-version"
+  register: homeassistant_oidc_auth_marker
+  failed_when: false
+
+- name: Install hass-oidc-auth {{ homeassistant_oidc_auth_version }}
+  when: >-
+    (homeassistant_oidc_auth_marker.content | default('') | b64decode | trim)
+    != homeassistant_oidc_auth_version ~ ' ' ~ homeassistant_oidc_auth_sha256
+  notify: Restart homeassistant
+  block:
+    - name: Download hass-oidc-auth release
+      ansible.builtin.get_url:
+        url: "https://github.com/christiaangoossens/hass-oidc-auth/releases/download/v{{ homeassistant_oidc_auth_version }}/hass-oidc-auth.zip"
+        dest: "/tmp/hass-oidc-auth-{{ homeassistant_oidc_auth_version }}.zip"
+        checksum: "sha256:{{ homeassistant_oidc_auth_sha256 }}"
+        mode: "0644"
+
+    - name: Remove previous hass-oidc-auth install
+      ansible.builtin.file:
+        path: "{{ homeassistant_data_dir }}/config/custom_components/auth_oidc"
+        state: absent
+
+    - name: Create hass-oidc-auth directory
+      ansible.builtin.file:
+        path: "{{ homeassistant_data_dir }}/config/custom_components/auth_oidc"
+        state: directory
+        mode: "0755"
+
+    - name: Extract hass-oidc-auth release
+      ansible.builtin.unarchive:
+        src: "/tmp/hass-oidc-auth-{{ homeassistant_oidc_auth_version }}.zip"
+        dest: "{{ homeassistant_data_dir }}/config/custom_components/auth_oidc"
+        remote_src: true
+
+    - name: Record installed hass-oidc-auth version
+      ansible.builtin.copy:
+        content: "{{ homeassistant_oidc_auth_version }} {{ homeassistant_oidc_auth_sha256 }}\n"
+        dest: "{{ homeassistant_data_dir }}/config/custom_components/auth_oidc/.ansible-version"
+        mode: "0644"
+
+    - name: Remove downloaded hass-oidc-auth release
+      ansible.builtin.file:
+        path: "/tmp/hass-oidc-auth-{{ homeassistant_oidc_auth_version }}.zip"
+        state: absent
+
+# ── HACS ──────────────────────────────────────────────────────────────────────
+# Same pinned-release + checksum + marker pattern as hass-oidc-auth. Updating HACS
+# from its own UI is reverted to the pinned version on the next run; integrations installed through HACS live in their own custom_components/
+# directories and are left alone.
+
+- name: Read installed HACS version
+  ansible.builtin.slurp:
+    src: "{{ homeassistant_data_dir }}/config/custom_components/hacs/.ansible-version"
+  register: homeassistant_hacs_marker
+  failed_when: false
+
+- name: Install HACS {{ homeassistant_hacs_version }}
+  when: >-
+    (homeassistant_hacs_marker.content | default('') | b64decode | trim)
+    != homeassistant_hacs_version ~ ' ' ~ homeassistant_hacs_sha256
+  notify: Restart homeassistant
+  block:
+    - name: Download HACS release
+      ansible.builtin.get_url:
+        url: "https://github.com/hacs/integration/releases/download/{{ homeassistant_hacs_version }}/hacs.zip"
+        dest: "/tmp/hacs-{{ homeassistant_hacs_version }}.zip"
+        checksum: "sha256:{{ homeassistant_hacs_sha256 }}"
+        mode: "0644"
+
+    - name: Remove previous HACS install
+      ansible.builtin.file:
+        path: "{{ homeassistant_data_dir }}/config/custom_components/hacs"
+        state: absent
+
+    - name: Create HACS directory
+      ansible.builtin.file:
+        path: "{{ homeassistant_data_dir }}/config/custom_components/hacs"
+        state: directory
+        mode: "0755"
+
+    - name: Extract HACS release
+      ansible.builtin.unarchive:
+        src: "/tmp/hacs-{{ homeassistant_hacs_version }}.zip"
+        dest: "{{ homeassistant_data_dir }}/config/custom_components/hacs"
+        remote_src: true
+
+    - name: Record installed HACS version
+      ansible.builtin.copy:
+        content: "{{ homeassistant_hacs_version }} {{ homeassistant_hacs_sha256 }}\n"
+        dest: "{{ homeassistant_data_dir }}/config/custom_components/hacs/.ansible-version"
+        mode: "0644"
+
+    - name: Remove downloaded HACS release
+      ansible.builtin.file:
+        path: "/tmp/hacs-{{ homeassistant_hacs_version }}.zip"
+        state: absent
+
+# ── Home Assistant ────────────────────────────────────────────────────────────
+
+- name: Template Home Assistant configuration.yaml
+  ansible.builtin.template:
+    src: ha-configuration.yaml.j2
+    dest: "{{ homeassistant_data_dir }}/config/configuration.yaml"
+    mode: "0644"
+  notify: Restart homeassistant
+
+- name: Template Home Assistant secrets.yaml
+  ansible.builtin.template:
+    src: ha-secrets.yaml.j2
+    dest: "{{ homeassistant_data_dir }}/config/secrets.yaml"
+    mode: "0600"
+  notify: Restart homeassistant
+
+# ── HTTP config store ─────────────────────────────────────────────────────────
+# HA 2026.x moved http: settings out of YAML into .storage/http. A migrated YAML
+# block only becomes a *pending trial* that HA reverts (to defaults, without proxy
+# trust) unless someone confirms it in the UI within 5 minutes — so YAML can't
+# reliably configure reverse-proxy trust. Instead, own the proxy keys in the
+# store directly. Only those keys are enforced; anything else set under
+# Settings > System > Network is preserved. Compared as parsed JSON, so HA's
+# own reformatting of the file doesn't cause churn.
+
+- name: Create HA storage directory
+  ansible.builtin.file:
+    path: "{{ homeassistant_data_dir }}/config/.storage"
+    state: directory
+    mode: "0700"
+
+- name: Read HA HTTP config store
+  ansible.builtin.slurp:
+    src: "{{ homeassistant_data_dir }}/config/.storage/http"
+  register: homeassistant_http_store
+  failed_when: false
+
+- name: Compute desired HA HTTP config store
+  vars:
+    _current: >-
+      {{ (homeassistant_http_store.content | b64decode | from_json)
+         if homeassistant_http_store.content is defined else {} }}
+    _proxy:
+      use_x_forwarded_for: true
+      trusted_proxies: "{{ homeassistant_trusted_proxies }}"
+    # HA's own defaults (HTTP_STORAGE_SCHEMA), used only when no store exists yet.
+    _defaults:
+      server_port: 8123
+      cors_allowed_origins: ["https://cast.home-assistant.io"]
+      login_attempts_threshold: -1
+      ip_ban_enabled: true
+      ssl_profile: modern
+      use_x_frame_options: true
+      created_at: "1970-01-01T00:00:00+00:00"
+      error: null
+      error_message: null
+    _pending: "{{ _current.data.pending | default(none) }}"
+  ansible.builtin.set_fact:
+    homeassistant_http_store_desired:
+      version: 2
+      minor_version: 2
+      key: http
+      data:
+        stable: "{{ _defaults | combine(_current.data.stable | default({})) | combine(_proxy) }}"
+        # A pending config that already failed its trial is never applied again;
+        # drop it. A live trial (a UI change awaiting confirmation) keeps proxy trust.
+        pending: >-
+          {{ (_pending | combine(_proxy))
+             if (_pending is mapping and _pending.error is none) else none }}
+        yaml_migration_done: true
+    homeassistant_http_store_current: "{{ _current }}"
+
+- name: Write HA HTTP config store
+  ansible.builtin.copy:
+    content: "{{ homeassistant_http_store_desired | to_nice_json(indent=2) }}\n"
+    dest: "{{ homeassistant_data_dir }}/config/.storage/http"
+    mode: "0600"
+  when: homeassistant_http_store_desired != homeassistant_http_store_current
+  notify: Restart homeassistant
+
+# Written by HA's UI editors — only seed them so configuration.yaml's !include resolves.
+- name: Seed UI-managed YAML files
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ homeassistant_data_dir }}/config/{{ item }}"
+    force: false
+    mode: "0644"
+  loop:
+    - automations.yaml
+    - scripts.yaml
+    - scenes.yaml
+
+# ── Mosquitto + Zigbee2MQTT ───────────────────────────────────────────────────
+
+- name: Template mosquitto.conf
+  ansible.builtin.template:
+    src: mosquitto.conf.j2
+    dest: "{{ homeassistant_data_dir }}/mosquitto/config/mosquitto.conf"
+    mode: "0644"
+  notify: Restart homeassistant
+
+- name: Template Zigbee2MQTT configuration.yaml
+  ansible.builtin.template:
+    src: z2m-configuration.yaml.j2
+    dest: "{{ homeassistant_data_dir }}/zigbee2mqtt/configuration.yaml"
+    mode: "0600"
+  notify: Restart homeassistant
+
+# ── Compose stack ─────────────────────────────────────────────────────────────
+
+- name: Template docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ homeassistant_data_dir }}/docker-compose.yml"
+    mode: "0640"
+  notify: Restart homeassistant
+
+# ── MQTT integration config entry ─────────────────────────────────────────────
+# HA Container has no Supervisor to discover the broker, and MQTT can't be set up
+# from YAML, so without this HA never connects to Mosquitto. Seed the config entry
+# HA's own UI flow would create — only when no mqtt entry exists, so a later
+# reconfigure in the UI is preserved. HA rewrites core.config_entries from memory,
+# so it must be stopped (and the file re-read) before editing.
+
+- name: Read HA config entries store
+  ansible.builtin.slurp:
+    src: "{{ homeassistant_data_dir }}/config/.storage/core.config_entries"
+  register: homeassistant_config_entries
+  failed_when: false
+
+- name: Seed MQTT config entry
+  vars:
+    _entries_present: "{{ homeassistant_config_entries.content is defined }}"
+    _mqtt_missing: >-
+      {{ not _entries_present or
+         ((homeassistant_config_entries.content | b64decode | from_json).data.entries
+          | selectattr('domain', 'equalto', 'mqtt') | list | length == 0) }}
+  when: _mqtt_missing | bool
+  block:
+    - name: Stop Home Assistant before editing its config entries
+      community.docker.docker_compose_v2:
+        project_src: "{{ homeassistant_data_dir }}"
+        services: [homeassistant]
+        state: stopped
+      when: _entries_present | bool
+
+    - name: Re-read HA config entries store
+      ansible.builtin.slurp:
+        src: "{{ homeassistant_data_dir }}/config/.storage/core.config_entries"
+      register: homeassistant_config_entries_stopped
+      failed_when: false
+
+    - name: Write HA config entries store with MQTT entry
+      vars:
+        _now: "{{ now(utc=True).isoformat() }}+00:00"
+        # Matches what the MQTT config flow's broker step creates (entry version 2.1).
+        _mqtt_entry:
+          entry_id: "{{ (inventory_hostname ~ '-mqtt') | hash('sha1') | upper | truncate(26, true, '') }}"
+          domain: mqtt
+          title: "127.0.0.1"
+          data:
+            broker: "127.0.0.1"
+            port: 1883
+          options: {}
+          version: 2
+          minor_version: 1
+          source: user
+          unique_id: null
+          disabled_by: null
+          discovery_keys: {}
+          subentries: []
+          pref_disable_new_entities: false
+          pref_disable_polling: false
+          created_at: "{{ _now }}"
+          modified_at: "{{ _now }}"
+        # Used only when HA has never started; HA migrates the store version itself.
+        _empty_store:
+          version: 1
+          minor_version: 5
+          key: core.config_entries
+          data:
+            entries: []
+        _store: >-
+          {{ (homeassistant_config_entries_stopped.content | b64decode | from_json)
+             if homeassistant_config_entries_stopped.content is defined else _empty_store }}
+      ansible.builtin.copy:
+        content: >-
+          {{ _store | combine({'data': {'entries':
+               (_store.data.entries | rejectattr('domain', 'equalto', 'mqtt') | list) + [_mqtt_entry]}})
+             | to_nice_json(indent=2) }}
+        dest: "{{ homeassistant_data_dir }}/config/.storage/core.config_entries"
+        mode: "0644"
+
+- name: Pull Home Assistant stack images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ homeassistant_data_dir }}"
+
+- name: Start Home Assistant stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ homeassistant_data_dir }}"
+    state: present

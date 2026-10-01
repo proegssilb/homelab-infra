@@ -1,0 +1,8 @@
+---
+homeassistant_db_host: "pg01.{{ homelab_domain }}"
+homeassistant_oidc_discovery_url: "https://auth.{{ homelab_domain }}/application/o/homeassistant/.well-known/openid-configuration"
+
+# HA rejects X-Forwarded-For from anything not listed here (400 Bad Request).
+# proxy01 is on DHCP, so trust the LAN subnet rather than pinning its address.
+homeassistant_trusted_proxies:
+  - 192.168.20.0/24

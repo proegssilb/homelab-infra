@@ -1,0 +1,36 @@
+---
+# Managed by Ansible — do not edit manually
+#
+# Host networking throughout: HA needs it for mDNS/SSDP discovery, and it lets
+# HA and Zigbee2MQTT reach the loopback-only Mosquitto broker on 127.0.0.1.
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:{{ homeassistant_version }}
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - {{ homeassistant_data_dir }}/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - mosquitto
+
+  mosquitto:
+    image: eclipse-mosquitto:{{ homeassistant_mosquitto_version }}
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - {{ homeassistant_data_dir }}/mosquitto/config:/mosquitto/config:ro
+      - {{ homeassistant_data_dir }}/mosquitto/data:/mosquitto/data
+
+  zigbee2mqtt:
+    image: ghcr.io/koenkk/zigbee2mqtt:{{ homeassistant_zigbee2mqtt_version }}
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - {{ homeassistant_data_dir }}/zigbee2mqtt:/app/data
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      # configuration.yaml is always templated by Ansible; never start the first-run wizard.
+      Z2M_ONBOARD_NO_SERVER: "1"
+    depends_on:
+      - mosquitto

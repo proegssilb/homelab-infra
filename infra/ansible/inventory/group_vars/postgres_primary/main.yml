@@ -4,12 +4,14 @@ postgresql_databases:
   - { name: freshrss,  owner: freshrss  }
   - { name: immich,    owner: immich    }
   - { name: anamnesis, owner: anamnesis }
+  - { name: homeassistant, owner: homeassistant }
 
 postgresql_users:
   - { name: mealie,    password: "{{ mealie_db_pass | trim }}",    db: mealie    }
   - { name: freshrss,  password: "{{ freshrss_db_pass | trim }}",  db: freshrss  }
   - { name: immich,    password: "{{ immich_db_pass | trim }}",    db: immich    }
   - { name: anamnesis, password: "{{ anamnesis_db_pass | trim }}", db: anamnesis }
+  - { name: homeassistant, password: "{{ homeassistant_db_pass | trim }}", db: homeassistant }
 
 # Immich's InitialMigration runs CREATE EXTENSION for each of these. Its DB user is
 # not a superuser, and `earthdistance` and `vector` are not trusted extensions, so the

@@ -88,6 +88,16 @@ _nginx_vhosts_apps:
     # nginx doesn't reject large attachments before the app ever sees them.
     extra_proxy_params: "client_max_body_size 40m;"
 
+  - name: homeassistant
+    server_name: "ha.{{ homelab_domain }}"
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      # Public alias intentionally differs from the VM hostname (homeassistant)
+      # to avoid colliding with the VM's own DHCP-registered DNS name.
+      - "homeassistant.{{ homelab_domain }}:8123"
+
   - name: garage-apps-s3
     server_name: "s3.{{ homelab_domain }}"
     ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
