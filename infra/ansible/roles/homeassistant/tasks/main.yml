@@ -50,6 +50,36 @@
     group: "1883"
     mode: "0750"
 
+# ── DNS cache ─────────────────────────────────────────────────────────────────
+# See templates/unbound.conf.j2 for why HA needs this. Installed before the
+# compose stack starts, since the container's resolv.conf points at it.
+
+- name: Install unbound
+  ansible.builtin.apt:
+    name: unbound
+    state: present
+
+- name: Template unbound config
+  ansible.builtin.template:
+    src: unbound.conf.j2
+    dest: /etc/unbound/unbound.conf.d/homeassistant.conf
+    mode: "0644"
+    validate: unbound-checkconf %s
+  notify: Restart unbound
+
+- name: Enable and start unbound
+  ansible.builtin.systemd_service:
+    name: unbound
+    enabled: true
+    state: started
+
+- name: Template container resolv.conf
+  ansible.builtin.template:
+    src: container-resolv.conf.j2
+    dest: "{{ homeassistant_data_dir }}/resolv.conf"
+    mode: "0644"
+  notify: Restart homeassistant
+
 # ── hass-oidc-auth (Authentik SSO) ────────────────────────────────────────────
 # Installed from a pinned release instead of HACS so the component version is a
 # deliberate choice. Uses the release's hass-oidc-auth.zip asset, not GitHub's source

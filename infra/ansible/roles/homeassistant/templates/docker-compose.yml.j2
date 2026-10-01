@@ -11,6 +11,8 @@ services:
     volumes:
       - {{ homeassistant_data_dir }}/config:/config
       - /etc/localtime:/etc/localtime:ro
+      # Resolve through the host's unbound cache (see unbound.conf).
+      - {{ homeassistant_data_dir }}/resolv.conf:/etc/resolv.conf:ro
     depends_on:
       - mosquitto
 

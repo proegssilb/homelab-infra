@@ -1,0 +1,24 @@
+# Managed by Ansible — do not edit manually
+#
+# Loopback-only caching forwarder for the Home Assistant container. HA's c-ares
+# resolver gives up within a second or two, so a brief hiccup at the gateway
+# fails OIDC token requests (500 on /auth/oidc/callback). Serving expired
+# answers immediately, refreshing in the background, rides those hiccups out.
+# systemd-resolved can't do this: it only serves stale data after an upstream
+# attempt has already timed out, and doesn't follow stale CNAME chains.
+
+server:
+    interface: 127.0.0.1
+    # No DNSSEC validation: the gateway answers local records under a public
+    # zone, which would validate as bogus if that zone is signed.
+    module-config: "iterator"
+    # Guard against the gateway serving TTL 0, which would never be cached.
+    cache-min-ttl: {{ homeassistant_dns_cache_min_ttl }}
+    prefetch: yes
+    serve-expired: yes
+    serve-expired-ttl: {{ homeassistant_dns_serve_expired_ttl }}
+    serve-expired-client-timeout: 0
+
+forward-zone:
+    name: "."
+    forward-addr: {{ homeassistant_dns_upstream }}

@@ -1,5 +1,8 @@
 ---
 homeassistant_db_host: "pg01.{{ homelab_domain }}"
+# Explicit LAN resolver for the unbound cache to forward to, rather than reading
+# resolv.conf (same reasoning as nginx_resolver in group_vars/proxy).
+homeassistant_dns_upstream: "192.168.20.1"
 homeassistant_oidc_discovery_url: "https://auth.{{ homelab_domain }}/application/o/homeassistant/.well-known/openid-configuration"
 
 # HA rejects X-Forwarded-For from anything not listed here (400 Bad Request).

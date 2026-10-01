@@ -13,6 +13,12 @@ homeassistant_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 homeassistant_data_dir: /opt/homeassistant
 homeassistant_trusted_proxies: []
 
+# Local unbound cache in front of the LAN resolver, used by the HA container only
+# (the host itself stays on systemd-resolved).
+homeassistant_dns_upstream: "{{ ansible_dns.nameservers | first }}"
+homeassistant_dns_cache_min_ttl: 30
+homeassistant_dns_serve_expired_ttl: 86400
+
 # Recorder (history/statistics) lives on the shared PostgreSQL server, not local SQLite.
 homeassistant_db_host: ""
 homeassistant_db_name: homeassistant
