@@ -27,7 +27,17 @@ just bootstrap
 
 # Tear down a state directory
 just destroy <platform|pets>
+
+# Day-2 boot benchmark: Proxmox start -> service answering (persistent VM, N runs)
+just cluster-up bench     # once; tofu/bench is NOT part of `just bootstrap`
+just boot-bench [runs]    # VM start -> service answering (api / agent / service phases)
+just docker-bench [runs]  # docker alone on the running VM (container start, daemon start)
+just destroy bench        # when done
 ```
+
+`tofu/bench/` needs its own gitignored `terraform.tfvars` (copy the template/datastore/ssh-key
+values from `platform/`). The bench VM is built like any real VM on purpose, so the numbers
+include whatever overhead the IaC produces.
 
 ### Environment setup
 

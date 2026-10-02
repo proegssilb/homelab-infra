@@ -48,6 +48,17 @@ vm-rebuild vm state="pets":
     cd tofu/{{state}} && tofu apply -auto-approve -target=module.vm["{{vm}}"]
     just tune {{vm}}
 
+# Time Proxmox start -> service answering on the persistent bench VM.
+# Needs `just cluster-up bench` first; see scripts/boot-bench.py.
+boot-bench runs="5":
+    just _tofu-init bench
+    ./scripts/boot-bench.py --runs {{runs}}
+
+# Time docker alone (container start, daemon start) on the running bench VM.
+docker-bench runs="5":
+    just _tofu-init bench
+    ./scripts/boot-bench.py --docker --runs {{runs}}
+
 # ── OS tuning ──────────────────────────────────────────────────────────────────
 
 # Run baseline OS tuning against a single host.
@@ -96,7 +107,7 @@ lint:
     rc=0
 
     echo "── tofu validate ─────────────────────────────────────────────"
-    for d in platform pets; do
+    for d in platform pets bench; do
       # -backend=false keeps this offline; `just plan` re-inits the real
       # Garage backend on its next run, so nothing is left broken.
       if ( cd tofu/"$d" && tofu init -backend=false -input=false >/dev/null \
@@ -115,7 +126,7 @@ lint:
     echo "── tofu fmt (advisory) ───────────────────────────────────────"
     # *.tf only, never *.tfvars — those hold plaintext secrets and -diff
     # would print them straight to the terminal.
-    for d in platform pets; do
+    for d in platform pets bench; do
       ( cd tofu/"$d" && tofu fmt -check -diff -- *.tf ) || true
     done
 
