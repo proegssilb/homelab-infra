@@ -144,6 +144,13 @@
   roles:
     - homeassistant
 
+- name: Homepage — browser start page
+  hosts: homepage_app
+  become: true
+  gather_facts: true
+  roles:
+    - homepage
+
 - name: Tailscale subnet routers
   hosts: tailscale_router
   become: true

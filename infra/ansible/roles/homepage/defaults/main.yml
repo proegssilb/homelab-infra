@@ -1,0 +1,22 @@
+---
+homepage_version: "v2.4.0"
+homepage_data_dir: /opt/homepage
+homepage_port: 3000
+homepage_server_name: "home.{{ homelab_domain }}"
+homepage_search_url: "https://search.{{ homelab_domain }}/search?q="
+# Hotlinked from Unsplash (their guidelines ask for hotlinking over rehosting).
+# "Northern lights" by Jonatan Pie.
+homepage_background: "https://images.unsplash.com/photo-1491466424936-e304919aada7?w=2560&q=80&auto=format&fit=crop"
+
+# Every proxy vhost becomes a row, so a new service shows up without touching
+# this role. The group comes from which vhosts_*.yml file defines the vhost;
+# a vhost can override it (and name/description/icon/monitor_path) with a
+# `homepage:` block, or set `homepage: false` to stay off the page.
+homepage_vhost_groups:
+  - name: Apps
+    vhosts: "{{ hostvars[groups['proxy'][0]]['_nginx_vhosts_apps'] if groups.get('proxy') else [] }}"
+  - name: Lab
+    vhosts: >-
+      {{ (hostvars[groups['proxy'][0]]['_nginx_vhosts_platform']
+          + hostvars[groups['proxy'][0]]['_nginx_vhosts_observability'])
+         if groups.get('proxy') else [] }}

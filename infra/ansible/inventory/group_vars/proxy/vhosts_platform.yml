@@ -2,6 +2,10 @@
 _nginx_vhosts_platform:
   - name: proxmox
     server_name: "proxmox.{{ homelab_domain }}"
+    homepage:
+      name: Proxmox
+      description: Virtualization cluster
+      icon: proxmox.png
     ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
     ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
     upstream_protocol: https

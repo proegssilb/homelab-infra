@@ -41,3 +41,4 @@ override.tf.json
 *.swp
 *~
 .envrc
+.superpowers/

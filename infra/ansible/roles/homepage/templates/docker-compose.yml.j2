@@ -1,0 +1,11 @@
+# Managed by Ansible — do not edit manually
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:{{ homepage_version }}
+    restart: unless-stopped
+    ports:
+      - "{{ homepage_port }}:3000"
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: "{{ homepage_server_name }}"
+    volumes:
+      - "{{ homepage_data_dir }}/config:/app/config"

@@ -1,0 +1,29 @@
+# Managed by Ansible — do not edit manually
+{% set ns = namespace(rows=[]) %}
+{% for group in homepage_vhost_groups %}
+{%   for vhost in group.vhosts if vhost.homepage | default({}) is not false %}
+{%     set hp = vhost.homepage | default({}) %}
+{%     set ns.rows = ns.rows + [{
+         'group': hp.group | default(group.name),
+         'name': hp.name | default(vhost.name),
+         'href': 'https://' ~ vhost.server_name,
+         'monitor': 'https://' ~ vhost.server_name ~ hp.monitor_path | default(''),
+         'description': hp.description | default(''),
+         'icon': hp.icon | default(''),
+       }] %}
+{%   endfor %}
+{% endfor %}
+{% for group_name in ns.rows | map(attribute='group') | unique %}
+- {{ group_name | to_json }}:
+{%   for row in ns.rows | selectattr('group', 'equalto', group_name) %}
+    - {{ row.name | to_json }}:
+        href: {{ row.href | to_json }}
+        siteMonitor: {{ row.monitor | to_json }}
+{%     if row.description %}
+        description: {{ row.description | to_json }}
+{%     endif %}
+{%     if row.icon %}
+        icon: {{ row.icon | to_json }}
+{%     endif %}
+{%   endfor %}
+{% endfor %}
