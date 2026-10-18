@@ -1,0 +1,16 @@
+modules:
+  # Default: the service must answer 2xx (redirects, e.g. to Authentik, are followed).
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: ip4
+
+  # For endpoints that legitimately refuse anonymous requests (S3 answers 403).
+  # Only 5xx or no answer at all counts as down.
+  http_reachable:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: ip4
+      valid_status_codes: [200, 201, 204, 301, 302, 303, 307, 308, 400, 401, 403, 404, 405]

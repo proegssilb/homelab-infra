@@ -50,6 +50,7 @@
     - prometheus
     - alertmanager
     - graphite_exporter
+    - blackbox_exporter
     - unpoller
 
 - name: Grafana — dashboards

@@ -51,6 +51,8 @@ _nginx_vhosts_apps:
     upstream_protocol: http
     upstream_servers:
       - "freshrss.{{ homelab_domain }}:8080"
+    # Answers 401 until logged in; only 5xx/no answer is down.
+    probe_module: http_reachable
 
   - name: immich
     server_name: "photos.{{ homelab_domain }}"
@@ -109,3 +111,5 @@ _nginx_vhosts_apps:
     # upload well below what the apps behind it allow (anamnesis alone permits
     # 40MiB). Generous but still bounded, since this endpoint is shared.
     extra_proxy_params: "client_max_body_size 5g;"
+    # Anonymous requests get 403 from a healthy Garage; only 5xx/no answer is down.
+    probe_module: http_reachable

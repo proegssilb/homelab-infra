@@ -6,3 +6,8 @@ prometheus_config_dir: /etc/prometheus
 prometheus_data_dir: /var/lib/prometheus
 prometheus_retention: "30d"
 prometheus_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
+prometheus_blackbox_address: "127.0.0.1:9115"
+# Every vhost the proxy serves is probed through the proxy by its public name,
+# so a new vhost gets monitored with no extra config. A vhost may set
+# probe_module to override the blackbox module (default http_2xx).
+prometheus_blackbox_vhosts: "{{ hostvars[groups['proxy'][0]]['nginx_vhosts'] if groups.get('proxy') else [] }}"

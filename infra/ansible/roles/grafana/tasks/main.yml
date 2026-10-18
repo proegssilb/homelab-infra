@@ -86,6 +86,24 @@
     group: grafana
     mode: "0644"
 
+- name: Download Blackbox Exporter dashboard
+  ansible.builtin.get_url:
+    url: "https://grafana.com/api/dashboards/14928/revisions/{{ grafana_blackbox_dashboard_revision }}/download"
+    dest: "{{ grafana_dashboards_dir }}/blackbox-exporter.json"
+    owner: grafana
+    group: grafana
+    mode: "0644"
+
+# The dashboard is exported for UI import; file provisioning never fills in
+# ${DS_PROMETHEUS}. Refer to the datasource by name: giving the provisioned
+# datasource a fixed uid instead stops Grafana from starting on an existing
+# install ("Datasource provisioning error: data source not found").
+- name: Point Blackbox Exporter dashboard at the Prometheus datasource
+  ansible.builtin.replace:
+    path: "{{ grafana_dashboards_dir }}/blackbox-exporter.json"
+    regexp: '\$\{DS_PROMETHEUS\}'
+    replace: "Prometheus"
+
 - name: Install Grafana plugins
   ansible.builtin.command:
     cmd: grafana-cli --homepath /usr/share/grafana plugins install {{ item }}

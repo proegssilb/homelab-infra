@@ -1,0 +1,7 @@
+---
+# https://github.com/prometheus/blackbox_exporter/releases — update as needed
+blackbox_exporter_version: "0.29.0"
+blackbox_exporter_install_dir: /usr/local/bin
+blackbox_exporter_config_dir: /etc/blackbox_exporter
+# Only Prometheus on this host talks to it.
+blackbox_exporter_http_listen: "127.0.0.1:9115"

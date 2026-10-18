@@ -30,3 +30,22 @@ scrape_configs:
     file_sd_configs:
       - files:
           - {{ prometheus_config_dir }}/targets/static.yml
+{% if prometheus_blackbox_vhosts | length > 0 %}
+
+  - job_name: blackbox_http
+    metrics_path: /probe
+    static_configs:
+{% for vhost in prometheus_blackbox_vhosts %}
+      - targets: ['https://{{ vhost.server_name }}/']
+        labels:
+          __param_module: {{ vhost.probe_module | default('http_2xx') }}
+          target: {{ vhost.name }}
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: {{ prometheus_blackbox_address }}
+{% endif %}
