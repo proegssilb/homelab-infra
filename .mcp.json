@@ -2,8 +2,8 @@
   "mcpServers": {
     "terraform": {
       "type": "stdio",
-      "command": "podman-remote",
-      "args": ["run", "-i", "--rm", "docker.io/hashicorp/terraform-mcp-server"]
+      "command": "sh",
+      "args": ["-c", "exec \"$(command -v podman-remote || command -v podman)\" run -i --rm docker.io/hashicorp/terraform-mcp-server"]
     }
   }
 }
