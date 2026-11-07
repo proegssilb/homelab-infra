@@ -9,6 +9,12 @@ apt_cache_port: 3142
 apt_cache_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 apt_cache_dir: /var/cache/apt-cacher-ng
 
+# Upstream address families, in order. The lab has no routed IPv6 (only
+# link-local), but repo hosts publish AAAA records; trying v6 first made every
+# HTTPS tunnel fail with a misleading "502 CONNECT error: Cannot allocate
+# memory". v4 first, v6 as fallback for if the network ever gets real IPv6.
+apt_cache_connect_proto: "v4 v6"
+
 # HTTPS repositories can't be cached; the proxy only tunnels (CONNECT) to these
 # hosts on 443. Each one is a repo (or the source of its signing key) that some
 # role adds with deb822_repository. Add a host here when a role starts using a
