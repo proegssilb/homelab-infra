@@ -1,0 +1,148 @@
+---
+- name: Install Docker
+  ansible.builtin.import_role:
+    name: docker_install
+
+- name: Assert required Coder settings are set
+  ansible.builtin.assert:
+    that:
+      - coder_access_url | length > 0
+      - coder_db_password | length > 0
+      - coder_proxmox_endpoint | length > 0
+      - coder_proxmox_password | length > 0
+      - coder_workspace_ssh_public_key | length > 0
+      - coder_workspace_ssh_private_key | length > 0
+    fail_msg: coder_* settings missing from group_vars/coder_app.yml or host_vars/coder.yml.
+
+# Coder runs as uid 1000 in its container and drives the host's Docker daemon
+# to create workspaces, so it needs the host's docker group on the socket.
+- name: Look up docker group GID
+  ansible.builtin.getent:
+    database: group
+    key: docker
+
+- name: Create app directory
+  ansible.builtin.file:
+    path: "{{ coder_data_dir }}"
+    state: directory
+    mode: "0750"
+
+# Read by the Coder container (uid 1000) when provisioning workspace VMs.
+- name: Create workspace SSH key directory
+  ansible.builtin.file:
+    path: "{{ coder_data_dir }}/workspace-ssh"
+    state: directory
+    owner: "1000"
+    group: "1000"
+    mode: "0700"
+
+- name: Install workspace SSH private key
+  ansible.builtin.copy:
+    content: "{{ coder_workspace_ssh_private_key | trim }}\n"
+    dest: "{{ coder_data_dir }}/workspace-ssh/id_ed25519"
+    owner: "1000"
+    group: "1000"
+    mode: "0400"
+  no_log: true
+
+- name: Install workspace SSH public key
+  ansible.builtin.copy:
+    content: "{{ coder_workspace_ssh_public_key | trim }}\n"
+    dest: "{{ coder_data_dir }}/workspace-ssh/id_ed25519.pub"
+    owner: "1000"
+    group: "1000"
+    mode: "0444"
+
+- name: Copy Coder templates
+  ansible.builtin.copy:
+    src: coder-templates/
+    dest: "{{ coder_data_dir }}/coder-templates/"
+    mode: "u=rwX,go=rX"
+
+- name: Template docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ coder_data_dir }}/docker-compose.yml"
+    mode: "0600"
+  notify: Restart coder
+
+- name: Pull Coder images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ coder_data_dir }}"
+
+- name: Start Coder stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ coder_data_dir }}"
+    state: present
+    wait: true
+
+- name: Wait for Coder to answer
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ coder_port }}/healthz"
+  register: coder_health
+  until: coder_health.status == 200
+  retries: 30
+  delay: 5
+
+# Push only when the template source or its variables changed since the last
+# successful push: write the wanted state to .pending, compare to .pushed.
+- name: Push Proxmox VM template
+  when: coder_admin_token | length > 0
+  block:
+    # A file, not --variable flags: the CLI splits flag values on commas.
+    - name: Write proxmox-vm template variables
+      ansible.builtin.copy:
+        content: |
+          clone_template_vmid: "{{ coder_proxmox_template.clone_template_vmid }}"
+          clone_template_node: "{{ coder_proxmox_template.clone_template_node }}"
+          nodes: "{{ coder_proxmox_template.nodes | join(',') }}"
+          datastore: "{{ coder_proxmox_template.datastore }}"
+          bridge: "{{ coder_proxmox_template.bridge }}"
+          pool: "{{ coder_proxmox_template.pool }}"
+          vmid_min: "{{ coder_proxmox_template.vmid_min }}"
+          vmid_max: "{{ coder_proxmox_template.vmid_max }}"
+        dest: "{{ coder_data_dir }}/coder-templates/proxmox-vm.vars.yml"
+        mode: "0644"
+
+    - name: Record wanted template state
+      ansible.builtin.copy:
+        content: |
+          {{ lookup('ansible.builtin.file', 'coder-templates/proxmox-vm/main.tf') | hash('sha256') }}
+          {{ coder_proxmox_template | to_json }}
+        dest: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
+        mode: "0644"
+
+    - name: Read pushed template state
+      ansible.builtin.slurp:
+        src: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pushed"
+      register: coder_template_pushed
+      failed_when: false
+
+    - name: Read wanted template state
+      ansible.builtin.slurp:
+        src: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
+      register: coder_template_pending
+
+    - name: Push proxmox-vm template to Coder
+      when: coder_template_pushed.content | default('') != coder_template_pending.content
+      ansible.builtin.command:
+        argv: "{{ ['docker', 'compose', 'exec', '-T',
+                   '-e', 'CODER_URL=http://127.0.0.1:7080',
+                   '-e', 'CODER_SESSION_TOKEN',
+                   'coder', 'coder', 'templates', 'push', 'proxmox-vm',
+                   '--directory', '/coder-templates/proxmox-vm', '--yes',
+                   '--variables-file', '/coder-templates/proxmox-vm.vars.yml',
+                   '--message', 'Pushed by Ansible'] }}"
+        chdir: "{{ coder_data_dir }}"
+      # Token goes in via the environment (`-e NAME` inherits it), so it never
+      # appears in argv or in task output — no need for no_log.
+      environment:
+        CODER_SESSION_TOKEN: "{{ coder_admin_token | trim }}"
+      changed_when: true
+
+    - name: Mark template state as pushed
+      ansible.builtin.copy:
+        src: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
+        dest: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pushed"
+        remote_src: true
+        mode: "0644"

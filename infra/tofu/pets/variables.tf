@@ -47,3 +47,9 @@ variable "oidc_client_secrets" {
   type        = map(string)
   sensitive   = true
 }
+
+variable "coder_proxmox_password" {
+  description = "Password for coder@pve (Coder's workspace provisioner). Set via TF_VAR_coder_proxmox_password in .env; must match coder_proxmox_password in ansible host_vars/coder.yml."
+  type        = string
+  sensitive   = true
+}

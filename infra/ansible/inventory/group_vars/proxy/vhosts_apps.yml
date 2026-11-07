@@ -133,6 +133,21 @@ _nginx_vhosts_apps:
     # nginx doesn't reject large attachments before the app ever sees them.
     extra_proxy_params: "client_max_body_size 40m;"
 
+  - name: coder
+    server_name: "dev.{{ homelab_domain }}"
+    homepage:
+      name: Coder
+      description: Remote dev environments (demo)
+      icon: coder.png
+      monitor_path: /healthz
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      # Public alias (dev) differs from the VM hostname (coder) so it doesn't
+      # collide with the VM's own DHCP-registered DNS name.
+      - "coder.{{ homelab_domain }}:7080"
+
   - name: homeassistant
     server_name: "ha.{{ homelab_domain }}"
     homepage:

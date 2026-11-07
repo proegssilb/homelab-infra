@@ -1,0 +1,31 @@
+---
+coder_version: "v2.38.5"
+coder_postgres_version: "17"
+coder_data_dir: /opt/coder
+coder_port: 7080
+# External URL workspaces and browsers use to reach Coder (set in group_vars).
+coder_access_url: ""
+# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --stdin-name coder_db_password
+coder_db_password: ""
+
+# ── Proxmox workspaces (template: files/coder-templates/proxmox-vm) ────────────
+# coder@pve is created by tofu/pets/coder_proxmox.tf, fenced to the "coder" pool.
+coder_proxmox_endpoint: ""
+coder_proxmox_user: coder@pve
+coder_proxmox_password: ""
+# Key Coder uses to SSH into workspace VMs to install the agent.
+coder_workspace_ssh_public_key: ""
+coder_workspace_ssh_private_key: ""
+coder_proxmox_template:
+  clone_template_vmid: 901
+  clone_template_node: pxmx02
+  nodes: [pxmx01, pxmx02, pxmx03, pxmx04, pxmx05]
+  datastore: ceph-ssd-pool
+  bridge: vmbr0
+  pool: coder
+  vmid_min: 1000
+  vmid_max: 1999
+# Coder API token of an Owner, used to push templates. Leave empty to skip the
+# push (e.g. right after a rebuild, before the first admin exists).
+# Create: Coder UI -> Account -> Tokens, then ansible-vault encrypt_string --stdin-name coder_admin_token
+coder_admin_token: ""

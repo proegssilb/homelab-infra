@@ -151,6 +151,13 @@
   roles:
     - homepage
 
+- name: Coder — remote dev environments (demo)
+  hosts: coder_app
+  become: true
+  gather_facts: true
+  roles:
+    - coder
+
 - name: Tailscale subnet routers
   hosts: tailscale_router
   become: true

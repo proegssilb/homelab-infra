@@ -79,6 +79,7 @@ Never blur this line — Tofu does not install software; Ansible does not create
 |------------|------------|---------|
 | `platform/` | 2xx | Infrastructure VMs: proxy pair, observability stack, auth |
 | `pets/`     | 1xx | Named standalone VMs: Nextcloud, Forgejo (code) |
+| (none)      | 1000–1999 | Coder workspace VMs, created by Coder (template in `ansible/roles/coder/files/coder-templates/`), fenced to the `coder` Proxmox pool, tagged `coder_workspace` and excluded from the Ansible inventory. Never allocate these IDs to lab VMs. |
 
 There is no `cluster-dev/` directory yet (referenced in justfile, not yet created).
 

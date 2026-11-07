@@ -54,6 +54,9 @@ locals {
 
     # Browser start page — Homepage (stateless Docker; rows generated from the proxy vhosts)
     homepage = { vmid = 115, cores = 1, memory = 1024, node = "pxmx02", tags = ["observe", "pets", "homepage_app"], ha = true }
+
+    # Remote dev environments — Coder (demo: bundled PostgreSQL; workspaces are Proxmox VMs 1000–1999, see coder_proxmox.tf)
+    coder = { vmid = 116, cores = 4, memory = 8192, disk_size = 60, node = "pxmx01", tags = ["observe", "pets", "coder_app"], ha = true }
   }
 }
 
