@@ -1,4 +1,67 @@
 ---
+# APT proxy (aptcache01). Must come before the first apt task so hosts without
+# direct internet access can still refresh and install. apt asks the detect
+# script per repository: the proxy if it answers, otherwise a direct
+# connection, so a host that still has internet keeps updating through a proxy
+# outage. Hosts with apt_proxy_host empty (the proxy itself, the bootstrap node)
+# get the config removed.
+- name: Check whether the APT proxy is reachable
+  ansible.builtin.wait_for:
+    host: "{{ apt_proxy_host }}"
+    port: "{{ apt_proxy_port }}"
+    timeout: 3
+  register: os_baseline_apt_proxy_probe
+  # Not failed_when: false, which would also mark a timeout as success; the
+  # real result is needed below.
+  ignore_errors: true
+  when: apt_proxy_host | length > 0
+
+# Used by roles that add repos with deb822_repository: its signed_by URL is
+# fetched by the module itself, outside apt, so it needs the proxy in the
+# environment. Empty when there's no proxy or it didn't answer.
+- name: Record proxy environment for repository key downloads
+  ansible.builtin.set_fact:
+    apt_proxy_env: "{{ {'http_proxy': os_baseline_apt_proxy_url, 'https_proxy': os_baseline_apt_proxy_url}
+      if (apt_proxy_host | length > 0 and os_baseline_apt_proxy_probe is succeeded)
+      else {} }}"
+  vars:
+    os_baseline_apt_proxy_url: "http://{{ apt_proxy_host }}:{{ apt_proxy_port }}"
+
+- name: Install APT proxy detect script
+  ansible.builtin.copy:
+    dest: /usr/local/lib/apt-proxy-detect
+    content: |
+      #!/bin/bash
+      # Managed by Ansible (os_baseline)
+      # apt runs this for each repository host: print the proxy if it answers,
+      # otherwise DIRECT.
+      if timeout 2 bash -c '</dev/tcp/{{ apt_proxy_host }}/{{ apt_proxy_port }}' 2>/dev/null; then
+        echo "http://{{ apt_proxy_host }}:{{ apt_proxy_port }}"
+      else
+        echo DIRECT
+      fi
+    mode: "0755"
+  when: apt_proxy_host | length > 0
+
+- name: Point apt at the proxy
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/01proxy
+    content: |
+      // Managed by Ansible (os_baseline)
+      Acquire::http::Proxy-Auto-Detect "/usr/local/lib/apt-proxy-detect";
+      Acquire::https::Proxy-Auto-Detect "/usr/local/lib/apt-proxy-detect";
+    mode: "0644"
+  when: apt_proxy_host | length > 0
+
+- name: Remove APT proxy config from hosts exempt from the proxy
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/apt/apt.conf.d/01proxy
+    - /usr/local/lib/apt-proxy-detect
+  when: apt_proxy_host | length == 0
+
 - name: Update apt cache
   ansible.builtin.apt:
     update_cache: true

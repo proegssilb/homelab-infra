@@ -101,8 +101,13 @@ So Proxmox tags in `tofu/*/main.tf` directly control which Ansible roles run on 
 
 Roles apply to groups, not individual hosts. Key assignments:
 
+- `apt_cache` (aptcache01) → os_baseline, apt_cache — first play, ahead of `all`
 - `all` → os_baseline, node_exporter, alloy
 - `bootstrap` (blade02 only) → garage
+
+### APT proxy
+
+Every Ansible-managed host fetches packages through `aptcache01` (apt-cacher-ng, port 3142), so a server that only needs the internet for packages can lose internet access. The proxy is an allowlist: plain-HTTP repos only via its Remap rules, HTTPS repos only by tunnel to the hosts in `apt_cache_https_passthrough_hosts`. When a role adds a new HTTPS repo, add its host there, and give its `deb822_repository` task `environment: "{{ apt_proxy_env | default({}) }}"` so the signing-key download goes through the proxy too. The proxy itself and the `bootstrap` group are exempt (`apt_proxy_host: ""`).
 - `proxy` → keepalived, certbot, nginx_reverse_proxy
 - `obs_prometheus` → prometheus, alertmanager, graphite_exporter, unpoller
 - `obs_loki` → loki

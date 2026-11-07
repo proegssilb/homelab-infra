@@ -1,0 +1,73 @@
+---
+# APT caching proxy (apt-cacher-ng). Runs in its own play ahead of the `all`
+# play in site.yml, so during `just cluster-up platform` it is serving before
+# any other host's os_baseline points apt at it. This host itself is exempt
+# from the proxy (group_vars/apt_cache.yml) and fetches directly.
+
+- name: Settle udev events before touching data disk
+  ansible.builtin.command:
+    cmd: udevadm settle
+  changed_when: false
+
+- name: Create ext4 filesystem on cache data disk
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ apt_cache_data_disk }}"
+
+- name: Mount cache data disk
+  ansible.posix.mount:
+    path: "{{ apt_cache_dir }}"
+    src: "{{ apt_cache_data_disk }}"
+    fstype: ext4
+    state: mounted
+    opts: defaults,noatime
+
+# Answer the package's install-time question (allow HTTPS tunnels to anywhere)
+# with "no"; the tunnel allowlist lives in the config file below instead.
+- name: Preseed apt-cacher-ng to refuse arbitrary HTTPS tunnels
+  ansible.builtin.debconf:
+    name: apt-cacher-ng
+    question: apt-cacher-ng/tunnelenable
+    value: "false"
+    vtype: boolean
+
+- name: Install apt-cacher-ng
+  ansible.builtin.apt:
+    name: apt-cacher-ng
+    state: present
+
+# The mount above replaces the directory the package created, so ownership has
+# to be set after both.
+- name: Give apt-cacher-ng ownership of the cache directory
+  ansible.builtin.file:
+    path: "{{ apt_cache_dir }}"
+    state: directory
+    owner: apt-cacher-ng
+    group: apt-cacher-ng
+    mode: "2755"
+  notify: Restart apt-cacher-ng
+
+- name: Write apt-cacher-ng homelab config
+  ansible.builtin.template:
+    src: homelab.conf.j2
+    dest: /etc/apt-cacher-ng/zz-homelab.conf
+    owner: root
+    group: apt-cacher-ng
+    mode: "0640"
+  notify: Restart apt-cacher-ng
+
+- name: Enable and start apt-cacher-ng
+  ansible.builtin.systemd:
+    name: apt-cacher-ng
+    enabled: true
+    state: started
+
+# Clients run on this play's heels; make sure the restarted daemon is listening
+# before the `all` play starts pointing apt at it.
+- name: Flush handlers so the proxy runs with the final config
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for apt-cacher-ng to accept connections
+  ansible.builtin.wait_for:
+    port: "{{ apt_cache_port }}"
+    timeout: 60

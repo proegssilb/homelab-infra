@@ -1,0 +1,3 @@
+---
+# aptcache01 is the APT proxy, so it fetches its own packages directly.
+apt_proxy_host: ""

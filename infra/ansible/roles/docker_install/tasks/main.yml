@@ -26,6 +26,8 @@
     suites: ["{{ ansible_distribution_release }}"]
     components: [stable]
     signed_by: https://download.docker.com/linux/debian/gpg
+  # The key download happens outside apt; send it through the APT proxy too.
+  environment: "{{ apt_proxy_env | default({}) }}"
   register: docker_install_source
 
 # The old get_url key path; kept if the module happens to use the same one.

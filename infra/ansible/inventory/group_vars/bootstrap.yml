@@ -1,0 +1,4 @@
+---
+# The bootstrap node is configured by `just garage` before any platform VM
+# exists, so it can't depend on aptcache01. It fetches packages directly.
+apt_proxy_host: ""

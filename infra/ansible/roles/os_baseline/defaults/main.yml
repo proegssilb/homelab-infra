@@ -11,3 +11,8 @@ base_packages:
   - ca-certificates
   - python3-debian   # required on the host by ansible.builtin.deb822_repository
 journald_system_max_use: 1G
+
+# APT caching proxy. Empty means fetch directly; group_vars/all sets the real
+# host, and the proxy itself and the bootstrap node set it back to empty.
+apt_proxy_host: ""
+apt_proxy_port: 3142

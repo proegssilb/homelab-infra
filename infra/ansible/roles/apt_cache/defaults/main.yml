@@ -1,0 +1,30 @@
+---
+# apt-cacher-ng listen port. Clients find it via apt_proxy_host/apt_proxy_port
+# (group_vars/all), which must agree with this.
+apt_cache_port: 3142
+
+# Dedicated ceph-hdd-pool data disk holding the package cache. scsi1 is the OS
+# disk, so the first (and only) data disk is always scsi2 — see CLAUDE.md's disk
+# device convention.
+apt_cache_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
+apt_cache_dir: /var/cache/apt-cacher-ng
+
+# HTTPS repositories can't be cached; the proxy only tunnels (CONNECT) to these
+# hosts on 443. Each one is a repo (or the source of its signing key) that some
+# role adds with deb822_repository. Add a host here when a role starts using a
+# new HTTPS repo, or hosts without internet access can't install from it.
+# The Debian hosts cover images whose sources.list uses https.
+apt_cache_https_passthrough_hosts:
+  - apt.grafana.com
+  - download.docker.com
+  - pkgs.tailscale.com
+  - deb.debian.org
+  - security.debian.org
+
+# Plain-HTTP repositories beyond the stock Debian/Ubuntu/Debian-security
+# mirror lists that apt-cacher-ng already knows. Anything not covered by a
+# Remap rule is refused (ForceManaged), so the cache isn't a general web proxy.
+apt_cache_extra_remaps:
+  - name: rpi
+    match: archive.raspberrypi.com/debian archive.raspberrypi.org/debian
+    backend: http://archive.raspberrypi.com/debian

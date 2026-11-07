@@ -4,6 +4,17 @@
 # To add a new role: define roles/<name>/, then add a play here targeting the right group.
 # Limit to a host or group at the CLI: ansible-playbook site.yml -l <host-or-group>
 
+# Must stay ahead of the `all` play: every other host's os_baseline points apt
+# at this proxy, so it has to be serving first (e.g. during `just cluster-up
+# platform` from an empty cluster).
+- name: APT caching proxy
+  hosts: apt_cache
+  become: true
+  gather_facts: true
+  roles:
+    - os_baseline
+    - apt_cache
+
 - name: OS baseline + observability agents — all hosts
   hosts: all
   become: true
