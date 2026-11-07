@@ -1,6 +1,5 @@
 # OpenTofu — local working files, never commit these
 .terraform/
-.terraform.lock.hcl
 *.tfvars
 *.tfvars.json
 terraform.tfstate

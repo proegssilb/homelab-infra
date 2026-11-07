@@ -14,7 +14,7 @@ garage_data_dir: /var/lib/garage/data
 garage_meta_dir: /var/lib/garage/meta
 
 # Garage version to install.
-garage_version: "1.0.1"
+garage_version: "1.3.1"
 
 # Architecture of the Raspberry Pi binary (aarch64 for Pi 4/5, armv6l for older).
 garage_arch: aarch64

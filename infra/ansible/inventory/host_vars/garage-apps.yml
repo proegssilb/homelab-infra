@@ -23,7 +23,7 @@ garage_data_disk_mount: /var/lib/garage
 # default access key, and a default bucket from the env vars below — with no
 # manual `garage key new` / `garage layout apply` step, so `just bootstrap`
 # still works from nothing.
-garage_version: "2.3.0"
+garage_version: "2.5.0"
 garage_arch: x86_64
 
 # Garage RPC secret — required by Garage even for single-node deployments.
