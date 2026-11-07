@@ -69,7 +69,7 @@ Paste the output into the relevant `host_vars/` or `group_vars/` file.
 **OpenTofu** = VM/LXC existence only. It provisions the VM in Proxmox (CPU, RAM, disks, cloud-init user+key) and stops there.  
 **Ansible** = everything inside the VM. Software, config, services.
 
-Never blur this line — Tofu does not install software; Ansible does not create VMs.
+While these two tools are in use, do not mix up their purposes — Tofu does not install software; Ansible does not create VMs.
 
 ### State directories
 
