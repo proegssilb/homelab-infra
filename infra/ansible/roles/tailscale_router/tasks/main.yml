@@ -26,11 +26,6 @@
     path: "{{ ansible_facts.env.HOME }}/.local/state/artis3n-tailscale"
     state: absent
 
-- name: Install deb822_repository prerequisite
-  ansible.builtin.apt:
-    name: python3-debian
-    state: present
-
 # Same file and keyring paths as Tailscale's official install.sh
 # (/etc/apt/sources.list.d/tailscale.sources, /etc/apt/keyrings/tailscale.gpg),
 # so a host bootstrapped with install.sh converges without APT seeing two

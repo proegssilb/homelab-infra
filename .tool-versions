@@ -1,4 +1,4 @@
 opentofu 1.10.10
-ansible 10.7.0
+ansible 14.5.0
 just 1.59.0
 pre-commit 4.7.0

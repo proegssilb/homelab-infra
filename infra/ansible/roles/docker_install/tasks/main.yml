@@ -7,20 +7,33 @@
     state: present
     update_cache: true
 
-- name: Add Docker GPG key
-  ansible.builtin.get_url:
-    url: https://download.docker.com/linux/debian/gpg
-    dest: /etc/apt/keyrings/docker.asc
-    mode: "0644"
+# Remove the one-line .list entry written by the old apt_repository task before
+# adding the deb822 one: two entries for the same repo with different
+# Signed-By values make APT refuse to run.
+- name: Remove legacy Docker .list entry
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/docker.list
+    state: absent
 
+# signed_by as a URL: the module fetches the key itself, replacing the separate
+# get_url step.
 - name: Add Docker apt repository
-  ansible.builtin.apt_repository:
-    repo: >-
-      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
-      https://download.docker.com/linux/debian
-      {{ ansible_distribution_release }} stable
-    filename: docker
-    state: present
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: [deb]
+    architectures: [amd64]
+    uris: https://download.docker.com/linux/debian
+    suites: ["{{ ansible_distribution_release }}"]
+    components: [stable]
+    signed_by: https://download.docker.com/linux/debian/gpg
+  register: docker_install_source
+
+# The old get_url key path; kept if the module happens to use the same one.
+- name: Remove legacy Docker keyring
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/docker.asc
+    state: absent
+  when: docker_install_source.key_filename | default('') != '/etc/apt/keyrings/docker.asc'
 
 - name: Install Docker Engine and Compose plugin
   ansible.builtin.apt:

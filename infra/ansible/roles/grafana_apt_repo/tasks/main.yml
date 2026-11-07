@@ -1,31 +1,36 @@
 ---
-- name: Create /etc/apt/keyrings directory
+# Remove the one-line .list entry written by the old apt_repository task before
+# adding the deb822 one: two entries for the same repo with different
+# Signed-By values make APT refuse to run.
+- name: Remove legacy Grafana .list entry
   ansible.builtin.file:
-    path: /etc/apt/keyrings
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
+    path: /etc/apt/sources.list.d/grafana.list
+    state: absent
+  register: grafana_apt_repo_legacy_list
 
-- name: Install gpg
-  ansible.builtin.package:
-    name: gpg
-    state: present
-
-- name: Download Grafana APT signing key
-  ansible.builtin.get_url:
-    url: https://apt.grafana.com/gpg.key
-    dest: /tmp/grafana.gpg.key
-    mode: "0644"
-
-- name: Dearmor Grafana APT signing key
-  ansible.builtin.command:
-    cmd: gpg --dearmor -o /etc/apt/keyrings/grafana.gpg /tmp/grafana.gpg.key
-    creates: /etc/apt/keyrings/grafana.gpg
-
+# signed_by as a URL: the module fetches the key itself and only reports a
+# change when its content differs, so no separate download/dearmor step.
 - name: Add Grafana APT repository
-  ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main"
-    state: present
-    filename: grafana
+  ansible.builtin.deb822_repository:
+    name: grafana
+    types: [deb]
+    uris: https://apt.grafana.com
+    suites: [stable]
+    components: [main]
+    signed_by: https://apt.grafana.com/gpg.key
+  register: grafana_apt_repo_source
+
+- name: Remove legacy Grafana keyring and downloaded key
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/grafana.gpg.key
+    - /etc/apt/keyrings/grafana.gpg
+  when: item != grafana_apt_repo_source.key_filename | default('')
+
+# Consumers (alloy, loki, grafana) install from this repo right after.
+- name: Refresh apt cache for the Grafana repository
+  ansible.builtin.apt:
     update_cache: true
+  when: grafana_apt_repo_source is changed or grafana_apt_repo_legacy_list is changed
