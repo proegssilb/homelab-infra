@@ -1,5 +1,5 @@
 ---
-forgejo_version: "15.0.2"
+forgejo_version: "15.0.11"
 forgejo_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 forgejo_data_dir: /opt/forgejo
 forgejo_ssh_port: 2222

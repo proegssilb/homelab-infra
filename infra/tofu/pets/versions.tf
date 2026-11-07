@@ -22,13 +22,15 @@ terraform {
   required_providers {
     proxmox = {
       source  = "bpg/proxmox"
-      version = "~> 0.112.0"
+      version = "~> 0.120.0"
     }
     authentik = {
       source  = "goauthentik/authentik"
       # 2026.2.x lacks the `grant_types` argument on authentik_provider_oauth2 —
-      # it was only added in 2026.5.0.
-      version = "~> 2026.5"
+      # it was only added in 2026.5.0. Keep the minor in step with the server's
+      # authentik_version (ansible/roles/authentik/defaults/main.yml) so an
+      # `init -upgrade` can't pull a provider newer than the server's API.
+      version = "~> 2026.5.2"
     }
   }
   required_version = ">= 1.8"

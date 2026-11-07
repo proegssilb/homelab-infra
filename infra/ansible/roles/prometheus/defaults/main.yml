@@ -1,6 +1,6 @@
 ---
 # https://github.com/prometheus/prometheus/releases — update as needed
-prometheus_version: "3.11.2"
+prometheus_version: "3.16.0"
 prometheus_install_dir: /usr/local/bin
 prometheus_config_dir: /etc/prometheus
 prometheus_data_dir: /var/lib/prometheus

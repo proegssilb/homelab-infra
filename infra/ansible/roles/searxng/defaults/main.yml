@@ -1,5 +1,5 @@
 ---
-searxng_version: "2026.8.16-b2da6b90f"
+searxng_version: "2026.11.6-ac11e14c5"
 searxng_data_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
 searxng_data_dir: /opt/searxng
 searxng_port: 8080

@@ -1,6 +1,6 @@
 ---
-homeassistant_version: "2026.9.4"
-homeassistant_zigbee2mqtt_version: "2.14.1"
+homeassistant_version: "2026.11.0"
+homeassistant_zigbee2mqtt_version: "2.14.3"
 homeassistant_mosquitto_version: "2.1.2-alpine"
 # Bump each version together with its checksum: sha256 of the release's zip asset
 # (hass-oidc-auth.zip / hacs.zip) from the matching GitHub release.

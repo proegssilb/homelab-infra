@@ -27,7 +27,6 @@ override.tf.json
 
 # Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
 *tfplan*
-.terraform.lock.hcl
 
 # Local env file (if you source credentials from a file instead of your shell rc)
 .env

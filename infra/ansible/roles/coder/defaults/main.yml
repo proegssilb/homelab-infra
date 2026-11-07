@@ -1,5 +1,5 @@
 ---
-coder_version: "v2.38.5"
+coder_version: "v2.38.6"
 coder_postgres_version: "17"
 coder_data_dir: /opt/coder
 coder_port: 7080
