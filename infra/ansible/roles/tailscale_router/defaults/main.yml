@@ -1,3 +1,10 @@
 ---
+# OAuth client secret (tskey-client-...) or a plain auth key (tskey-auth-...).
 tailscale_authkey: ""
 tailscale_subnets: []
+# Bare tag names; the role prefixes each with "tag:".
+tailscale_tags: []
+# Only applied when tailscale_authkey is an OAuth client secret.
+tailscale_oauth_ephemeral: false
+tailscale_oauth_preauthorized: false
+tailscale_up_timeout: 120

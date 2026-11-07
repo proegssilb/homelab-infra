@@ -1,0 +1,7 @@
+---
+# Safe to restart: these hosts are managed over the LAN, never through their
+# own userspace netstack (see host_vars/tsrouter01.yml).
+- name: Restart tailscaled
+  ansible.builtin.systemd:
+    name: tailscaled
+    state: restarted
