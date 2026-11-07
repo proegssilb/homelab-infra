@@ -9,4 +9,5 @@ base_packages:
   - jq
   - unzip
   - ca-certificates
+  - python3-debian   # required on the host by ansible.builtin.deb822_repository
 journald_system_max_use: 1G
