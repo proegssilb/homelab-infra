@@ -1,33 +1,14 @@
 ---
-# Pre-configure tailscaled to use userspace networking before artis3n.tailscale
-# installs the package and starts the service. The LXC containers do not have
-# /dev/net/tun — userspace-networking avoids the kernel TUN module entirely.
+# Tailscale subnet router, installed straight from Tailscale's apt repo.
+
+# The LXC containers do not have /dev/net/tun — userspace-networking avoids the
+# kernel TUN module entirely.
 #
-# The tailscale Debian package ships /etc/default/tailscaled as a conffile.
-# Creating it here before package install causes dpkg to keep our version
-# (non-interactive mode preserves an existing conffile that differs from the
-# package default).
-
-# The official Tailscale install.sh writes a deb822 .sources file with the
-# keyring at /etc/apt/keyrings/tailscale.gpg. artis3n.tailscale writes a
-# separate .list file with the keyring at
-# /usr/share/keyrings/tailscale-archive-keyring.gpg. APT treats both as the
-# same repo URL with conflicting Signed-By values and refuses to run. Remove
-# the install.sh artifacts so artis3n owns the only source entry.
-- name: Remove official-installer Tailscale apt sources file
-  become: true
-  ansible.builtin.file:
-    path: /etc/apt/sources.list.d/tailscale.sources
-    state: absent
-
-- name: Remove official-installer Tailscale keyring
-  become: true
-  ansible.builtin.file:
-    path: /etc/apt/keyrings/tailscale.gpg
-    state: absent
-
+# Written *before* the package is installed: the tailscale .deb ships
+# /etc/default/tailscaled as a conffile, and dpkg in non-interactive mode keeps
+# an existing conffile that differs from the package default, so the daemon's
+# very first start already uses userspace networking.
 - name: Configure tailscaled for userspace networking
-  become: true
   ansible.builtin.copy:
     dest: /etc/default/tailscaled
     content: |
@@ -36,3 +17,109 @@
     owner: root
     group: root
     mode: "0644"
+  notify: Restart tailscaled
+
+# Leftover state hash from the artis3n.tailscale collection this role replaced.
+# Safe to delete this task once every router has run the new role once.
+- name: Remove artis3n.tailscale state directory
+  ansible.builtin.file:
+    path: "{{ ansible_facts.env.HOME }}/.local/state/artis3n-tailscale"
+    state: absent
+
+- name: Install deb822_repository prerequisite
+  ansible.builtin.apt:
+    name: python3-debian
+    state: present
+
+# Same file and keyring paths as Tailscale's official install.sh
+# (/etc/apt/sources.list.d/tailscale.sources, /etc/apt/keyrings/tailscale.gpg),
+# so a host bootstrapped with install.sh converges without APT seeing two
+# entries for one repo with conflicting Signed-By values.
+- name: Add Tailscale apt repository
+  ansible.builtin.deb822_repository:
+    name: tailscale
+    types: [deb]
+    uris: "https://pkgs.tailscale.com/stable/{{ ansible_facts.distribution | lower }}"
+    suites: ["{{ ansible_facts.distribution_release }}"]
+    components: [main]
+    signed_by: "https://pkgs.tailscale.com/stable/{{ ansible_facts.distribution | lower }}/{{ ansible_facts.distribution_release }}.noarmor.gpg"
+  register: tailscale_router_repo
+
+# Not folded into the install task via cache_valid_time: os_baseline refreshes
+# the cache minutes earlier, which would skip the refresh on a fresh host and
+# leave the just-added repo unindexed. Not a handler either: it must run before
+# the install task, not at the end of the play.
+- name: Refresh apt cache for the Tailscale repository  # noqa: no-handler
+  ansible.builtin.apt:
+    update_cache: true
+  when: tailscale_router_repo is changed
+
+- name: Install Tailscale
+  ansible.builtin.apt:
+    name: tailscale
+    state: present
+
+- name: Enable and start tailscaled
+  ansible.builtin.systemd:
+    name: tailscaled
+    enabled: true
+    state: started
+
+- name: Read Tailscale status
+  ansible.builtin.command: tailscale status --json
+  register: tailscale_router_status
+  changed_when: false
+  check_mode: false  # read-only; later tasks parse its output
+
+# Log in only when the node isn't already up. A logged-in node is never
+# re-authenticated, so tag changes in group_vars do not reach existing nodes —
+# remove the device in the admin console and rerun to apply new tags.
+#
+# --reset makes `up` apply exactly these flags rather than erroring when a
+# previously-stopped node has other non-default prefs.
+- name: Log in to the tailnet
+  vars:
+    tailscale_auth_key_arg: >-
+      {{ tailscale_authkey ~ '?ephemeral=' ~ (tailscale_oauth_ephemeral | bool | lower)
+         ~ '&preauthorized=' ~ (tailscale_oauth_preauthorized | bool | lower)
+         if tailscale_authkey.startswith('tskey-client-') else tailscale_authkey }}
+  ansible.builtin.command:
+    argv:
+      - tailscale
+      - up
+      - --reset
+      - "--auth-key={{ tailscale_auth_key_arg }}"
+      - "--advertise-tags={{ tailscale_tags | map('regex_replace', '^', 'tag:') | join(',') }}"
+      - "--advertise-routes={{ tailscale_subnets | join(',') }}"
+      - "--timeout={{ tailscale_up_timeout }}s"
+  when: (tailscale_router_status.stdout | from_json).BackendState != 'Running'
+  register: tailscale_router_up
+  changed_when: true
+  failed_when: false
+  no_log: true
+
+# no_log above hides the error along with the key; surface it redacted.
+- name: Report tailscale up failure
+  ansible.builtin.fail:
+    msg: "tailscale up failed: {{ (tailscale_router_up.stderr | default('')) | replace(tailscale_authkey, 'REDACTED') }}"
+  when: tailscale_router_up.rc is defined and tailscale_router_up.rc != 0
+
+# `tailscale set` changes prefs without re-authenticating, so subnet edits in
+# local.yml reach routers that are already logged in. `debug prefs` is the only
+# CLI view of the advertised (as opposed to approved) routes.
+- name: Read advertised routes
+  ansible.builtin.command: tailscale debug prefs
+  register: tailscale_router_prefs
+  changed_when: false
+  check_mode: false  # read-only; the next task parses its output
+
+- name: Update advertised routes
+  ansible.builtin.command:
+    argv:
+      - tailscale
+      - set
+      - "--advertise-routes={{ tailscale_subnets | join(',') }}"
+  when: >-
+    ((tailscale_router_prefs.stdout | from_json).AdvertiseRoutes | default([], true) | sort)
+    != (tailscale_subnets | sort)
+  changed_when: true

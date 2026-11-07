@@ -14,8 +14,6 @@ tailscale_tags:
   - homelab
   - homelab-router
 
-tailscale_args: "--advertise-routes={{ tailscale_subnets | join(',') }}"
-
 # Not ephemeral — nodes must survive reboots and HA migrations without being
 # dropped from the tailnet. Ghost nodes from rebuilds are cleaned up by the
 # Tailscale admin console's device expiry setting.

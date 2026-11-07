@@ -2,7 +2,7 @@
 galaxy_info:
   role_name: tailscale_router
   author: proegssilb
-  description: Tailscale subnet router — enables IP forwarding and installs Tailscale via artis3n.tailscale
-  min_ansible_version: "2.14"
+  description: Tailscale subnet router — installs Tailscale from its apt repo and advertises LAN subnets
+  min_ansible_version: "2.15"
 
 dependencies: []

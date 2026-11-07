@@ -7,7 +7,7 @@ tailscale_subnets:
   # - "10.XX.XX.0/24"   # additional subnets as needed
 
 # OAuth client secret from the Tailscale admin console (tskey-client-...).
-# No client ID needed — artis3n.tailscale passes this directly to tailscale up --authkey
-# and the Tailscale CLI handles the token exchange internally.
+# No client ID needed — the tailscale_router role passes this directly to
+# `tailscale up --auth-key` and the Tailscale CLI handles the token exchange internally.
 # Encrypt with: ansible-vault encrypt_string 'tskey-client-...' --name tailscale_authkey
 tailscale_authkey: ""
