@@ -4,6 +4,24 @@
 # any other host's os_baseline points apt at it. This host itself is exempt
 # from the proxy (group_vars/apt_cache.yml) and fetches directly.
 
+# The package starts its service during install and exits if it can't write to
+# the cache directory. That directory is the data disk's mount point, so the
+# service account has to exist, and own the mounted disk, before the package
+# is installed. adduser in the package's postinst reuses the existing account.
+- name: Create apt-cacher-ng group
+  ansible.builtin.group:
+    name: apt-cacher-ng
+    system: true
+
+- name: Create apt-cacher-ng user
+  ansible.builtin.user:
+    name: apt-cacher-ng
+    group: apt-cacher-ng
+    system: true
+    home: "{{ apt_cache_dir }}"
+    create_home: false
+    shell: /usr/sbin/nologin
+
 - name: Settle udev events before touching data disk
   ansible.builtin.command:
     cmd: udevadm settle
@@ -22,6 +40,15 @@
     state: mounted
     opts: defaults,noatime
 
+- name: Give apt-cacher-ng ownership of the cache disk
+  ansible.builtin.file:
+    path: "{{ apt_cache_dir }}"
+    state: directory
+    owner: apt-cacher-ng
+    group: apt-cacher-ng
+    mode: "2755"
+  notify: Restart apt-cacher-ng
+
 # Answer the package's install-time question (allow HTTPS tunnels to anywhere)
 # with "no"; the tunnel allowlist lives in the config file below instead.
 - name: Preseed apt-cacher-ng to refuse arbitrary HTTPS tunnels
@@ -35,17 +62,6 @@
   ansible.builtin.apt:
     name: apt-cacher-ng
     state: present
-
-# The mount above replaces the directory the package created, so ownership has
-# to be set after both.
-- name: Give apt-cacher-ng ownership of the cache directory
-  ansible.builtin.file:
-    path: "{{ apt_cache_dir }}"
-    state: directory
-    owner: apt-cacher-ng
-    group: apt-cacher-ng
-    mode: "2755"
-  notify: Restart apt-cacher-ng
 
 - name: Write apt-cacher-ng homelab config
   ansible.builtin.template:

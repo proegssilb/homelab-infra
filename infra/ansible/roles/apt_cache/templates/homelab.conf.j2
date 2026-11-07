@@ -5,6 +5,9 @@
 CacheDir: {{ apt_cache_dir }}
 Port: {{ apt_cache_port }}
 
+# Address families for upstream connections, in order of preference.
+ConnectProto: {{ apt_cache_connect_proto }}
+
 # Allowlist: serve only repositories that match a Remap rule. Any other
 # plain-HTTP URL is refused, so the cache can't be used as a general web proxy.
 ForceManaged: 1
