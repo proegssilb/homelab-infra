@@ -40,7 +40,7 @@ locals {
     freshrss = { vmid = 109, cores = 1, memory = 1024, node = "pxmx04", tags = ["observe", "pets", "freshrss_app"], data_disks = [{ size = 10, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
 
     # Photo management — Immich (PostgreSQL + pgvector on pg01)
-    immich = { vmid = 110, cores = 4, memory = 8192, node = "pxmx05", tags = ["observe", "pets", "immich_app"], data_disks = [{ size = 700, datastore = "ceph-hdd-pool" }], ha = true, backup = true }
+    immich = { vmid = 110, cores = 4, memory = 8192, disk_size = 40, node = "pxmx05", tags = ["observe", "pets", "immich_app"], data_disks = [{ size = 700, datastore = "ceph-hdd-pool" }], ha = true, backup = true }
 
     # Privacy-preserving metasearch — SearXNG (Docker + Redis, no external accounts)
     searxng = { vmid = 111, cores = 2, memory = 2048, node = "pxmx03", tags = ["observe", "pets", "searxng_app"], data_disks = [{ size = 5, datastore = "ceph-ssd-pool" }], ha = true }

@@ -37,3 +37,51 @@
     name: docker
     enabled: true
     state: started
+
+# Apps track moving tags (release, latest, :9) or get version bumps, so every
+# update leaves the old image behind — untagged or still tagged. Prune weekly
+# with --all: any image no container uses goes. Running stacks keep theirs; a
+# stack that happens to be stopped re-pulls on next start. Volumes are never
+# touched (no --volumes).
+- name: Install weekly docker prune service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker-prune.service
+    content: |
+      # Managed by Ansible (docker_install)
+      [Unit]
+      Description=Prune unused Docker data (stopped containers, unused images, unused networks, build cache)
+      Requires=docker.service
+      After=docker.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/docker system prune --all --force
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install weekly docker prune timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker-prune.timer
+    content: |
+      # Managed by Ansible (docker_install)
+      [Unit]
+      Description=Weekly Docker prune
+
+      [Timer]
+      OnCalendar=weekly
+      RandomizedDelaySec=6h
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Flush handlers so systemd sees the prune units
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable weekly docker prune timer
+  ansible.builtin.systemd:
+    name: docker-prune.timer
+    enabled: true
+    state: started

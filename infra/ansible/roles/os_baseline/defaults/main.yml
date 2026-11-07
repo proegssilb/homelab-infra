@@ -9,3 +9,4 @@ base_packages:
   - jq
   - unzip
   - ca-certificates
+journald_system_max_use: 1G

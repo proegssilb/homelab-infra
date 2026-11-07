@@ -54,3 +54,48 @@
     regexp: "^127\\.0\\.1\\.1"
     line: "127.0.1.1 {{ inventory_hostname }}"
     state: present
+
+- name: Create journald drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: "0755"
+
+- name: Cap journald disk usage
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/size.conf
+    content: |
+      # Managed by Ansible (os_baseline)
+      [Journal]
+      SystemMaxUse={{ journald_system_max_use }}
+    mode: "0644"
+  notify: Restart journald
+
+# A root disk grown in tofu (disk_size) only reaches the filesystem at the next
+# boot via cloud-init; do it online instead. VMs only: the root device is found
+# from the live mount, so it doesn't depend on sdX naming.
+- name: Install growpart
+  ansible.builtin.package:
+    name: cloud-guest-utils
+    state: present
+  when: not is_lxc
+
+- name: Grow root partition and filesystem to fill the disk
+  ansible.builtin.shell: |
+    set -eu
+    src=$(findmnt -no SOURCE /)
+    [ "$(findmnt -no FSTYPE /)" = ext4 ] || { echo "SKIP: root is not ext4"; exit 0; }
+    part=$(basename "$src")
+    disk=$(lsblk -no PKNAME "$src")
+    num=$(cat "/sys/class/block/$part/partition")
+    if out=$(growpart "/dev/$disk" "$num" 2>&1); then
+      resize2fs "$src"
+      echo CHANGED
+    else
+      case "$out" in *NOCHANGE*) echo NOCHANGE ;; *) echo "$out" >&2; exit 1 ;; esac
+    fi
+  args:
+    executable: /bin/bash
+  register: os_baseline_growroot
+  changed_when: "'CHANGED' in os_baseline_growroot.stdout"
+  when: not is_lxc
