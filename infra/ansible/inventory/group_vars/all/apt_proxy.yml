@@ -1,0 +1,8 @@
+---
+# Every host fetches packages through aptcache01 (platform, roles/apt_cache),
+# so servers that only need the internet for packages can be cut off from it.
+# Exempt: the proxy itself (group_vars/apt_cache.yml) and the bootstrap node
+# (group_vars/bootstrap.yml), which `just bootstrap` configures before the
+# proxy exists.
+apt_proxy_host: "aptcache01.{{ homelab_domain }}"
+apt_proxy_port: 3142

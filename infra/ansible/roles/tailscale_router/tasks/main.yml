@@ -38,6 +38,8 @@
     suites: ["{{ ansible_facts.distribution_release }}"]
     components: [main]
     signed_by: "https://pkgs.tailscale.com/stable/{{ ansible_facts.distribution | lower }}/{{ ansible_facts.distribution_release }}.noarmor.gpg"
+  # The key download happens outside apt; send it through the APT proxy too.
+  environment: "{{ apt_proxy_env | default({}) }}"
   register: tailscale_router_repo
 
 # Not folded into the install task via cache_valid_time: os_baseline refreshes

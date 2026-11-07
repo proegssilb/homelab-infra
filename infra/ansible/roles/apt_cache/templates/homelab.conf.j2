@@ -1,0 +1,16 @@
+# Managed by Ansible (apt_cache)
+# Read after the stock acng.conf, which supplies the Debian, Ubuntu and
+# Debian-security Remap rules this file relies on.
+
+CacheDir: {{ apt_cache_dir }}
+Port: {{ apt_cache_port }}
+
+# Allowlist: serve only repositories that match a Remap rule. Any other
+# plain-HTTP URL is refused, so the cache can't be used as a general web proxy.
+ForceManaged: 1
+{% for r in apt_cache_extra_remaps %}
+Remap-{{ r.name }}: {{ r.match }} ; {{ r.backend }}
+{% endfor %}
+
+# HTTPS repositories can't be cached; tunnel (CONNECT) only to these hosts.
+PassThroughPattern: ^({{ apt_cache_https_passthrough_hosts | map('regex_escape') | join('|') }}):443$

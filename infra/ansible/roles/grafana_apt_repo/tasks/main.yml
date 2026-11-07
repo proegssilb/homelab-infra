@@ -18,6 +18,8 @@
     suites: [stable]
     components: [main]
     signed_by: https://apt.grafana.com/gpg.key
+  # The key download happens outside apt; send it through the APT proxy too.
+  environment: "{{ apt_proxy_env | default({}) }}"
   register: grafana_apt_repo_source
 
 - name: Remove legacy Grafana keyring and downloaded key
