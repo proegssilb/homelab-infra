@@ -72,10 +72,15 @@ resource "proxmox_virtual_environment_container" "lxc" {
   # injected root SSH key after creation, so `tofu import` can never
   # populate these two fields — every plan after an import shows them as
   # forces-replacement drift against a real, unchanged container.
+  #
+  # node_name controls initial placement only, as in the vm module: Proxmox
+  # HA and manual migrations move containers, and node_name forces
+  # replacement, so without this an HA move plans a destroy + recreate.
   lifecycle {
     ignore_changes = [
       operating_system,
       initialization[0].user_account,
+      node_name,
     ]
   }
 }
