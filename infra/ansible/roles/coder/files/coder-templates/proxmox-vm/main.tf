@@ -59,6 +59,11 @@ variable "vlan_id" {
   default     = 0
 }
 
+variable "ssh_sources" {
+  description = "Comma-separated addresses the workspace VM firewall accepts SSH from. Must include the Coder server, which installs the agent over SSH."
+  type        = string
+}
+
 variable "pool" {
   description = "Proxmox pool the coder@pve user is fenced to."
   type        = string
@@ -276,9 +281,10 @@ resource "proxmox_virtual_environment_vm" "workspace" {
   }
 
   network_device {
-    bridge  = var.bridge
-    model   = "virtio"
-    vlan_id = var.vlan_id > 0 ? var.vlan_id : null
+    bridge   = var.bridge
+    model    = "virtio"
+    vlan_id  = var.vlan_id > 0 ? var.vlan_id : null
+    firewall = true # filtered by the VM firewall below
   }
 
   initialization {
@@ -314,6 +320,66 @@ resource "proxmox_virtual_environment_vm" "workspace" {
   }
 }
 
+# ── VM firewall ────────────────────────────────────────────────────────────────
+# Proxmox firewall on the workspace NIC (needs the datacenter firewall enabled).
+# The UniFi Agents zone fences workspaces off from the rest of the network, but
+# workspaces on the same VLAN reach each other at L2 without passing the
+# gateway. Dropping all inbound except Coder's SSH closes that: no workspace
+# accepts connections from another. Outbound stays open (UniFi filters it),
+# minus DHCP/DHCPv6 server replies, so no workspace can hand out leases to the
+# others; macfilter stops MAC spoofing and radv (off) stops rogue IPv6 RAs.
+#
+# The VM boots a few seconds before these apply; the NIC is unfiltered until
+# then. The agent is installed only after (depends_on below).
+
+resource "proxmox_virtual_environment_firewall_options" "workspace" {
+  node_name = proxmox_virtual_environment_vm.workspace.node_name
+  vm_id     = proxmox_virtual_environment_vm.workspace.vm_id
+
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+  dhcp          = true
+  macfilter     = true
+  # ipfilter would also stop IP/ARP spoofing, but DHCP-addressed VMs need the
+  # VLAN's subnet in an ipfilter-net0 ipset for it to allow anything.
+  ipfilter = false
+  ndp      = false
+  radv     = false
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "workspace" {
+  node_name = proxmox_virtual_environment_vm.workspace.node_name
+  vm_id     = proxmox_virtual_environment_vm.workspace.vm_id
+
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    proto   = "tcp"
+    dport   = "22"
+    source  = var.ssh_sources
+    comment = "Coder server installs the agent over SSH"
+  }
+
+  rule {
+    type    = "out"
+    action  = "DROP"
+    proto   = "udp"
+    sport   = "67"
+    comment = "No rogue DHCP server"
+  }
+
+  rule {
+    type    = "out"
+    action  = "DROP"
+    proto   = "udp"
+    sport   = "547"
+    comment = "No rogue DHCPv6 server"
+  }
+
+  depends_on = [proxmox_virtual_environment_firewall_options.workspace]
+}
+
 locals {
   vm_ip = try([for a in flatten(proxmox_virtual_environment_vm.workspace.ipv4_addresses) : a if a != "127.0.0.1"][0], null)
 }
@@ -322,6 +388,9 @@ locals {
 resource "terraform_data" "agent_install" {
   count            = data.coder_workspace.me.start_count
   triggers_replace = [coder_agent.main.token, proxmox_virtual_environment_vm.workspace.vm_id]
+
+  # SSH in only once the firewall (and its SSH allow rule) is in place.
+  depends_on = [proxmox_virtual_environment_firewall_rules.workspace]
 
   connection {
     type        = "ssh"

@@ -102,6 +102,7 @@
           pool: "{{ coder_proxmox_template.pool }}"
           vmid_min: "{{ coder_proxmox_template.vmid_min }}"
           vmid_max: "{{ coder_proxmox_template.vmid_max }}"
+          ssh_sources: "{{ coder_workspace_ssh_sources | join(',') }}"
         dest: "{{ coder_data_dir }}/coder-templates/proxmox-vm.vars.yml"
         mode: "0644"
 
@@ -110,6 +111,7 @@
         content: |
           {{ lookup('ansible.builtin.file', 'coder-templates/proxmox-vm/main.tf') | hash('sha256') }}
           {{ coder_proxmox_template | to_json }}
+          {{ coder_workspace_ssh_sources | to_json }}
         dest: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
         mode: "0644"
 
