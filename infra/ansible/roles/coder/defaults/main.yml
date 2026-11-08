@@ -29,6 +29,12 @@ coder_proxmox_template:
   pool: coder
   vmid_min: 1000
   vmid_max: 1999
+# Addresses each workspace VM's Proxmox firewall accepts SSH from (all other
+# inbound is dropped, including from other workspaces). The Coder server must
+# be here: it installs the agent over SSH. Add admin hosts (e.g. in local.yml)
+# only if they should SSH in directly rather than through Coder.
+coder_workspace_ssh_sources:
+  - "{{ ansible_default_ipv4.address }}"
 # Coder API token of an Owner, used to push templates. Leave empty to skip the
 # push (e.g. right after a rebuild, before the first admin exists).
 # Create: Coder UI -> Account -> Tokens, then ansible-vault encrypt_string --stdin-name coder_admin_token
