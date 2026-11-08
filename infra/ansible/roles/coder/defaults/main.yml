@@ -19,9 +19,13 @@ coder_workspace_ssh_private_key: ""
 coder_proxmox_template:
   clone_template_vmid: 901
   clone_template_node: pxmx02
+  # Every node here needs a VLAN-aware vmbr0 carrying vlan_id (grunt's isn't).
   nodes: [pxmx01, pxmx02, pxmx03, pxmx04, pxmx05]
   datastore: ceph-ssd-pool
   bridge: vmbr0
+  # Agents VLAN: workspaces (where AI agents run) reach only the proxy, git
+  # and the apt cache; the UniFi Agents zone blocks everything else.
+  vlan_id: 30
   pool: coder
   vmid_min: 1000
   vmid_max: 1999
