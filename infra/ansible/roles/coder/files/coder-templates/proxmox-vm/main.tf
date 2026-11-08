@@ -53,6 +53,12 @@ variable "bridge" {
   default = "vmbr0"
 }
 
+variable "vlan_id" {
+  description = "VLAN tag for the workspace NIC (0 = untagged). Workspaces belong on the Agents VLAN, fenced off from the rest of the lab by the UniFi firewall; every node in var.nodes needs a VLAN-aware bridge."
+  type        = number
+  default     = 0
+}
+
 variable "pool" {
   description = "Proxmox pool the coder@pve user is fenced to."
   type        = string
@@ -270,8 +276,9 @@ resource "proxmox_virtual_environment_vm" "workspace" {
   }
 
   network_device {
-    bridge = var.bridge
-    model  = "virtio"
+    bridge  = var.bridge
+    model   = "virtio"
+    vlan_id = var.vlan_id > 0 ? var.vlan_id : null
   }
 
   initialization {

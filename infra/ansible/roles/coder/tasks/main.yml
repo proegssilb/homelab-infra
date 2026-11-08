@@ -98,6 +98,7 @@
           nodes: "{{ coder_proxmox_template.nodes | join(',') }}"
           datastore: "{{ coder_proxmox_template.datastore }}"
           bridge: "{{ coder_proxmox_template.bridge }}"
+          vlan_id: "{{ coder_proxmox_template.vlan_id | default(0) }}"
           pool: "{{ coder_proxmox_template.pool }}"
           vmid_min: "{{ coder_proxmox_template.vmid_min }}"
           vmid_max: "{{ coder_proxmox_template.vmid_max }}"
