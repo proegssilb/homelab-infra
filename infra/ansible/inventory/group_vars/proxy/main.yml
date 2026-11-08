@@ -21,6 +21,11 @@ nginx_stream_proxies:
   - name: forgejo_ssh
     listen_port: 2222
     upstream: "forgejo.{{ homelab_domain }}:2222"
+  # Graphite plaintext (TCP) for senders like TrueNAS, so they point at
+  # graphite.<domain> instead of obs01's address.
+  - name: graphite
+    listen_port: 2003
+    upstream: "obs01.{{ homelab_domain }}:2003"
 
 # ── certbot ───────────────────────────────────────────────────────────────────
 
