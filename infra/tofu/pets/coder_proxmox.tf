@@ -40,6 +40,43 @@ resource "proxmox_sdn_applier" "coder" {
   }
 }
 
+# ── Workspace clone source ─────────────────────────────────────────────────────
+# Coder clones workspaces from this, not from the lab template: cloning checks
+# SDN.Use on the source's NIC bridge, and the lab template's NIC is on vmbr0,
+# which coder@pve must not be able to use. This copy's NIC is already on the
+# agents VNet, so cloning needs nothing beyond the VNet grant below.
+# Stopped template: the Ansible inventory only lists running VMs.
+
+locals {
+  coder_template_vmid = 903
+  coder_template_node = var.template_node != "" ? var.template_node : var.proxmox_node
+}
+
+resource "proxmox_virtual_environment_vm" "coder_template" {
+  name        = "coder-template"
+  description = "Clone source for Coder workspaces (NIC on the agents VNet). Managed by tofu/pets/coder_proxmox.tf."
+  node_name   = local.coder_template_node
+  vm_id       = local.coder_template_vmid
+  template    = true
+  started     = false
+  on_boot     = false
+
+  clone {
+    vm_id        = var.template_id
+    node_name    = local.coder_template_node
+    full         = true
+    datastore_id = var.datastore
+  }
+
+  network_device {
+    bridge   = proxmox_sdn_vnet.agents.id
+    model    = "virtio"
+    firewall = true
+  }
+
+  depends_on = [proxmox_sdn_applier.coder]
+}
+
 resource "proxmox_virtual_environment_pool" "coder" {
   pool_id = "coder"
   comment = "Coder workspace VMs (VMID 1000-1999). Managed by Coder, not tofu."
@@ -94,9 +131,9 @@ resource "proxmox_virtual_environment_user" "coder" {
 
 locals {
   coder_acls = {
-    pool        = { path = "/pool/${proxmox_virtual_environment_pool.coder.pool_id}", role = proxmox_virtual_environment_role.coder_workspaces.role_id }
-    template    = { path = "/vms/${var.template_id}", role = proxmox_virtual_environment_role.coder_template.role_id }
-    storage     = { path = "/storage/${var.datastore}", role = proxmox_virtual_environment_role.coder_resources.role_id }
+    pool     = { path = "/pool/${proxmox_virtual_environment_pool.coder.pool_id}", role = proxmox_virtual_environment_role.coder_workspaces.role_id }
+    template = { path = "/vms/${proxmox_virtual_environment_vm.coder_template.vm_id}", role = proxmox_virtual_environment_role.coder_template.role_id }
+    storage  = { path = "/storage/${var.datastore}", role = proxmox_virtual_environment_role.coder_resources.role_id }
     # The only network coder@pve may attach a NIC to (no vmbr0, no other VLAN).
     agents_vnet = { path = "/sdn/zones/${proxmox_sdn_zone_vlan.coder.id}/${proxmox_sdn_vnet.agents.id}", role = proxmox_virtual_environment_role.coder_resources.role_id }
   }
