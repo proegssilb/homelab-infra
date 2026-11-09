@@ -17,7 +17,10 @@ coder_proxmox_password: ""
 coder_workspace_ssh_public_key: ""
 coder_workspace_ssh_private_key: ""
 coder_proxmox_template:
-  clone_template_vmid: 901
+  # coder-template (tofu/pets/coder_proxmox.tf): a copy of the lab template
+  # with its NIC on the agents VNet, so cloning needs no vmbr0 permission.
+  # The node must match where tofu puts it (pets' template_node).
+  clone_template_vmid: 903
   clone_template_node: pxmx02
   nodes: [pxmx01, pxmx02, pxmx03, pxmx04, pxmx05]
   datastore: ceph-ssd-pool
