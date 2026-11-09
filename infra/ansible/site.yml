@@ -169,6 +169,13 @@
   roles:
     - coder
 
+- name: Egress proxy — mitmproxy for Coder workspaces (agentsvc VLAN)
+  hosts: egress_proxy
+  become: true
+  gather_facts: true
+  roles:
+    - egress_proxy
+
 - name: Tailscale subnet routers
   hosts: tailscale_router
   become: true
