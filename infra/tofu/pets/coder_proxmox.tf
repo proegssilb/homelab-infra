@@ -97,10 +97,8 @@ locals {
     pool        = { path = "/pool/${proxmox_virtual_environment_pool.coder.pool_id}", role = proxmox_virtual_environment_role.coder_workspaces.role_id }
     template    = { path = "/vms/${var.template_id}", role = proxmox_virtual_environment_role.coder_template.role_id }
     storage     = { path = "/storage/${var.datastore}", role = proxmox_virtual_environment_role.coder_resources.role_id }
+    # The only network coder@pve may attach a NIC to (no vmbr0, no other VLAN).
     agents_vnet = { path = "/sdn/zones/${proxmox_sdn_zone_vlan.coder.id}/${proxmox_sdn_vnet.agents.id}", role = proxmox_virtual_environment_role.coder_resources.role_id }
-    # TODO: drop once a workspace has been built on the agents VNet without it.
-    # Kept for one step in case cloning the template (NIC on vmbr0) needs it.
-    bridges = { path = "/sdn/zones/localnetwork", role = proxmox_virtual_environment_role.coder_resources.role_id }
   }
 }
 
