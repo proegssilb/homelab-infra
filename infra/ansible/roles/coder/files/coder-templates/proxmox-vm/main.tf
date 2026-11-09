@@ -59,6 +59,11 @@ variable "vlan_id" {
   default     = 0
 }
 
+variable "agents_cidr" {
+  description = "Subnet of the workspace network (e.g. 10.0.30.0/24). No DHCP there: each workspace gets the static address cidrhost(agents_cidr, 10 + vmid - vmid_min), the gateway is the first host, and the VM firewall pins the NIC to that one address."
+  type        = string
+}
+
 variable "ssh_sources" {
   description = "Comma-separated addresses the workspace VM firewall accepts SSH from. Must include the Coder server, which installs the agent over SSH."
   type        = string
@@ -192,6 +197,29 @@ locals {
   started = data.coder_workspace.me.start_count == 1
 }
 
+# The VMID picked at creation, frozen: the MAC and the static IP derive from it,
+# so later builds (where free_vmids no longer contains it) must not re-pick.
+resource "terraform_data" "vmid" {
+  input = try(local.free_vmids[0], null)
+
+  lifecycle {
+    ignore_changes = [input]
+    precondition {
+      condition     = length(local.free_vmids) > 0
+      error_message = "No free VMID left in ${var.vmid_min}-${var.vmid_max}."
+    }
+  }
+}
+
+locals {
+  vmid = terraform_data.vmid.output
+  # Same scheme as the lab VMs (tofu/modules/vm): 02:00:00:00:<vmid/256>:<vmid%256>.
+  mac        = format("02:00:00:00:%02x:%02x", floor(local.vmid / 256), local.vmid % 256)
+  ip         = cidrhost(var.agents_cidr, 10 + local.vmid - var.vmid_min)
+  gateway_ip = cidrhost(var.agents_cidr, 1)
+  prefix_len = split("/", var.agents_cidr)[1]
+}
+
 # ── Agent ──────────────────────────────────────────────────────────────────────
 
 resource "coder_agent" "main" {
@@ -245,7 +273,7 @@ module "code-server" {
 resource "proxmox_virtual_environment_vm" "workspace" {
   name      = local.vm_name
   node_name = data.coder_parameter.node.value
-  vm_id     = local.free_vmids[0]
+  vm_id     = local.vmid
   pool_id   = var.pool
   # Keeps these VMs out of the Ansible dynamic inventory (see proxmox.yml).
   tags        = ["coder_workspace"]
@@ -281,10 +309,11 @@ resource "proxmox_virtual_environment_vm" "workspace" {
   }
 
   network_device {
-    bridge   = var.bridge
-    model    = "virtio"
-    vlan_id  = var.vlan_id > 0 ? var.vlan_id : null
-    firewall = true # filtered by the VM firewall below
+    bridge      = var.bridge
+    model       = "virtio"
+    vlan_id     = var.vlan_id > 0 ? var.vlan_id : null
+    mac_address = local.mac
+    firewall    = true # filtered by the VM firewall below
   }
 
   initialization {
@@ -295,8 +324,12 @@ resource "proxmox_virtual_environment_vm" "workspace" {
     }
     ip_config {
       ipv4 {
-        address = "dhcp"
+        address = "${local.ip}/${local.prefix_len}"
+        gateway = local.gateway_ip
       }
+    }
+    dns {
+      servers = [local.gateway_ip]
     }
   }
 
@@ -314,8 +347,8 @@ resource "proxmox_virtual_environment_vm" "workspace" {
     # can't read the pool back, which Proxmox rejects ("already a pool member").
     ignore_changes = [vm_id, node_name, clone, pool_id]
     precondition {
-      condition     = length(local.free_vmids) > 0
-      error_message = "No free VMID left in ${var.vmid_min}-${var.vmid_max}."
+      condition     = 10 + var.vmid_max - var.vmid_min < pow(2, 32 - tonumber(local.prefix_len)) - 1
+      error_message = "VMIDs ${var.vmid_min}-${var.vmid_max} don't all fit in ${var.agents_cidr} at offset 10; narrow the range or widen the subnet."
     }
   }
 }
@@ -326,8 +359,10 @@ resource "proxmox_virtual_environment_vm" "workspace" {
 # workspaces on the same VLAN reach each other at L2 without passing the
 # gateway. Dropping all inbound except Coder's SSH closes that: no workspace
 # accepts connections from another. Outbound stays open (UniFi filters it),
-# minus DHCP/DHCPv6 server replies, so no workspace can hand out leases to the
-# others; macfilter stops MAC spoofing and radv (off) stops rogue IPv6 RAs.
+# minus DHCP/DHCPv6 server replies. macfilter pins the NIC to its MAC, the
+# ipfilter-net0 set pins it to its static IP (so it can't pose as another
+# workspace, the gateway or the Coder server), and radv (off) stops rogue IPv6
+# RAs. The network has no DHCP, so the dhcp option is off too.
 #
 # The VM boots a few seconds before these apply; the NIC is unfiltered until
 # then. The agent is installed only after (depends_on below).
@@ -339,13 +374,22 @@ resource "proxmox_virtual_environment_firewall_options" "workspace" {
   enabled       = true
   input_policy  = "DROP"
   output_policy = "ACCEPT"
-  dhcp          = true
+  dhcp          = false
   macfilter     = true
-  # ipfilter would also stop IP/ARP spoofing, but DHCP-addressed VMs need the
-  # VLAN's subnet in an ipfilter-net0 ipset for it to allow anything.
-  ipfilter = false
-  ndp      = false
-  radv     = false
+  ipfilter      = true
+  ndp           = false
+  radv          = false
+}
+
+resource "proxmox_virtual_environment_firewall_ipset" "ipfilter" {
+  node_name = proxmox_virtual_environment_vm.workspace.node_name
+  vm_id     = proxmox_virtual_environment_vm.workspace.vm_id
+  name      = "ipfilter-net0"
+  comment   = "Only source address net0 may use"
+
+  cidr {
+    name = local.ip
+  }
 }
 
 resource "proxmox_virtual_environment_firewall_rules" "workspace" {
@@ -377,11 +421,10 @@ resource "proxmox_virtual_environment_firewall_rules" "workspace" {
     comment = "No rogue DHCPv6 server"
   }
 
-  depends_on = [proxmox_virtual_environment_firewall_options.workspace]
-}
-
-locals {
-  vm_ip = try([for a in flatten(proxmox_virtual_environment_vm.workspace.ipv4_addresses) : a if a != "127.0.0.1"][0], null)
+  depends_on = [
+    proxmox_virtual_environment_firewall_options.workspace,
+    proxmox_virtual_environment_firewall_ipset.ipfilter,
+  ]
 }
 
 # Re-runs on every start: the agent token can change per build.
@@ -394,7 +437,7 @@ resource "terraform_data" "agent_install" {
 
   connection {
     type        = "ssh"
-    host        = local.vm_ip
+    host        = local.ip
     user        = "coder"
     private_key = file(var.ssh_private_key_path)
     timeout     = "5m"
@@ -426,6 +469,6 @@ resource "coder_metadata" "vm" {
   }
   item {
     key   = "IP"
-    value = coalesce(local.vm_ip, "pending")
+    value = local.ip
   }
 }

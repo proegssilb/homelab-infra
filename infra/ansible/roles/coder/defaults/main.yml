@@ -19,22 +19,30 @@ coder_workspace_ssh_private_key: ""
 coder_proxmox_template:
   clone_template_vmid: 901
   clone_template_node: pxmx02
-  # Every node here needs a VLAN-aware vmbr0 carrying vlan_id (grunt's isn't).
   nodes: [pxmx01, pxmx02, pxmx03, pxmx04, pxmx05]
   datastore: ceph-ssd-pool
-  bridge: vmbr0
-  # Agents VLAN: workspaces (where AI agents run) reach only the proxy, git
-  # and the apt cache; the UniFi Agents zone blocks everything else.
-  vlan_id: 30
+  # SDN VNet for the Agents VLAN (30), created in tofu/pets/coder_proxmox.tf;
+  # it tags the traffic itself, so vlan_id stays 0. Workspaces (where AI
+  # agents run) reach only the proxy, git and the apt cache; the UniFi Agents
+  # zone blocks everything else. coder@pve may use only this VNet.
+  bridge: agents
+  vlan_id: 0
   pool: coder
   vmid_min: 1000
-  vmid_max: 1999
+  # Workspace IPs are static, derived from the VMID (see coder_agents_cidr);
+  # 1000-1239 fills .10-.249 of a /24. 1240-1999 stay reserved for Coder.
+  vmid_max: 1239
 # Addresses each workspace VM's Proxmox firewall accepts SSH from (all other
 # inbound is dropped, including from other workspaces). The Coder server must
 # be here: it installs the agent over SSH. Add admin hosts (e.g. in local.yml)
 # only if they should SSH in directly rather than through Coder.
 coder_workspace_ssh_sources:
   - "{{ ansible_default_ipv4.address }}"
+# Subnet of the workspace network (UniFi "Agents", VLAN 30), e.g. 10.0.30.0/24.
+# Site-specific: set it in group_vars/all/local.yml. That network runs no DHCP;
+# each workspace gets a static IP derived from its VMID, and its VM firewall
+# only lets it send from that address.
+coder_agents_cidr: ""
 # Coder API token of an Owner, used to push templates. Leave empty to skip the
 # push (e.g. right after a rebuild, before the first admin exists).
 # Create: Coder UI -> Account -> Tokens, then ansible-vault encrypt_string --stdin-name coder_admin_token
