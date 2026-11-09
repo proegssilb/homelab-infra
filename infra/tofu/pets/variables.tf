@@ -48,6 +48,24 @@ variable "oidc_client_secrets" {
   sensitive   = true
 }
 
+# ── Agent support services (agentsvc.tf) ───────────────────────────────────────
+# Site-specific addresses; set them in terraform.tfvars.
+
+variable "agents_cidr" {
+  description = "Workspace subnet (UniFi Agents, VLAN 30), e.g. 10.0.30.0/24. Allowed in to each support VM's service ports. Same value as coder_agents_cidr in Ansible."
+  type        = string
+}
+
+variable "agentsvc_admin_sources" {
+  description = "Addresses allowed to SSH into agent support VMs (where Ansible runs from)."
+  type        = list(string)
+}
+
+variable "agentsvc_scrape_sources" {
+  description = "Addresses allowed to scrape node_exporter (:9100) on agent support VMs (the Prometheus host)."
+  type        = list(string)
+}
+
 variable "coder_proxmox_password" {
   description = "Password for coder@pve (Coder's workspace provisioner). Set via TF_VAR_coder_proxmox_password in .env; must match coder_proxmox_password in ansible host_vars/coder.yml."
   type        = string

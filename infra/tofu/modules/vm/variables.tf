@@ -54,6 +54,12 @@ variable "bridge" {
   default     = "vmbr0"
 }
 
+variable "firewall" {
+  description = "Turn on the Proxmox firewall for the NIC. Rules and options are set by the caller (proxmox_virtual_environment_firewall_*); without them the datacenter's ACCEPT policies apply."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "List of tags to apply in Proxmox."
   type        = list(string)

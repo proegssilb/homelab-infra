@@ -32,11 +32,28 @@ resource "proxmox_sdn_vnet" "agents" {
   isolate_ports = true
 }
 
+# VLAN 31 (UniFi "AgentSvc", in the Agents zone, DHCP on): support services
+# for the workspaces (egress proxy, package caches, credential broker). Its own
+# VLAN so workspaces reach these VMs only through explicit UniFi allows, and
+# inside the Agents zone so a compromised support VM is no better a foothold
+# into Lab than a workspace is (see agentsvc.tf).
+#
+# Reserved for IaC: coder@pve gets NO grant here (see coder_acls below, and
+# keep it that way), so a compromised Coder server cannot plant a VM next to
+# the support services. Only tofu, with the admin token, attaches NICs to it.
+resource "proxmox_sdn_vnet" "agentsvc" {
+  id            = "agentsvc"
+  zone          = proxmox_sdn_zone_vlan.coder.id
+  alias         = "Agent support services (UniFi AgentSvc VLAN)"
+  tag           = 31
+  isolate_ports = true
+}
+
 resource "proxmox_sdn_applier" "coder" {
-  depends_on = [proxmox_sdn_zone_vlan.coder, proxmox_sdn_vnet.agents]
+  depends_on = [proxmox_sdn_zone_vlan.coder, proxmox_sdn_vnet.agents, proxmox_sdn_vnet.agentsvc]
 
   lifecycle {
-    replace_triggered_by = [proxmox_sdn_zone_vlan.coder, proxmox_sdn_vnet.agents]
+    replace_triggered_by = [proxmox_sdn_zone_vlan.coder, proxmox_sdn_vnet.agents, proxmox_sdn_vnet.agentsvc]
   }
 }
 
@@ -134,7 +151,9 @@ locals {
     pool     = { path = "/pool/${proxmox_virtual_environment_pool.coder.pool_id}", role = proxmox_virtual_environment_role.coder_workspaces.role_id }
     template = { path = "/vms/${proxmox_virtual_environment_vm.coder_template.vm_id}", role = proxmox_virtual_environment_role.coder_template.role_id }
     storage  = { path = "/storage/${var.datastore}", role = proxmox_virtual_environment_role.coder_resources.role_id }
-    # The only network coder@pve may attach a NIC to (no vmbr0, no other VLAN).
+    # The only network coder@pve may attach a NIC to (no vmbr0, no other VLAN,
+    # and in particular not agentsvc). Never grant on /sdn/zones/coder itself:
+    # with propagate it would cover agentsvc too.
     agents_vnet = { path = "/sdn/zones/${proxmox_sdn_zone_vlan.coder.id}/${proxmox_sdn_vnet.agents.id}", role = proxmox_virtual_environment_role.coder_resources.role_id }
   }
 }

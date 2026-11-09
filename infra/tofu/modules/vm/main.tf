@@ -61,6 +61,7 @@ resource "proxmox_virtual_environment_vm" "vm" {
     mac_address = local.mac_address
     bridge      = var.bridge
     model       = "virtio"
+    firewall    = var.firewall
   }
 
   # Cloud-init: create the ansible user with SSH key, request DHCP.

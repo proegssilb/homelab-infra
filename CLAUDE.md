@@ -110,6 +110,16 @@ Roles apply to groups, not individual hosts. Key assignments:
 - `obs_grafana` → grafana
 - `auth` → authentik
 - `nextcloud_app` → nextcloud
+- `egress_proxy` (egress01) → egress_proxy (mitmproxy for Coder workspaces)
+
+### Agent support services
+
+VMs that Coder workspaces use (egress proxy now; package caches, credential broker later) live in
+`tofu/pets/agentsvc.tf` on the `agentsvc` SDN VNet (VLAN 31, UniFi "AgentSvc", DHCP, inside the
+Agents zone). Each gets its own Proxmox VM firewall (inbound: service ports from the workspace
+subnet, admin SSH, the node_exporter scrape). Never grant coder@pve anything on `agentsvc` or on
+the `coder` SDN zone as a whole. Adding a VNet to an existing zone needs
+`-replace=proxmox_sdn_applier.coder` on that apply (`replace_triggered_by` ignores creates).
 
 ### APT proxy
 
