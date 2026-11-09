@@ -1,0 +1,6 @@
+---
+- name: Restart egress proxy
+  community.docker.docker_compose_v2:
+    project_src: "{{ egress_proxy_data_dir }}"
+    state: present
+    recreate: always

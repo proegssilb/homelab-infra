@@ -1,0 +1,26 @@
+# Managed by Ansible — do not edit manually
+services:
+  mitmproxy:
+    image: mitmproxy/mitmproxy:{{ egress_proxy_version }}
+    container_name: egress-proxy
+    restart: unless-stopped
+    # block_global=false: mitmproxy otherwise refuses clients from non-local
+    # addresses. Who may connect is decided by egress01's VM firewall
+    # (workspace subnet only, tofu/pets/agentsvc.tf) and UniFi.
+    command:
+      - mitmdump
+      - --mode
+      - regular@8080
+{% for pattern in egress_proxy_ignore_hosts %}
+      - --ignore-hosts
+      - "{{ pattern }}"
+{% endfor %}
+      - --set
+      - block_global=false
+    ports:
+      - "{{ egress_proxy_port }}:8080"
+    # To the journal, which Alloy ships to Loki.
+    logging:
+      driver: journald
+      options:
+        tag: egress-proxy

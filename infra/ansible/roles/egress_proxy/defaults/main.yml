@@ -1,0 +1,17 @@
+---
+# Egress proxy for Coder workspaces (AI agents): mitmproxy on egress01, on the
+# agentsvc VLAN (tofu/pets/agentsvc.tf).
+#
+# Phase 1, logging only: every host is passed through untouched (no TLS
+# interception, so no CA in workspaces yet and the proxy never sees decrypted
+# traffic). It logs one line per HTTPS destination ("server connect host:443")
+# and the full request line for plain HTTP, with the client's address, to the
+# journal and from there to Loki ({host="egress01"}, SYSLOG_IDENTIFIER
+# egress-proxy). Workspaces only go through it once they set HTTP(S)_PROXY.
+egress_proxy_version: "12.3.1"
+egress_proxy_data_dir: /opt/egress-proxy
+egress_proxy_port: 8080
+# Regexes for hosts passed through without TLS interception. ".*" = all of
+# them (logging phase). Narrow this when interception starts.
+egress_proxy_ignore_hosts:
+  - ".*"

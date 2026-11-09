@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: egress_proxy
+  author: homelab
+  description: mitmproxy egress proxy for Coder workspaces (logging-only phase)
+  min_ansible_version: "2.15"
+dependencies: []
