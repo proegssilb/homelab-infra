@@ -9,11 +9,11 @@
 # - The iptables backend stays (nftables = false; the nftables one is a tech
 #   preview and generates different rules).
 #
-# Not managed here (no provider attribute): each node's
-# nf_conntrack_allow_invalid = 1, set once through the API
-# (`pvesh set /nodes/<node>/firewall/options --nf_conntrack_allow_invalid 1`).
-# Without it, bridged VM traffic in conntrack state INVALID is dropped; rare
-# here (no asymmetric routing), so a rebuilt cluster works without it.
+# Everything else is stock PVE, deliberately: in particular
+# nf_conntrack_allow_invalid stays at its default (off), so bridged VM packets
+# in conntrack state INVALID are dropped. Measured on the busiest node: about
+# one such packet every few minutes (stray RSTs after a connection closed);
+# nothing depends on them.
 
 data "proxmox_virtual_environment_nodes" "all" {}
 
