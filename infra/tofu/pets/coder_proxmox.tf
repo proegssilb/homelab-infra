@@ -8,6 +8,38 @@
 # The password must match coder_proxmox_password in ansible host_vars/coder.yml
 # (same pattern as oidc_client_secrets).
 
+# ── Agents VNet ────────────────────────────────────────────────────────────────
+# VLAN 30 (the UniFi "Agents" network) as an SDN VNet on every node's vmbr0, so
+# coder@pve's SDN.Use can be granted on this VNet alone: Coder then cannot put
+# a workspace on any other VLAN, or untagged, even with its own credentials.
+# isolate_ports: guests on the same node's VNet bridge can't talk to each other
+# at L2 (they only reach the uplink). Workspaces on different nodes still meet
+# on the switch; the per-VM firewall in the Coder template covers that.
+#
+# Applying SDN regenerates the SDN part of each node's network config and runs
+# ifreload there.
+
+resource "proxmox_sdn_zone_vlan" "coder" {
+  id     = "coder"
+  bridge = "vmbr0"
+}
+
+resource "proxmox_sdn_vnet" "agents" {
+  id            = "agents"
+  zone          = proxmox_sdn_zone_vlan.coder.id
+  alias         = "Coder workspaces (UniFi Agents VLAN)"
+  tag           = 30
+  isolate_ports = true
+}
+
+resource "proxmox_sdn_applier" "coder" {
+  depends_on = [proxmox_sdn_zone_vlan.coder, proxmox_sdn_vnet.agents]
+
+  lifecycle {
+    replace_triggered_by = [proxmox_sdn_zone_vlan.coder, proxmox_sdn_vnet.agents]
+  }
+}
+
 resource "proxmox_virtual_environment_pool" "coder" {
   pool_id = "coder"
   comment = "Coder workspace VMs (VMID 1000-1999). Managed by Coder, not tofu."
@@ -62,10 +94,13 @@ resource "proxmox_virtual_environment_user" "coder" {
 
 locals {
   coder_acls = {
-    pool     = { path = "/pool/${proxmox_virtual_environment_pool.coder.pool_id}", role = proxmox_virtual_environment_role.coder_workspaces.role_id }
-    template = { path = "/vms/${var.template_id}", role = proxmox_virtual_environment_role.coder_template.role_id }
-    storage  = { path = "/storage/${var.datastore}", role = proxmox_virtual_environment_role.coder_resources.role_id }
-    bridges  = { path = "/sdn/zones/localnetwork", role = proxmox_virtual_environment_role.coder_resources.role_id }
+    pool        = { path = "/pool/${proxmox_virtual_environment_pool.coder.pool_id}", role = proxmox_virtual_environment_role.coder_workspaces.role_id }
+    template    = { path = "/vms/${var.template_id}", role = proxmox_virtual_environment_role.coder_template.role_id }
+    storage     = { path = "/storage/${var.datastore}", role = proxmox_virtual_environment_role.coder_resources.role_id }
+    agents_vnet = { path = "/sdn/zones/${proxmox_sdn_zone_vlan.coder.id}/${proxmox_sdn_vnet.agents.id}", role = proxmox_virtual_environment_role.coder_resources.role_id }
+    # TODO: drop once a workspace has been built on the agents VNet without it.
+    # Kept for one step in case cloning the template (NIC on vmbr0) needs it.
+    bridges = { path = "/sdn/zones/localnetwork", role = proxmox_virtual_environment_role.coder_resources.role_id }
   }
 }
 

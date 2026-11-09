@@ -5,3 +5,7 @@
 # Base domain for all homelab services (e.g. home.example.com).
 # Referenced by proxy vhosts, app configs, pg01 NFS backup target, and more.
 homelab_domain: home.example.com
+
+# Subnet of the Coder workspace network (UniFi "Agents" VLAN, no DHCP there).
+# Workspaces get static IPs from it, derived from their VMID (coder role).
+coder_agents_cidr: 10.0.30.0/24
