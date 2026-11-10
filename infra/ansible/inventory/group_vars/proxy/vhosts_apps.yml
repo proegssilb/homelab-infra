@@ -11,6 +11,7 @@ _nginx_vhosts_apps:
     upstream_protocol: http
     upstream_servers:
       - "forgejo.{{ homelab_domain }}:3000"
+    access_deny: []   # Coder workspaces clone and push here
 
   - name: authentik
     server_name: "auth.{{ homelab_domain }}"
@@ -147,6 +148,7 @@ _nginx_vhosts_apps:
       # Public alias (dev) differs from the VM hostname (coder) so it doesn't
       # collide with the VM's own DHCP-registered DNS name.
       - "coder.{{ homelab_domain }}:7080"
+    access_deny: []   # workspace agents connect back to Coder here
 
   - name: homeassistant
     server_name: "ha.{{ homelab_domain }}"

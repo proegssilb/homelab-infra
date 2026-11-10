@@ -32,6 +32,22 @@ server {
 
   ssl_certificate     {{ item.ssl_cert }};
   ssl_certificate_key {{ item.ssl_key }};
+{% set _allow = item.access_allow | default([]) %}
+{% set _deny = item.access_deny if item.access_deny is defined else nginx_vhost_default_deny %}
+{% if _allow or _deny %}
+
+  # Source restrictions (access_allow / access_deny, default nginx_vhost_default_deny).
+  # Server-level, so every location inherits them unless it sets its own.
+{% for src in _allow %}
+  allow {{ src }};
+{% endfor %}
+{% for src in _deny %}
+  deny  {{ src }};
+{% endfor %}
+{% if _allow %}
+  deny  all;
+{% endif %}
+{% endif %}
 
   location / {
 {% if item.upstream_servers | length > 1 or (item.sticky_cookie is defined and item.sticky_cookie) %}

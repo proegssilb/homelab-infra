@@ -17,6 +17,16 @@ nginx_resolver: "192.168.20.1"
 
 nginx_vhosts: "{{ _nginx_vhosts_platform + _nginx_vhosts_apps + _nginx_vhosts_observability }}"
 
+# UniFi lets Coder workspaces reach proxy01:443 so they can use Coder (dev.)
+# and Forgejo (code.); without this, every other vhost would be reachable too.
+# AgentSvc is in the list because egress01 proxies for workspaces: allowing
+# it here would let a workspace CONNECT through egress01 to any vhost.
+# Vhosts that agents need set `access_deny: []`. The Forgejo SSH stream (2222)
+# is a stream proxy and isn't affected.
+nginx_vhost_default_deny:
+  - "{{ coder_agents_cidr }}"
+  - "{{ agentsvc_cidr }}"
+
 nginx_stream_proxies:
   - name: forgejo_ssh
     listen_port: 2222

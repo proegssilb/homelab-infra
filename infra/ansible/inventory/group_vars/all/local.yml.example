@@ -9,3 +9,7 @@ homelab_domain: home.example.com
 # Subnet of the Coder workspace network (UniFi "Agents" VLAN, no DHCP there).
 # Workspaces get static IPs from it, derived from their VMID (coder role).
 coder_agents_cidr: 10.0.30.0/24
+
+# Subnet of the agent support services network (UniFi "AgentSvc" VLAN, DHCP).
+# proxy01 refuses it on every vhost except the ones workspaces need.
+agentsvc_cidr: 10.0.31.0/24
