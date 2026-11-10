@@ -6,9 +6,10 @@ coder_access_url: "https://dev.{{ homelab_domain }}"
 coder_proxmox_endpoint: "https://proxmox.{{ homelab_domain }}/"
 
 # Per-workspace Forgejo deploy keys, minted through proxy01's deploy-key proxy
-# (nginx_forgejo_keys in group_vars/proxy). Token: coder_forgejo_keys_token
-# in host_vars/coder.yml.
+# (nginx_forgejo_keys in group_vars/proxy).
 coder_forgejo_keys_url: "https://code.{{ homelab_domain }}:9443"
+# Shared with proxy01; vaulted once in group_vars/all/main.yml.
+coder_forgejo_keys_token: "{{ forgejo_keys_client_token }}"
 coder_forgejo_ssh_url_prefix: "ssh://git@code.{{ homelab_domain }}:2222/"
 coder_forgejo_web_url_prefix: "https://code.{{ homelab_domain }}/"
 

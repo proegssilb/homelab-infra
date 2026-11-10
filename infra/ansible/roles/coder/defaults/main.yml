@@ -51,8 +51,8 @@ coder_agents_cidr: ""
 # real token; the template refuses to push without these.
 # URL of that proxy, e.g. https://code.example.com:9443
 coder_forgejo_keys_url: ""
-# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --stdin-name coder_forgejo_keys_token
-# Same value as nginx_forgejo_keys_client_token (group_vars/proxy).
+# Token Coder presents to that proxy; must equal nginx_forgejo_keys_client_token
+# (both are set from forgejo_keys_client_token in group_vars/all/main.yml).
 coder_forgejo_keys_token: ""
 # Repo URL prefixes (up to owner/repo) that count as this Forgejo.
 coder_forgejo_ssh_url_prefix: ""

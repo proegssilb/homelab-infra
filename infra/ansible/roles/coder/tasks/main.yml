@@ -105,8 +105,8 @@
           - coder_forgejo_web_url_prefix is match('^https://.*/$')
         fail_msg: >-
           Set coder_forgejo_keys_url / _ssh_url_prefix / _web_url_prefix
-          (group_vars/coder_app.yml) and vault coder_forgejo_keys_token
-          (host_vars/coder.yml).
+          (group_vars/coder_app.yml) and coder_forgejo_keys_token (from
+          forgejo_keys_client_token: run `just fill-vault-stubs`).
 
     # A file, not --variable flags: the CLI splits flag values on commas.
     - name: Write proxmox-vm template variables

@@ -59,12 +59,12 @@
       nginx_forgejo_keys.allow is empty (no Coder server yet?); leaving the
       Forgejo deploy-key proxy off. Re-run this role once it exists.
   when:
-    - nginx_forgejo_keys_client_token | length > 0
+    - nginx_forgejo_keys_forgejo_token | length > 0
     - nginx_forgejo_keys.allow | default([]) | length == 0
 
 - name: Forgejo deploy-key proxy
   when:
-    - nginx_forgejo_keys_client_token | length > 0
+    - nginx_forgejo_keys_forgejo_token | length > 0
     - nginx_forgejo_keys.allow | default([]) | length > 0
   block:
     - name: Check deploy-key proxy settings
@@ -95,7 +95,7 @@
     path: /etc/nginx/conf.d/forgejo-keys.conf
     state: absent
   when: >-
-    nginx_forgejo_keys_client_token | length == 0
+    nginx_forgejo_keys_forgejo_token | length == 0
     or nginx_forgejo_keys.allow | default([]) | length == 0
   notify: Reload nginx
 

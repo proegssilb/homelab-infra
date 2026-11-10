@@ -91,3 +91,11 @@ homeassistant_db_pass: !vault |
           61316537323763653734386663393165316366613365393565383831353930383930636533306434
           62306136313131323462333363656361613830336130633265643135356463366230343865323234
           35373431353861306566
+
+# Token Coder presents to proxy01's Forgejo deploy-key proxy (port 9443): read by
+# both sides, as nginx_forgejo_keys_client_token and coder_forgejo_keys_token.
+# Alphanumeric only (the proxy asserts it). `just fill-vault-stubs` fills it.
+# Generate: openssl rand -hex 32 | tr -d '\n' | ansible-vault encrypt_string --name forgejo_keys_client_token
+forgejo_keys_client_token: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          REPLACE_ME_WITH_ANSIBLE_VAULT_ENCRYPT_STRING_OUTPUT
