@@ -56,7 +56,7 @@ locals {
     homepage = { vmid = 115, cores = 1, memory = 1024, node = "pxmx02", tags = ["observe", "pets", "homepage_app"], ha = true }
 
     # Remote dev environments — Coder (demo: bundled PostgreSQL; workspaces are Proxmox VMs 1000–1999, see coder_proxmox.tf)
-    coder = { vmid = 116, cores = 4, memory = 8192, disk_size = 60, node = "pxmx01", tags = ["observe", "pets", "coder_app"], ha = true }
+    coder = { vmid = 116, cores = 4, memory = 8192, disk_size = 60, node = "pxmx01", tags = ["observe", "pets", "coder_app"], ha = true, firewall = true }
   }
 }
 
@@ -113,6 +113,9 @@ module "vm" {
   disk_size = lookup(each.value, "disk_size", 20)
 
   data_disks = try(each.value.data_disks, [])
+
+  # Rules and options for VMs with firewall = true live beside them (coder_firewall.tf).
+  firewall = try(each.value.firewall, false)
 
   ansible_user    = var.ansible_user
   ansible_ssh_key = var.ansible_ssh_key

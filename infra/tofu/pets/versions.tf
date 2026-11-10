@@ -32,6 +32,12 @@ terraform {
       # `init -upgrade` can't pull a provider newer than the server's API.
       version = "~> 2026.5.2"
     }
+    # Read-only lookups (coder_firewall.tf): firewall rules need addresses,
+    # and DNS already knows them. Uses the resolver of the machine running tofu.
+    dns = {
+      source  = "hashicorp/dns"
+      version = "~> 3.6.2"
+    }
   }
   required_version = ">= 1.8"
 }
