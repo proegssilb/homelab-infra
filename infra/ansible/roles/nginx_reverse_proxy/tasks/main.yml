@@ -1,4 +1,21 @@
 ---
+# An empty or mistyped entry would either break nginx (`deny ;`) or quietly
+# drop a restriction, so refuse to run with one.
+- name: Check vhost access lists are IPs/CIDRs
+  ansible.builtin.assert:
+    that:
+      - _access_sources | reject('match', '^[0-9a-fA-F:.]+(/[0-9]{1,3})?$') | list | length == 0
+    fail_msg: >-
+      Not an IP/CIDR in nginx_vhost_default_deny or a vhost's access_allow/access_deny:
+      {{ _access_sources | reject('match', '^[0-9a-fA-F:.]+(/[0-9]{1,3})?$') | list }}
+    quiet: true
+  vars:
+    _access_sources: >-
+      {{ (nginx_vhost_default_deny
+          + (nginx_vhosts | map(attribute='access_allow', default=[]) | flatten)
+          + (nginx_vhosts | map(attribute='access_deny', default=[]) | flatten))
+         | map('string') | list }}
+
 - name: Install nginx
   ansible.builtin.package:
     name: nginx

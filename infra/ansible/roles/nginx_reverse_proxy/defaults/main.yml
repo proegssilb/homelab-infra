@@ -14,9 +14,19 @@
 #                        the main location {} block
 #   extra_location_blocks — (optional) raw nginx location blocks appended
 #                           after the main location block
+#   access_allow       — (optional) source addresses/CIDRs allowed in; when
+#                        set, everything else is refused (deny all)
+#   access_deny        — (optional) source addresses/CIDRs refused; replaces
+#                        nginx_vhost_default_deny for this vhost ([] = none)
 #
+# Allow/deny apply to the HTTPS server only; the port-80 server just redirects.
 # Override this variable in group_vars or host_vars to customise per role/task.
 nginx_vhosts: []
+
+# Sources refused (403) on every vhost that doesn't set its own access_deny.
+# Default-closed on purpose: a newly added vhost is denied to these sources
+# until it opts out. Entries must be IPs or CIDRs.
+nginx_vhost_default_deny: []
 
 # List of TCP stream proxy definitions (nginx stream module).
 # Each entry supports:
