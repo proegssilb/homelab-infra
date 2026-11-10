@@ -17,6 +17,14 @@ terraform {
       source  = "bpg/proxmox"
       version = "~> 0.120.0"
     }
+    forgejo = {
+      source  = "svalabs/forgejo"
+      version = "~> 1.7.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 }
 
@@ -24,6 +32,13 @@ provider "coder" {}
 
 provider "proxmox" {
   # endpoint, username, password from PROXMOX_VE_ENDPOINT/_USERNAME/_PASSWORD.
+}
+
+provider "forgejo" {
+  # host, api_token from FORGEJO_HOST/FORGEJO_API_TOKEN: the deploy-key proxy
+  # on proxy01 and Coder's token for it — not a Forgejo token. The proxy holds
+  # the real one and passes only the deploy-key calls (see forgejo_keys in
+  # group_vars/proxy).
 }
 
 # ── Template variables (set by `coder templates push --variable`) ──────────────
@@ -93,6 +108,16 @@ variable "ssh_public_key_path" {
 variable "ssh_private_key_path" {
   type    = string
   default = "/etc/coder-workspaces/id_ed25519"
+}
+
+variable "forgejo_ssh_url_prefix" {
+  description = "Forgejo SSH clone URL up to owner/repo, e.g. ssh://git@code.example.com:2222/. Repos under it (or under forgejo_web_url_prefix) get a per-workspace deploy key."
+  type        = string
+}
+
+variable "forgejo_web_url_prefix" {
+  description = "Forgejo web URL up to owner/repo, e.g. https://code.example.com/. Such repo URLs are cloned over SSH with the deploy key instead."
+  type        = string
 }
 
 # ── Workspace parameters ───────────────────────────────────────────────────────
@@ -170,10 +195,11 @@ data "coder_parameter" "repo_url" {
   display_name = "Git repository (optional)"
   description  = <<-EOT
     Cloned into /home/coder on first start; later starts leave it alone.
-    Public: https://github.com/owner/repo or https://code.<domain>/owner/repo.
-    Private: use SSH (git@github.com:owner/repo.git, or
-    ssh://git@code.<domain>:2222/owner/repo.git) after adding your Coder
-    public key (Account → SSH Keys) to GitHub / Forgejo.
+    Forgejo (https://code.<domain>/owner/repo or
+    ssh://git@code.<domain>:2222/owner/repo.git): the workspace gets its own
+    deploy key with push access to that one repo, deleted with the workspace.
+    Protect main on the repo: deploy keys must not be allowed to push there.
+    Other hosts: public HTTPS clones only; there is no key for them.
   EOT
   type         = "string"
   default      = ""
@@ -220,11 +246,67 @@ locals {
   prefix_len = split("/", var.agents_cidr)[1]
 }
 
+# ── Git credentials: one Forgejo deploy key per workspace ─────────────────────
+#
+# The workspace gets an SSH key that can push to the one repo it was created
+# for, and nothing else. Not tied to start_count, so it survives stop/start
+# and is deleted (key and Forgejo deploy key) with the workspace. The private
+# key sits in this workspace's Terraform state in Coder's database.
+#
+# Coder's own per-user key (`coder gitssh`) stays reachable from inside any
+# workspace through the agent API, so it must not be registered on Forgejo or
+# GitHub; GIT_SSH_COMMAND below stops git from offering it.
+
+locals {
+  repo_url = trimspace(data.coder_parameter.repo_url.value)
+
+  # owner/repo when repo_url points at this Forgejo, "" otherwise.
+  forgejo_rest = (
+    startswith(local.repo_url, var.forgejo_ssh_url_prefix) ? trimprefix(local.repo_url, var.forgejo_ssh_url_prefix) :
+    startswith(local.repo_url, var.forgejo_web_url_prefix) ? trimprefix(local.repo_url, var.forgejo_web_url_prefix) :
+    ""
+  )
+  forgejo_parts = split("/", trimsuffix(trimsuffix(local.forgejo_rest, "/"), ".git"))
+  is_forgejo    = length(local.forgejo_parts) == 2 && alltrue([for p in local.forgejo_parts : length(p) > 0])
+  forgejo_owner = local.is_forgejo ? local.forgejo_parts[0] : ""
+  forgejo_repo  = local.is_forgejo ? local.forgejo_parts[1] : ""
+
+  # Forgejo repos are always cloned over SSH, so the deploy key can push.
+  clone_url = local.is_forgejo ? "${var.forgejo_ssh_url_prefix}${local.forgejo_owner}/${local.forgejo_repo}.git" : local.repo_url
+
+  deploy_key_path = "/home/coder/.ssh/deploy_key"
+}
+
+data "forgejo_repository" "repo" {
+  count = local.is_forgejo ? 1 : 0
+  owner = local.forgejo_owner
+  name  = local.forgejo_repo
+}
+
+resource "tls_private_key" "deploy" {
+  count     = local.is_forgejo ? 1 : 0
+  algorithm = "ED25519"
+}
+
+resource "forgejo_deploy_key" "workspace" {
+  count         = local.is_forgejo ? 1 : 0
+  repository_id = data.forgejo_repository.repo[0].id
+  key           = trimspace(tls_private_key.deploy[0].public_key_openssh)
+  title         = "coder ${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}"
+  read_only     = false
+}
+
 # ── Agent ──────────────────────────────────────────────────────────────────────
 
 resource "coder_agent" "main" {
   arch = "amd64"
   os   = "linux"
+
+  # Overrides the agent's default `coder gitssh` (manifest variables win):
+  # git uses the workspace's deploy key only, never the owner's Coder key.
+  env = {
+    GIT_SSH_COMMAND = "ssh -i ${local.deploy_key_path} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+  }
 
   metadata {
     display_name = "CPU"
@@ -249,14 +331,14 @@ resource "coder_agent" "main" {
   }
 }
 
-# Empty URL → the module skips the clone. SSH URLs authenticate with the
-# owner's Coder-managed key (the agent sets GIT_SSH_COMMAND to `coder gitssh`).
+# Empty URL → the module skips the clone. Forgejo repos clone over SSH with the
+# workspace's deploy key (GIT_SSH_COMMAND above).
 module "git-clone" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/coder/git-clone/coder"
   version  = "~> 2.0"
   agent_id = coder_agent.main.id
-  url      = trimspace(data.coder_parameter.repo_url.value)
+  url      = local.clone_url
   base_dir = "/home/coder"
 }
 
@@ -429,8 +511,12 @@ resource "proxmox_virtual_environment_firewall_rules" "workspace" {
 
 # Re-runs on every start: the agent token can change per build.
 resource "terraform_data" "agent_install" {
-  count            = data.coder_workspace.me.start_count
-  triggers_replace = [coder_agent.main.token, proxmox_virtual_environment_vm.workspace.vm_id]
+  count = data.coder_workspace.me.start_count
+  triggers_replace = [
+    coder_agent.main.token,
+    proxmox_virtual_environment_vm.workspace.vm_id,
+    tls_private_key.deploy[*].public_key_fingerprint_sha256,
+  ]
 
   # SSH in only once the firewall (and its SSH allow rule) is in place.
   depends_on = [proxmox_virtual_environment_firewall_rules.workspace]
@@ -444,8 +530,15 @@ resource "terraform_data" "agent_install" {
   }
 
   provisioner "remote-exec" {
-    inline = [
+    inline = concat([
       "cloud-init status --wait >/dev/null || true",
+      # Deploy key (runs as user coder); removed if the repo isn't on Forgejo.
+      "install -d -m 0700 /home/coder/.ssh",
+      ], local.is_forgejo ? [
+      "echo '${base64encode(tls_private_key.deploy[0].private_key_openssh)}' | base64 -d | install -m 0600 /dev/stdin ${local.deploy_key_path}",
+      ] : [
+      "rm -f ${local.deploy_key_path}",
+      ], [
       # git-clone module needs git; the cloud image doesn't ship it.
       "command -v git >/dev/null || { sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git >/dev/null; }",
       "sudo install -d -m 0755 /opt/coder-agent",
@@ -456,7 +549,7 @@ resource "terraform_data" "agent_install" {
       "sudo systemctl daemon-reload",
       "sudo systemctl enable coder-agent >/dev/null 2>&1",
       "sudo systemctl restart coder-agent",
-    ]
+    ])
   }
 }
 

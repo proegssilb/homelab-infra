@@ -46,6 +46,17 @@ coder_workspace_ssh_sources:
 # each workspace gets a static IP derived from its VMID, and its VM firewall
 # only lets it send from that address.
 coder_agents_cidr: ""
+# Per-workspace Forgejo deploy keys (template proxmox-vm). Coder talks to the
+# deploy-key proxy on proxy01 (nginx_forgejo_keys), never to Forgejo with a
+# real token; the template refuses to push without these.
+# URL of that proxy, e.g. https://code.example.com:9443
+coder_forgejo_keys_url: ""
+# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --stdin-name coder_forgejo_keys_token
+# Same value as nginx_forgejo_keys_client_token (group_vars/proxy).
+coder_forgejo_keys_token: ""
+# Repo URL prefixes (up to owner/repo) that count as this Forgejo.
+coder_forgejo_ssh_url_prefix: ""
+coder_forgejo_web_url_prefix: ""
 # Coder API token of an Owner, used to push templates. Leave empty to skip the
 # push (e.g. right after a rebuild, before the first admin exists).
 # Create: Coder UI -> Account -> Tokens, then ansible-vault encrypt_string --stdin-name coder_admin_token

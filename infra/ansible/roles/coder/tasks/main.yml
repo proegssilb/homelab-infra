@@ -94,6 +94,20 @@
         that: coder_agents_cidr is match('^\d{1,3}(\.\d{1,3}){3}/\d{1,2}$')
         fail_msg: "Set coder_agents_cidr (the Agents VLAN subnet) in group_vars/all/local.yml."
 
+    # Without these the template's Forgejo provider can't configure and
+    # every workspace build would fail.
+    - name: Require the Forgejo deploy-key settings
+      ansible.builtin.assert:
+        that:
+          - coder_forgejo_keys_url is match('^https://')
+          - coder_forgejo_keys_token | trim | length > 0
+          - coder_forgejo_ssh_url_prefix is match('^ssh://.*/$')
+          - coder_forgejo_web_url_prefix is match('^https://.*/$')
+        fail_msg: >-
+          Set coder_forgejo_keys_url / _ssh_url_prefix / _web_url_prefix
+          (group_vars/coder_app.yml) and vault coder_forgejo_keys_token
+          (host_vars/coder.yml).
+
     # A file, not --variable flags: the CLI splits flag values on commas.
     - name: Write proxmox-vm template variables
       ansible.builtin.copy:
@@ -109,6 +123,8 @@
           vmid_max: "{{ coder_proxmox_template.vmid_max }}"
           ssh_sources: "{{ coder_workspace_ssh_sources | join(',') }}"
           agents_cidr: "{{ coder_agents_cidr }}"
+          forgejo_ssh_url_prefix: "{{ coder_forgejo_ssh_url_prefix }}"
+          forgejo_web_url_prefix: "{{ coder_forgejo_web_url_prefix }}"
         dest: "{{ coder_data_dir }}/coder-templates/proxmox-vm.vars.yml"
         mode: "0644"
 
@@ -118,6 +134,7 @@
           {{ lookup('ansible.builtin.file', 'coder-templates/proxmox-vm/main.tf') | hash('sha256') }}
           {{ coder_proxmox_template | to_json }}
           {{ coder_workspace_ssh_sources | to_json }} {{ coder_agents_cidr }}
+          {{ coder_forgejo_ssh_url_prefix }} {{ coder_forgejo_web_url_prefix }}
         dest: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
         mode: "0644"
 

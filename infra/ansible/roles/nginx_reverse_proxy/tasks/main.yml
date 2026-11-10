@@ -53,6 +53,52 @@
   loop: "{{ nginx_vhosts }}"
   notify: Reload nginx
 
+- name: Note that the deploy-key proxy waits for its allow list
+  ansible.builtin.debug:
+    msg: >-
+      nginx_forgejo_keys.allow is empty (no Coder server yet?); leaving the
+      Forgejo deploy-key proxy off. Re-run this role once it exists.
+  when:
+    - nginx_forgejo_keys_client_token | length > 0
+    - nginx_forgejo_keys.allow | default([]) | length == 0
+
+- name: Forgejo deploy-key proxy
+  when:
+    - nginx_forgejo_keys_client_token | length > 0
+    - nginx_forgejo_keys.allow | default([]) | length > 0
+  block:
+    - name: Check deploy-key proxy settings
+      ansible.builtin.assert:
+        that:
+          - nginx_forgejo_keys_forgejo_token | trim | length > 0
+          - nginx_forgejo_keys_client_token | trim | length >= 32
+          - nginx_forgejo_keys_client_token | trim is match('^[A-Za-z0-9]+$')
+          - nginx_forgejo_keys.port | default(0) | int > 0
+          - nginx_forgejo_keys.allow | default([]) | length > 0
+          - nginx_forgejo_keys.allow | map('string') | reject('match', '^[0-9a-fA-F:.]+(/[0-9]{1,3})?$') | list | length == 0
+        fail_msg: >-
+          nginx_forgejo_keys needs both tokens (client token: 32+ alphanumerics),
+          a port and an allow list of IPs/CIDRs.
+        quiet: true
+
+    - name: Template Forgejo deploy-key proxy
+      ansible.builtin.template:
+        src: forgejo_keys.conf.j2
+        dest: /etc/nginx/conf.d/forgejo-keys.conf
+        owner: root
+        group: root
+        mode: "0600" # holds the Forgejo token
+      notify: Reload nginx
+
+- name: Remove Forgejo deploy-key proxy when off
+  ansible.builtin.file:
+    path: /etc/nginx/conf.d/forgejo-keys.conf
+    state: absent
+  when: >-
+    nginx_forgejo_keys_client_token | length == 0
+    or nginx_forgejo_keys.allow | default([]) | length == 0
+  notify: Reload nginx
+
 - name: Create nginx systemd drop-in directory
   ansible.builtin.file:
     path: /etc/systemd/system/nginx.service.d

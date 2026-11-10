@@ -126,6 +126,12 @@ proxy01 refuses the Agents and AgentSvc subnets (`coder_agents_cidr`, `agentsvc_
 `group_vars/proxy/main.yml`). Only `dev` and `code` opt out with `access_deny: []`; a new vhost
 stays closed to workspaces unless it does the same.
 
+The Coder server (VM 116) has its own VM firewall with outbound DROP (`tofu/pets/coder_firewall.tf`);
+a new thing Coder must reach needs a rule there. Workspaces get git access only through a
+per-workspace Forgejo deploy key, which the Coder template creates through proxy01's deploy-key
+proxy (`code.<domain>:9443`, `roles/nginx_reverse_proxy/templates/forgejo_keys.conf.j2`): a
+method+path allowlist in front of a Forgejo bot token that never leaves proxy01.
+
 ### APT proxy
 
 Every Ansible-managed host fetches packages through `aptcache01` (apt-cacher-ng, port 3142), so a server that only needs the internet for packages can lose internet access. The proxy is an allowlist: plain-HTTP repos only via its Remap rules, HTTPS repos only by tunnel to the hosts in `apt_cache_https_passthrough_hosts`. When a role adds a new HTTPS repo, add its host there, and give its `deb822_repository` task `environment: "{{ apt_proxy_env | default({}) }}"` so the signing-key download goes through the proxy too. The proxy itself and the `bootstrap` group are exempt (`apt_proxy_host: ""`).

@@ -39,6 +39,21 @@ nginx_vhost_default_deny: []
 # list is non-empty.
 nginx_stream_proxies: []
 
+# Forgejo deploy-key proxy for Coder (templates/forgejo_keys.conf.j2): the
+# only Forgejo API calls Coder's workspace template needs, with a Forgejo
+# token that never leaves this host. Off (file removed) while
+# nginx_forgejo_keys_client_token is empty.
+#
+#   port        — its own listen port, so the UniFi rules keep workspaces off it
+#   server_name, ssl_cert, ssl_key — as for nginx_vhosts
+#   upstream    — Forgejo's plain-HTTP host:port
+#   allow       — source IPs allowed in (the Coder server); all else refused
+nginx_forgejo_keys: {}
+# Token Coder sends (Authorization: token …); must match coder_forgejo_keys_token.
+nginx_forgejo_keys_client_token: ""
+# Forgejo token sent upstream (bot account, scope write:repository).
+nginx_forgejo_keys_forgejo_token: ""
+
 # DNS resolver for runtime upstream hostname resolution (defers lookup to request
 # time so nginx starts cleanly even when backend VMs are not yet provisioned).
 # Override in group_vars to a known-stable resolver (e.g. the LAN gateway) rather

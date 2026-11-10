@@ -37,6 +37,35 @@ nginx_stream_proxies:
     listen_port: 2003
     upstream: "obs01.{{ homelab_domain }}:2003"
 
+# Forgejo deploy-key proxy for Coder (see roles/nginx_reverse_proxy
+# templates/forgejo_keys.conf.j2). Coder reaches it as
+# https://code.<domain>:9443 (coder_forgejo_keys_url). Off until the two
+# tokens below are set and the Coder VM exists.
+nginx_forgejo_keys:
+  port: 9443
+  server_name: "code.{{ homelab_domain }}"
+  ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+  ssl_key: "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+  upstream: "forgejo.{{ homelab_domain }}:3000"
+  # The Coder server's address as Proxmox's guest agent reports it (the
+  # dynamic inventory's ansible_host). Empty until the VM exists — e.g. when
+  # `just bootstrap` configures proxy01 before pets — and the proxy stays off;
+  # bootstrap re-runs the proxy group last to pick it up.
+  allow: >-
+    {{ (groups['coder_app'] | default([]))
+       | map('extract', hostvars, 'ansible_host')
+       | select('match', '^[0-9]{1,3}(\.[0-9]{1,3}){3}$')
+       | list }}
+
+# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --stdin-name nginx_forgejo_keys_client_token
+# Same value as coder_forgejo_keys_token (host_vars/coder.yml).
+nginx_forgejo_keys_client_token: ""
+
+# Token of the Forgejo bot account that owns deploy-key creation (site admin,
+# so any repo can get a workspace; scope write:repository only). Never leaves
+# proxy01. Encrypt: ansible-vault encrypt_string '<token>' --name nginx_forgejo_keys_forgejo_token
+nginx_forgejo_keys_forgejo_token: ""
+
 # ── certbot ───────────────────────────────────────────────────────────────────
 
 certbot_domains:
