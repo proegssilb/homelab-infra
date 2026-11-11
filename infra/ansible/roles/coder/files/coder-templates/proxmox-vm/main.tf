@@ -68,6 +68,43 @@ variable "bridge" {
   default = "vmbr0"
 }
 
+variable "cpu_type" {
+  description = "QEMU CPU model for workspaces. Every node must support it; not \"host\"."
+  type        = string
+  default     = "x86-64-v3"
+}
+
+# Disk throttles on the workspace's OS disk (MB/s and IOPS, per direction).
+variable "disk_iops" {
+  type    = number
+  default = 1000
+}
+
+variable "disk_iops_burst" {
+  type    = number
+  default = 4000
+}
+
+variable "disk_read_mbps" {
+  type    = number
+  default = 200
+}
+
+variable "disk_read_mbps_burst" {
+  type    = number
+  default = 400
+}
+
+variable "disk_write_mbps" {
+  type    = number
+  default = 100
+}
+
+variable "disk_write_mbps_burst" {
+  type    = number
+  default = 200
+}
+
 variable "vlan_id" {
   description = "VLAN tag for the workspace NIC (0 = untagged). Workspaces belong on the Agents VLAN, fenced off from the rest of the lab by the UniFi firewall; every node in var.nodes needs a VLAN-aware bridge."
   type        = number
@@ -435,9 +472,12 @@ resource "proxmox_virtual_environment_vm" "workspace" {
     datastore_id = var.datastore
   }
 
+  # A named model, not "host": the guest sees only a fixed feature set, not
+  # every flag of the node's CPU, which narrows what an escape attempt has to
+  # work with. Every node (and grunt) does x86-64-v3, so AVX2 etc. stay.
   cpu {
     cores = data.coder_parameter.cores.value
-    type  = "host"
+    type  = var.cpu_type
   }
 
   memory {
@@ -451,6 +491,19 @@ resource "proxmox_virtual_environment_vm" "workspace" {
     interface    = "scsi1"
     file_format  = "raw"
     discard      = "on"
+
+    # Workspaces share the Ceph pools with the lab; a runaway agent shouldn't
+    # be able to saturate them. Short bursts above the limits are allowed.
+    speed {
+      iops_read            = var.disk_iops
+      iops_write           = var.disk_iops
+      iops_read_burstable  = var.disk_iops_burst
+      iops_write_burstable = var.disk_iops_burst
+      read                 = var.disk_read_mbps
+      read_burstable       = var.disk_read_mbps_burst
+      write                = var.disk_write_mbps
+      write_burstable      = var.disk_write_mbps_burst
+    }
   }
 
   network_device {

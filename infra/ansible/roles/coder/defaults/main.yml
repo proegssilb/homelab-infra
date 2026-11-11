@@ -35,6 +35,17 @@ coder_proxmox_template:
   # Workspace IPs are static, derived from the VMID (see coder_agents_cidr);
   # 1000-1239 fills .10-.249 of a /24. 1240-1999 stay reserved for Coder.
   vmid_max: 1239
+  # Named CPU model, not "host"; all nodes support x86-64-v3 (checked
+  # 2026-11-10 from /nodes/<n>/status flags).
+  cpu_type: x86-64-v3
+  # Throttles on each workspace's disk so one agent can't saturate the Ceph
+  # pools the lab shares. Per direction; bursts are short (QEMU default 1 s).
+  disk_iops: 1000
+  disk_iops_burst: 4000
+  disk_read_mbps: 200
+  disk_read_mbps_burst: 400
+  disk_write_mbps: 100
+  disk_write_mbps_burst: 200
 # Addresses each workspace VM's Proxmox firewall accepts SSH from (all other
 # inbound is dropped, including from other workspaces). The Coder server must
 # be here: it installs the agent over SSH. Add admin hosts (e.g. in local.yml)
