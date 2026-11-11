@@ -32,6 +32,8 @@ def _public(addr: str) -> bool:
 
 class BlockPrivate:
     async def server_connect(self, data: server_hooks.ServerConnectionHookData) -> None:
+        if data.server.error:  # already refused (allowlist.py, enforce mode)
+            return
         host, port = data.server.address
         try:
             infos = await asyncio.get_running_loop().getaddrinfo(

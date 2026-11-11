@@ -110,7 +110,7 @@ Roles apply to groups, not individual hosts. Key assignments:
 - `obs_grafana` → grafana
 - `auth` → authentik
 - `nextcloud_app` → nextcloud
-- `egress_proxy` (egress01) → egress_proxy (mitmproxy for Coder workspaces; refuses non-public destinations)
+- `egress_proxy` (egress01) → egress_proxy (mitmproxy for Coder workspaces; refuses non-public destinations; destination allowlist `egress_proxy_allowlist`, in shadow mode: misses are logged as "egress would refuse", not blocked)
 - `ntp_server` (egress01) → ntp_server (chrony; workspaces' NTP, so they need no internet NTP)
 
 ### Agent support services
