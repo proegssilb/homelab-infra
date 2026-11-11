@@ -57,6 +57,13 @@ coder_forgejo_keys_token: ""
 # Repo URL prefixes (up to owner/repo) that count as this Forgejo.
 coder_forgejo_ssh_url_prefix: ""
 coder_forgejo_web_url_prefix: ""
+# Workspace egress (template proxmox-vm): sessions' HTTP(S) via the egress
+# proxy (mitmproxy on egress01), lab names direct (NO_PROXY), apt via the lab
+# apt cache, time from egress01's chrony.
+coder_egress_proxy_url: ""
+coder_no_proxy: []
+coder_apt_proxy_url: ""
+coder_ntp_server: ""
 # Coder API token of an Owner, used to push templates. Leave empty to skip the
 # push (e.g. right after a rebuild, before the first admin exists).
 # Create: Coder UI -> Account -> Tokens, then ansible-vault encrypt_string --stdin-name coder_admin_token

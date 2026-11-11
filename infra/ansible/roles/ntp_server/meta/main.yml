@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: ntp_server
+  author: homelab
+  description: chrony serving time to subnets without internet NTP (Coder workspaces)
+  min_ansible_version: "2.15"
+dependencies: []

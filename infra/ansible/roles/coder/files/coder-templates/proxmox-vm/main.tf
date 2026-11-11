@@ -120,6 +120,28 @@ variable "forgejo_web_url_prefix" {
   type        = string
 }
 
+# ── Egress: what workspaces use instead of the open internet ───────────────────
+
+variable "egress_proxy_url" {
+  description = "HTTP(S) proxy for workspace sessions (mitmproxy on egress01), e.g. http://egress01.example.com:8080."
+  type        = string
+}
+
+variable "no_proxy" {
+  description = "Comma-separated NO_PROXY for workspace sessions: lab names reached directly (Coder, Forgejo), never through the egress proxy (which refuses private addresses anyway)."
+  type        = string
+}
+
+variable "apt_proxy_url" {
+  description = "apt proxy for workspaces (the lab apt cache), e.g. http://aptcache01.example.com:3142."
+  type        = string
+}
+
+variable "ntp_server" {
+  description = "NTP server for workspaces (chrony on egress01), so they need no internet NTP."
+  type        = string
+}
+
 # ── Workspace parameters ───────────────────────────────────────────────────────
 
 data "coder_workspace" "me" {}
@@ -279,6 +301,20 @@ locals {
   # Coder owner and workspace names are lowercase letters, digits and dashes.
   agent_git_name  = "Coder agent (${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name})"
   agent_git_email = "${data.coder_workspace.me.name}.${data.coder_workspace_owner.me.name}@coder-agent.invalid"
+
+  apt_proxy_conf = <<-EOT
+    // Managed by the Coder template: packages through the lab apt cache.
+    Acquire::http::Proxy "${var.apt_proxy_url}";
+    Acquire::https::Proxy "${var.apt_proxy_url}";
+  EOT
+
+  # Empty FallbackNTP: no silent fallback to internet pools.
+  timesyncd_conf = <<-EOT
+    # Managed by the Coder template: time from egress01, not the internet.
+    [Time]
+    NTP=${var.ntp_server}
+    FallbackNTP=
+  EOT
 }
 
 data "forgejo_repository" "repo" {
@@ -316,7 +352,18 @@ resource "coder_agent" "main" {
   # is labelling, not enforcement (an agent can set any author); what keeps
   # agents from posing as the owner is that only the owner's desktop holds
   # their signing key, and main requires signed commits.
+  #
+  # Proxy variables send sessions' HTTP(S) through the egress proxy, where
+  # every destination is logged (phase 1 of gap 3). Both spellings, since
+  # tools disagree on which they read. The agent service itself is not
+  # proxied: it talks to Coder directly.
   env = {
+    HTTP_PROXY          = var.egress_proxy_url
+    HTTPS_PROXY         = var.egress_proxy_url
+    NO_PROXY            = var.no_proxy
+    http_proxy          = var.egress_proxy_url
+    https_proxy         = var.egress_proxy_url
+    no_proxy            = var.no_proxy
     GIT_SSH_COMMAND     = "ssh -i ${local.deploy_key_path} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
     GIT_AUTHOR_NAME     = local.agent_git_name
     GIT_AUTHOR_EMAIL    = local.agent_git_email
@@ -548,6 +595,12 @@ resource "terraform_data" "agent_install" {
   provisioner "remote-exec" {
     inline = concat([
       "cloud-init status --wait >/dev/null || true",
+      # Packages through the lab apt cache and time from egress01, before
+      # anything is installed: neither needs the open internet.
+      "echo '${base64encode(local.apt_proxy_conf)}' | base64 -d | sudo tee /etc/apt/apt.conf.d/01proxy >/dev/null",
+      "sudo install -d -m 0755 /etc/systemd/timesyncd.conf.d",
+      "echo '${base64encode(local.timesyncd_conf)}' | base64 -d | sudo tee /etc/systemd/timesyncd.conf.d/agents.conf >/dev/null",
+      "sudo systemctl try-restart systemd-timesyncd || true",
       # Deploy key (runs as user coder); removed if the repo isn't on Forgejo.
       "install -d -m 0700 /home/coder/.ssh",
       ], local.is_forgejo ? [

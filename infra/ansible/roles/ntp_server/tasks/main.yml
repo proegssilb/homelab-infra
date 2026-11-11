@@ -1,0 +1,31 @@
+---
+- name: Require at least one client subnet
+  ansible.builtin.assert:
+    that:
+      - ntp_server_allow | length > 0
+      - ntp_server_allow | map('string') | reject('match', '^[0-9a-fA-F:.]+(/[0-9]{1,3})?$') | list | length == 0
+    fail_msg: "Set ntp_server_allow to the subnets (CIDRs) that may query this NTP server."
+    quiet: true
+
+# Replaces systemd-timesyncd (the packages conflict).
+- name: Install chrony
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+
+- name: Serve time to the allowed subnets
+  ansible.builtin.copy:
+    dest: /etc/chrony/conf.d/ntp-server.conf
+    content: |
+      # Managed by Ansible (ntp_server role)
+      {% for net in ntp_server_allow %}
+      allow {{ net }}
+      {% endfor %}
+    mode: "0644"
+  notify: Restart chrony
+
+- name: Enable and start chrony
+  ansible.builtin.systemd:
+    name: chrony
+    enabled: true
+    state: started
