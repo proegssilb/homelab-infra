@@ -37,6 +37,48 @@ nginx_stream_proxies:
     listen_port: 2003
     upstream: "obs01.{{ homelab_domain }}:2003"
 
+# Forgejo deploy-key proxy for Coder (see roles/nginx_reverse_proxy
+# templates/forgejo_keys.conf.j2). Coder reaches it as
+# https://code.<domain>:9443 (coder_forgejo_keys_url). Off until the Forgejo
+# token below is set and the Coder VM exists.
+nginx_forgejo_keys:
+  port: 9443
+  server_name: "code.{{ homelab_domain }}"
+  ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+  ssl_key: "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+  upstream: "forgejo.{{ homelab_domain }}:3000"
+  # The Coder server's eth0 IPv4 address as Proxmox's guest agent reports it
+  # (proxmox_agent_interfaces from the dynamic inventory; for VMs the
+  # inventory's ansible_host is just the hostname). Empty until the VM exists —
+  # e.g. when `just bootstrap` configures proxy01 before pets — and the proxy
+  # stays off; bootstrap re-runs the proxy group last to pick it up.
+  allow: >-
+    {{ (groups['coder_app'] | default([]))
+       | map('extract', hostvars)
+       | map(attribute='proxmox_agent_interfaces', default=[])
+       | flatten
+       | selectattr('name', 'equalto', 'eth0')
+       | map(attribute='ip-addresses')
+       | flatten
+       | select('match', '^[0-9]{1,3}(\.[0-9]{1,3}){3}/')
+       | map('regex_replace', '/.*', '')
+       | list }}
+
+# Shared with Coder; vaulted once in group_vars/all/main.yml.
+nginx_forgejo_keys_client_token: "{{ forgejo_keys_client_token }}"
+
+# Token of the Forgejo bot account that owns deploy-key creation (site admin,
+# so any repo can get a workspace; scope write:repository only). Never leaves
+# proxy01. Encrypt: ansible-vault encrypt_string '<token>' --name nginx_forgejo_keys_forgejo_token
+nginx_forgejo_keys_forgejo_token: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          31666136313634306562313131376166333631333938383861323065643034343130323963306336
+          3931353632333230663032383966306539646239323530620a306237653537323666666431383839
+          65613536383866306164633561613330323734336534363534353637366236356262653162393061
+          3134333038363032620a396463336531376631383861656562373330366263303232346335396133
+          39343261386238663730363762343235613264363633393130393333306566353264636530356331
+          3564383565396137316531366165623839643864306430343330
+
 # ── certbot ───────────────────────────────────────────────────────────────────
 
 certbot_domains:

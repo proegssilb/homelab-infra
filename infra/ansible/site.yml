@@ -176,6 +176,16 @@
   roles:
     - egress_proxy
 
+- name: NTP server — time for Coder workspaces (agentsvc VLAN)
+  hosts: ntp_server
+  become: true
+  gather_facts: true
+  vars:
+    ntp_server_allow:
+      - "{{ coder_agents_cidr }}"
+  roles:
+    - ntp_server
+
 - name: Tailscale subnet routers
   hosts: tailscale_router
   become: true

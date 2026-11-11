@@ -94,6 +94,23 @@
         that: coder_agents_cidr is match('^\d{1,3}(\.\d{1,3}){3}/\d{1,2}$')
         fail_msg: "Set coder_agents_cidr (the Agents VLAN subnet) in group_vars/all/local.yml."
 
+    # Without these the template's Forgejo provider can't configure and
+    # every workspace build would fail.
+    - name: Require the Forgejo deploy-key settings
+      ansible.builtin.assert:
+        that:
+          - coder_forgejo_keys_url is match('^https://')
+          - coder_forgejo_keys_token | trim | length > 0
+          - coder_forgejo_ssh_url_prefix is match('^ssh://.*/$')
+          - coder_forgejo_web_url_prefix is match('^https://.*/$')
+          - coder_egress_proxy_url is match('^http://')
+          - coder_apt_proxy_url is match('^http://')
+          - coder_ntp_server | length > 0
+        fail_msg: >-
+          Set coder_forgejo_keys_url / _ssh_url_prefix / _web_url_prefix
+          (group_vars/coder_app.yml) and coder_forgejo_keys_token (from
+          forgejo_keys_client_token: run `just fill-vault-stubs`).
+
     # A file, not --variable flags: the CLI splits flag values on commas.
     - name: Write proxmox-vm template variables
       ansible.builtin.copy:
@@ -109,6 +126,12 @@
           vmid_max: "{{ coder_proxmox_template.vmid_max }}"
           ssh_sources: "{{ coder_workspace_ssh_sources | join(',') }}"
           agents_cidr: "{{ coder_agents_cidr }}"
+          forgejo_ssh_url_prefix: "{{ coder_forgejo_ssh_url_prefix }}"
+          forgejo_web_url_prefix: "{{ coder_forgejo_web_url_prefix }}"
+          egress_proxy_url: "{{ coder_egress_proxy_url }}"
+          no_proxy: "{{ coder_no_proxy | join(',') }}"
+          apt_proxy_url: "{{ coder_apt_proxy_url }}"
+          ntp_server: "{{ coder_ntp_server }}"
         dest: "{{ coder_data_dir }}/coder-templates/proxmox-vm.vars.yml"
         mode: "0644"
 
@@ -118,6 +141,8 @@
           {{ lookup('ansible.builtin.file', 'coder-templates/proxmox-vm/main.tf') | hash('sha256') }}
           {{ coder_proxmox_template | to_json }}
           {{ coder_workspace_ssh_sources | to_json }} {{ coder_agents_cidr }}
+          {{ coder_forgejo_ssh_url_prefix }} {{ coder_forgejo_web_url_prefix }}
+          {{ coder_egress_proxy_url }} {{ coder_no_proxy | to_json }} {{ coder_apt_proxy_url }} {{ coder_ntp_server }}
         dest: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
         mode: "0644"
 

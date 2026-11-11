@@ -17,8 +17,17 @@ services:
 {% endfor %}
       - --set
       - block_global=false
+      # Refuse every non-public destination (lab services egress01 can reach).
+      - -s
+      - /addons/block_private.py
+    # Without a TTY Python block-buffers stdout, so log lines reached the
+    # journal (and Loki) only in batches or when the container stopped.
+    environment:
+      PYTHONUNBUFFERED: "1"
     ports:
       - "{{ egress_proxy_port }}:8080"
+    volumes:
+      - {{ egress_proxy_data_dir }}/addons:/addons:ro
     # To the journal, which Alloy ships to Loki.
     logging:
       driver: journald

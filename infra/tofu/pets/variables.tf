@@ -71,3 +71,12 @@ variable "coder_proxmox_password" {
   type        = string
   sensitive   = true
 }
+
+# ── Coder server VM firewall (coder_firewall.tf) ───────────────────────────────
+# Lab peers are resolved from DNS there. Admin SSH and the node_exporter scrape
+# reuse agentsvc_admin_sources / agentsvc_scrape_sources.
+
+variable "lab_dns_servers" {
+  description = "DNS servers Lab VMs get by DHCP (the UniFi gateway, which has no DNS name of its own). Set in terraform.tfvars."
+  type        = list(string)
+}

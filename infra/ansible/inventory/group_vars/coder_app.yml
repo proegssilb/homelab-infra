@@ -5,5 +5,24 @@ coder_access_url: "https://dev.{{ homelab_domain }}"
 # Via the proxy for a valid cert; any node answers (sticky on PVEAuthCookie).
 coder_proxmox_endpoint: "https://proxmox.{{ homelab_domain }}/"
 
+# Per-workspace Forgejo deploy keys, minted through proxy01's deploy-key proxy
+# (nginx_forgejo_keys in group_vars/proxy).
+coder_forgejo_keys_url: "https://code.{{ homelab_domain }}:9443"
+# Shared with proxy01; vaulted once in group_vars/all/main.yml.
+coder_forgejo_keys_token: "{{ forgejo_keys_client_token }}"
+coder_forgejo_ssh_url_prefix: "ssh://git@code.{{ homelab_domain }}:2222/"
+coder_forgejo_web_url_prefix: "https://code.{{ homelab_domain }}/"
+
+# Workspace egress: see coder role defaults. egress01 lives in tofu/pets/agentsvc.tf.
+coder_egress_proxy_url: "http://egress01.{{ homelab_domain }}:8080"
+coder_no_proxy:
+  - localhost
+  - 127.0.0.1
+  - "::1"
+  - "{{ homelab_domain }}"
+  - ".{{ homelab_domain }}"
+coder_apt_proxy_url: "http://{{ apt_proxy_host }}:{{ apt_proxy_port }}"
+coder_ntp_server: "egress01.{{ homelab_domain }}"
+
 # Private half is vaulted in host_vars/coder.yml.
 coder_workspace_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDPx9k/tH1Z/B45jbQ0fpTDtBR1DYt5i4Ct1ncBJqVec coder-workspaces"

@@ -15,6 +15,10 @@ services:
       PROXMOX_VE_ENDPOINT: "{{ coder_proxmox_endpoint }}"
       PROXMOX_VE_USERNAME: "{{ coder_proxmox_user }}"
       PROXMOX_VE_PASSWORD: "{{ coder_proxmox_password | trim }}"
+      # Read by the svalabs/forgejo provider: the deploy-key proxy on proxy01
+      # and Coder's token for it (not a Forgejo token).
+      FORGEJO_HOST: "{{ coder_forgejo_keys_url }}"
+      FORGEJO_API_TOKEN: "{{ coder_forgejo_keys_token | trim }}"
     group_add:
       - "{{ getent_group['docker'][1] }}"
     volumes:

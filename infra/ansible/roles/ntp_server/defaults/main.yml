@@ -1,0 +1,8 @@
+---
+# chrony as an NTP server for networks that can't reach the internet's NTP
+# pools (Coder workspaces, once their internet access is cut). The host itself
+# syncs from Debian's default pools.
+#
+# Subnets allowed to query this server. Who can actually reach UDP 123 is also
+# decided by the VM firewall (tofu) and UniFi.
+ntp_server_allow: []

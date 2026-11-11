@@ -18,17 +18,22 @@
 
 locals {
   agentsvc_vms = {
-    # Egress proxy — mitmproxy, logging only for now (no TLS interception);
-    # workspaces opt in via HTTP(S)_PROXY. Sees every request workspaces make
-    # through it, so treat it as sensitive.
+    # Egress proxy — mitmproxy, logging only for now (no TLS interception),
+    # refusing non-public destinations; workspaces use it via HTTP(S)_PROXY.
+    # Sees every request workspaces make through it, so treat it as
+    # sensitive. Also their NTP server (chrony), so workspaces need no
+    # internet NTP.
     egress01 = {
-      vmid     = 117
-      node     = "pxmx03"
-      cores    = 2
-      memory   = 2048
-      tags     = ["observe", "pets", "agentsvc", "egress_proxy"]
-      ha       = true
-      services = [{ port = "8080", comment = "mitmproxy (HTTP/HTTPS proxy)" }]
+      vmid   = 117
+      node   = "pxmx03"
+      cores  = 2
+      memory = 2048
+      tags   = ["observe", "pets", "agentsvc", "egress_proxy", "ntp_server"]
+      ha     = true
+      services = [
+        { port = "8080", proto = "tcp", comment = "mitmproxy (HTTP/HTTPS proxy)" },
+        { port = "123", proto = "udp", comment = "NTP (chrony)" },
+      ]
     }
   }
 }
@@ -96,7 +101,7 @@ resource "proxmox_virtual_environment_firewall_rules" "agentsvc" {
     content {
       type    = "in"
       action  = "ACCEPT"
-      proto   = "tcp"
+      proto   = rule.value.proto
       dport   = rule.value.port
       source  = var.agents_cidr
       comment = "Workspaces: ${rule.value.comment}"

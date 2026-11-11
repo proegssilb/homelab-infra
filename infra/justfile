@@ -24,6 +24,9 @@ bootstrap:
     just garage
     just cluster-up platform
     just cluster-up pets
+    # proxy01 was configured before pets existed; its Forgejo deploy-key proxy
+    # allows the Coder server by address, so it can only switch on now.
+    just tune-all proxy
 
 # Bring up all VMs in a named cluster/group.
 cluster-up cluster:

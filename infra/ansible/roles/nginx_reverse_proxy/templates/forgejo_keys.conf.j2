@@ -1,0 +1,87 @@
+# Managed by Ansible — do not edit by hand.
+# Role: nginx_reverse_proxy — Forgejo deploy-key proxy for Coder.
+#
+# The Coder workspace template (svalabs/forgejo provider) creates and deletes
+# one deploy key per workspace through this server. Forgejo can't scope a
+# token to deploy keys: they need repo admin, the same right that edits branch
+# protection. So the real token lives only here, and only the calls the
+# provider makes get through:
+#
+#   GET    /api/v1/version                       (SDK version check)
+#   GET    /api/v1/repos/{owner}/{repo}          (forgejo_repository)
+#   GET    /api/v1/repositories/{id}             (deploy key → owner/repo)
+#   POST   /api/v1/repos/{owner}/{repo}/keys     (create)
+#   GET    /api/v1/repos/{owner}/{repo}/keys/{id} (read)
+#   DELETE /api/v1/repos/{owner}/{repo}/keys/{id} (delete)
+#
+# Everything else gets 403. Layers, outermost first: its own port (UniFi lets
+# workspaces reach only 443/2222 on this host); a source allowlist (the Coder
+# server); Coder's client token; the method + path allowlist. The upstream
+# request is rebuilt from scratch: no client headers (so no Sudo, Cookie or
+# OTP header reaches Forgejo), no query string (no ?sudo=), a small body.
+
+server {
+  listen {{ nginx_forgejo_keys.port }} ssl;
+  server_name {{ nginx_forgejo_keys.server_name }};
+
+  ssl_certificate     {{ nginx_forgejo_keys.ssl_cert }};
+  ssl_certificate_key {{ nginx_forgejo_keys.ssl_key }};
+
+  access_log /var/log/nginx/forgejo-keys.access.log;
+
+{% for src in nginx_forgejo_keys.allow %}
+  allow {{ src }};
+{% endfor %}
+  deny  all;
+
+  client_max_body_size 4k;
+
+  # Plain string compare (a map would need map_hash_bucket_size raised for a
+  # 64-char token).
+  if ($http_authorization != "token {{ nginx_forgejo_keys_client_token | trim }}") {
+    return 403;
+  }
+
+  set $forgejo_keys_backend "{{ nginx_forgejo_keys.upstream }}";
+
+  proxy_http_version 1.1;
+  proxy_pass_request_headers off;
+  proxy_set_header Host          $host;
+  proxy_set_header Content-Type  $content_type;
+  proxy_set_header Accept        "application/json";
+  proxy_set_header Authorization "token {{ nginx_forgejo_keys_forgejo_token | trim }}";
+  proxy_set_header X-Real-IP     $remote_addr;
+  proxy_redirect off;
+
+  location = /api/v1/version {
+    limit_except GET { deny all; }
+    proxy_pass http://$forgejo_keys_backend$uri;
+  }
+
+  # "issues" is a reserved owner name; /repos/issues/search is a cross-repo
+  # issue search, not a repo.
+  location ~ ^/api/v1/repos/(?!issues/)[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ {
+    limit_except GET { deny all; }
+    proxy_pass http://$forgejo_keys_backend$uri;
+  }
+
+  location ~ ^/api/v1/repositories/[0-9]+$ {
+    limit_except GET { deny all; }
+    proxy_pass http://$forgejo_keys_backend$uri;
+  }
+
+  # POST only: GET here would list every key on the repo.
+  location ~ ^/api/v1/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/keys$ {
+    limit_except POST { deny all; }
+    proxy_pass http://$forgejo_keys_backend$uri;
+  }
+
+  location ~ ^/api/v1/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/keys/[0-9]+$ {
+    limit_except GET DELETE { deny all; }
+    proxy_pass http://$forgejo_keys_backend$uri;
+  }
+
+  location / {
+    return 403;
+  }
+}
