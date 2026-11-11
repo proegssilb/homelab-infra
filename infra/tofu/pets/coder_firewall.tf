@@ -65,8 +65,12 @@ resource "proxmox_virtual_environment_firewall_ipset" "coder_internet" {
   name      = "internet"
   comment   = "Public IPv4: everything but the private ranges"
 
+  # PVE refuses a zero prefix in an ipset, so 0.0.0.0/0 is two halves.
   cidr {
-    name = "0.0.0.0/0"
+    name = "0.0.0.0/1"
+  }
+  cidr {
+    name = "128.0.0.0/1"
   }
   cidr {
     name    = "10.0.0.0/8"

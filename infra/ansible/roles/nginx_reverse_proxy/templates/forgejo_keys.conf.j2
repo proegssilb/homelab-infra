@@ -20,11 +20,6 @@
 # request is rebuilt from scratch: no client headers (so no Sudo, Cookie or
 # OTP header reaches Forgejo), no query string (no ?sudo=), a small body.
 
-map $http_authorization $forgejo_keys_client_ok {
-  default 0;
-  "token {{ nginx_forgejo_keys_client_token | trim }}" 1;
-}
-
 server {
   listen {{ nginx_forgejo_keys.port }} ssl;
   server_name {{ nginx_forgejo_keys.server_name }};
@@ -41,7 +36,9 @@ server {
 
   client_max_body_size 4k;
 
-  if ($forgejo_keys_client_ok = 0) {
+  # Plain string compare (a map would need map_hash_bucket_size raised for a
+  # 64-char token).
+  if ($http_authorization != "token {{ nginx_forgejo_keys_client_token | trim }}") {
     return 403;
   }
 
