@@ -275,6 +275,10 @@ locals {
   clone_url = local.is_forgejo ? "${var.forgejo_ssh_url_prefix}${local.forgejo_owner}/${local.forgejo_repo}.git" : local.repo_url
 
   deploy_key_path = "/home/coder/.ssh/deploy_key"
+
+  # Coder owner and workspace names are lowercase letters, digits and dashes.
+  agent_git_name  = "Coder agent (${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name})"
+  agent_git_email = "${data.coder_workspace.me.name}.${data.coder_workspace_owner.me.name}@coder-agent.invalid"
 }
 
 data "forgejo_repository" "repo" {
@@ -302,10 +306,22 @@ resource "coder_agent" "main" {
   arch = "amd64"
   os   = "linux"
 
-  # Overrides the agent's default `coder gitssh` (manifest variables win):
-  # git uses the workspace's deploy key only, never the owner's Coder key.
+  # GIT_SSH_COMMAND overrides the agent's default `coder gitssh` (manifest
+  # variables win): git uses the workspace's deploy key only, never the
+  # owner's Coder key.
+  #
+  # Commits made here carry an obviously-agent identity, never the owner's:
+  # anything in a workspace is agent-tier. A .invalid address matches no
+  # Forgejo account, so these commits are never attributed to a person. This
+  # is labelling, not enforcement (an agent can set any author); what keeps
+  # agents from posing as the owner is that only the owner's desktop holds
+  # their signing key, and main requires signed commits.
   env = {
-    GIT_SSH_COMMAND = "ssh -i ${local.deploy_key_path} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+    GIT_SSH_COMMAND     = "ssh -i ${local.deploy_key_path} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+    GIT_AUTHOR_NAME     = local.agent_git_name
+    GIT_AUTHOR_EMAIL    = local.agent_git_email
+    GIT_COMMITTER_NAME  = local.agent_git_name
+    GIT_COMMITTER_EMAIL = local.agent_git_email
   }
 
   metadata {
