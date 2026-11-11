@@ -131,7 +131,9 @@ The Coder server (VM 116) has its own VM firewall with outbound DROP (`tofu/pets
 a new thing Coder must reach needs a rule there.
 
 Workspaces send HTTP(S) through egress01's mitmproxy (proxy env vars in the Coder template; lab
-names are NO_PROXY), apt through aptcache01, and NTP to egress01's chrony. Each egress01 service is
+names are NO_PROXY), apt through aptcache01, and NTP to egress01's chrony. They have no direct
+internet: UniFi "Agents: workspaces -> internet only via egress proxy" blocks (and logs) VLAN 30 ->
+External; AgentSvc (VLAN 31) isn't matched, so egress01 keeps its internet. Each egress01 service is
 a `services` entry in `agentsvc.tf` (VM firewall) plus a UniFi "Agents: workspaces -> AgentSvc …"
 allow from VLAN 30. Workspaces get git access only through a
 per-workspace Forgejo deploy key, which the Coder template creates through proxy01's deploy-key
