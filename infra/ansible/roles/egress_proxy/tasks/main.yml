@@ -17,8 +17,28 @@
 
 - name: Install mitmproxy addons
   ansible.builtin.copy:
-    src: block_private.py
-    dest: "{{ egress_proxy_data_dir }}/addons/block_private.py"
+    src: "{{ item }}"
+    dest: "{{ egress_proxy_data_dir }}/addons/{{ item }}"
+    mode: "0644"
+  loop:
+    - allowlist.py
+    - block_private.py
+  notify: Restart egress proxy
+
+- name: Check the allowlist mode
+  ansible.builtin.assert:
+    that: egress_proxy_allowlist_mode in ['shadow', 'enforce']
+    fail_msg: egress_proxy_allowlist_mode must be shadow or enforce.
+
+# Read once at startup, so a change restarts the proxy.
+- name: Write the destination allowlist
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (egress_proxy_allowlist) — do not edit by hand.
+      {% for host in egress_proxy_allowlist %}
+      {{ host }}
+      {% endfor %}
+    dest: "{{ egress_proxy_data_dir }}/addons/allowlist.txt"
     mode: "0644"
   notify: Restart egress proxy
 
