@@ -43,3 +43,7 @@ override.tf.json
 .superpowers/
 .claude/settings.local.json
 .claude/worktrees/
+
+# Python bytecode
+__pycache__/
+*.pyc
