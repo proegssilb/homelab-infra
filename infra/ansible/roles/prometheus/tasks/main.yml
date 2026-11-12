@@ -102,6 +102,27 @@
     group: root
     mode: "0755"
 
+- name: Create prometheus rules directory
+  ansible.builtin.file:
+    path: "{{ prometheus_config_dir }}/rules"
+    state: directory
+    owner: root
+    group: prometheus
+    mode: "0750"
+
+- name: Install alerting rules
+  ansible.builtin.copy:
+    src: "rules/{{ item }}"
+    dest: "{{ prometheus_config_dir }}/rules/{{ item }}"
+    owner: root
+    group: prometheus
+    mode: "0640"
+    # Rules Prometheus would reject never replace the running ones.
+    validate: "{{ prometheus_install_dir }}/promtool check rules %s"
+  loop:
+    - hypervisors.yml
+  notify: Restart prometheus
+
 - name: Template prometheus config
   ansible.builtin.template:
     src: prometheus.yml.j2
@@ -109,6 +130,8 @@
     owner: root
     group: prometheus
     mode: "0640"
+    # A config Prometheus rejects never replaces the running one.
+    validate: "{{ prometheus_install_dir }}/promtool check config --syntax-only %s"
   notify: Restart prometheus
 
 - name: Install prometheus systemd unit

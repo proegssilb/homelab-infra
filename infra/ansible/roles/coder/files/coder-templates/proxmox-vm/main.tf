@@ -577,6 +577,11 @@ resource "proxmox_virtual_environment_firewall_options" "workspace" {
   ipfilter      = true
   ndp           = false
   radv          = false
+  # Log inbound policy drops (e.g. another workspace probing this one) to the
+  # node's /var/log/pve-firewall.log, which rsyslog ships to Loki
+  # ({job="syslog", app="pve-firewall"}). Outbound stays unlogged: its policy is
+  # ACCEPT, so it would log every connection.
+  log_level_in = "info"
 }
 
 resource "proxmox_virtual_environment_firewall_ipset" "ipfilter" {

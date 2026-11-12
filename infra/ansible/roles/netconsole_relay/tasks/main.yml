@@ -1,0 +1,29 @@
+---
+# Netconsole -> Loki, without Alloy's experimental "raw" syslog format: rsyslog
+# (Debian) wraps the raw lines and forwards them to Alloy over RFC 5424. If the
+# relay breaks, only netconsole is affected.
+- name: Install rsyslog
+  ansible.builtin.apt:
+    name: rsyslog
+    state: present
+
+- name: Template netconsole relay
+  ansible.builtin.template:
+    src: netconsole-relay.conf.j2
+    dest: /etc/rsyslog.d/60-netconsole-relay.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart rsyslog
+
+# Whole config (Debian's rsyslog.conf + drop-ins). On failure the play stops
+# before the restart handler, so the running rsyslog keeps its old config.
+- name: Check the rsyslog config
+  ansible.builtin.command: rsyslogd -N1
+  changed_when: false
+
+- name: Enable and start rsyslog
+  ansible.builtin.systemd:
+    name: rsyslog
+    enabled: true
+    state: started

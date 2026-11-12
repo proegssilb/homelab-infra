@@ -1,3 +1,7 @@
 ---
 alloy_config_dir: /etc/alloy
 loki_url: "http://obs02:3100"
+# Syslog listeners that forward to Loki (job="syslog"); empty = none. Set for
+# obs02. Each: address, protocol (tcp/udp), format (rfc5424/rfc3164), and
+# optional extra labels.
+alloy_syslog_listeners: []

@@ -1,0 +1,26 @@
+# Managed by Ansible (netconsole_relay) — do not edit by hand.
+#
+# Netconsole: UniFi devices send kernel log lines as raw UDP text (no syslog
+# header). Wrap each line as RFC 5424 (host = sender, app = netconsole) and
+# hand it to Alloy's syslog listener, which writes to Loki. A separate ruleset,
+# so these lines never reach the local log files.
+
+module(load="imudp")
+
+template(name="netconsole_rfc5424" type="string"
+         string="<4>1 %timegenerated:::date-rfc3339% %fromhost% netconsole - - - %rawmsg:::drop-last-lf%")
+
+ruleset(name="netconsole") {
+  action(type="omfwd"
+         target="{{ netconsole_relay_target }}"
+         port="{{ netconsole_relay_target_port }}"
+         protocol="tcp"
+         TCP_Framing="octet-counted"
+         template="netconsole_rfc5424"
+         queue.type="LinkedList"
+         queue.size="20000"
+         action.resumeRetryCount="-1")
+  stop
+}
+
+input(type="imudp" port="{{ netconsole_relay_port }}" ruleset="netconsole")

@@ -2,6 +2,17 @@ global:
   scrape_interval: 60s
   evaluation_interval: 60s
 
+# OTLP push (--web.enable-otlp-receiver): Proxmox's OpenTelemetry metric server
+# (tofu/platform/proxmox_metrics.tf). Its unit metadata is unreliable (the same
+# value arrives as _bytes and _seconds, _percent and _ratio), and Prometheus
+# would otherwise append the unit to the name, splitting one stat into several
+# series. Without suffixes each stat keeps one name.
+otlp:
+  translation_strategy: UnderscoreEscapingWithoutSuffixes
+
+rule_files:
+  - {{ prometheus_config_dir }}/rules/*.yml
+
 alerting:
   alertmanagers:
     - static_configs:
@@ -18,6 +29,37 @@ scrape_configs:
           - {{ prometheus_config_dir }}/targets/proxmox.json
         refresh_interval: 5m
 
+{% if groups.get('hypervisors') %}
+  # Proxmox nodes: Debian's node_exporter (hypervisors.yml). Static, from the
+  # inventory's hypervisors group; they aren't guests, so proxmox SD misses them.
+  - job_name: hypervisors
+    static_configs:
+      - targets:
+{% for h in groups['hypervisors'] %}
+          - '{{ h }}.{{ homelab_domain }}:9100'
+{% endfor %}
+    # Full names: not every node's short name resolves from obs01. The
+    # instance label keeps the short name.
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '([^.:]+)[.:].*'
+        target_label: instance
+        replacement: '$1'
+
+{% endif %}
+{% if prometheus_ceph_mgr_hosts | length > 0 %}
+  # Ceph's built-in mgr exporter. Only the active mgr serves metrics; a standby
+  # answers 200 with an empty body, so both targets are up and nothing is
+  # duplicated. honor_labels: Ceph sets its own labels.
+  - job_name: ceph
+    honor_labels: true
+    static_configs:
+      - targets:
+{% for h in prometheus_ceph_mgr_hosts %}
+          - '{{ h }}.{{ homelab_domain }}:9283'
+{% endfor %}
+
+{% endif %}
   - job_name: unpoller
     static_configs:
       - targets: ['localhost:9130']

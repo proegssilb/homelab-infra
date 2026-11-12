@@ -1,0 +1,16 @@
+---
+# Logs: rsyslog (Debian package) forwards everything it sees, plus the PVE
+# firewall log (a plain file, not in the journal), to the syslog listener of
+# Alloy on obs02, which writes to Loki. RFC 5424 over TCP, octet-counted.
+hypervisor_syslog_target: "obs02.{{ homelab_domain }}"
+hypervisor_syslog_port: 1514
+# Kept on disk while obs02 is unreachable, then sent.
+hypervisor_syslog_queue_max: 200m
+# Plain-text logs that aren't in the journal.
+hypervisor_log_files:
+  - path: /var/log/pve-firewall.log
+    tag: pve-firewall
+
+# Ceph: enable the mgr's built-in Prometheus module (port 9283 on the active
+# mgr). Run once, on a node that has the Ceph admin keyring. Empty = skip.
+hypervisor_ceph_admin_host: pxmx01
