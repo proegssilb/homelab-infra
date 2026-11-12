@@ -1,0 +1,30 @@
+# Managed by Ansible (hypervisor_observability) — do not edit by hand.
+#
+# Forward every message rsyslog receives (Debian's default inputs: the journal's
+# syslog stream and the kernel log), plus plain-text PVE logs, to Alloy on
+# obs02, which writes them to Loki. Local files written by Debian's default
+# rules are left as they are.
+
+module(load="imfile")
+
+{% for f in hypervisor_log_files %}
+input(type="imfile"
+      File="{{ f.path }}"
+      Tag="{{ f.tag }}:"
+      Facility="local0"
+      # Start at the end on first run, not with the file's whole history.
+      freshStartTail="on")
+{% endfor %}
+
+action(type="omfwd"
+       target="{{ hypervisor_syslog_target }}"
+       port="{{ hypervisor_syslog_port }}"
+       protocol="tcp"
+       TCP_Framing="octet-counted"
+       template="RSYSLOG_SyslogProtocol23Format"
+       # Disk-assisted queue: keep messages while obs02 is down, retry forever.
+       queue.type="LinkedList"
+       queue.filename="fwd-obs"
+       queue.maxDiskSpace="{{ hypervisor_syslog_queue_max }}"
+       queue.saveOnShutdown="on"
+       action.resumeRetryCount="-1")

@@ -19,6 +19,47 @@ loki.relabel "journal" {
   }
 }
 
+{% if alloy_syslog_listeners %}
+// Syslog from hosts that can't run Alloy (Proxmox nodes' rsyslog, the UniFi
+// gateway).
+loki.source.syslog "remote" {
+{% for l in alloy_syslog_listeners %}
+  listener {
+    address       = "{{ l.address }}"
+    protocol      = "{{ l.protocol }}"
+    syslog_format = "{{ l.format }}"
+    // RFC 3164 timestamps carry no year or zone; use arrival time for those.
+    use_incoming_timestamp = {{ (l.format == 'rfc5424') | lower }}
+    labels = {
+      job = "syslog",
+{% for k, v in (l.labels | default({})).items() %}
+      {{ k }} = "{{ v }}",
+{% endfor %}
+    }
+  }
+{% endfor %}
+  forward_to    = [loki.write.endpoint.receiver]
+  relabel_rules = loki.relabel.syslog.rules
+}
+
+loki.relabel "syslog" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__syslog_message_hostname"]
+    target_label  = "host"
+  }
+  rule {
+    source_labels = ["__syslog_message_app_name"]
+    target_label  = "app"
+  }
+  rule {
+    source_labels = ["__syslog_message_severity"]
+    target_label  = "level"
+  }
+}
+
+{% endif %}
 loki.write "endpoint" {
   endpoint {
     url = "{{ loki_url }}/loki/api/v1/push"

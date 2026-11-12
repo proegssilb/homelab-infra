@@ -36,3 +36,9 @@ variable "lxc_template_file_id" {
   description = "Proxmox storage path to the LXC template, e.g. local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst"
   type        = string
 }
+
+variable "metrics_otlp_host" {
+  description = "Host whose Prometheus receives the Proxmox OpenTelemetry metrics (proxmox_metrics.tf)."
+  type        = string
+  default     = "obs01.i.xenrelay.com"
+}

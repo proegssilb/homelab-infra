@@ -67,6 +67,12 @@ tune host:
 tune-all group:
     cd ansible && ansible-playbook -l {{group}} site.yml
 
+# Observability on the Proxmox nodes (node_exporter, rsyslog -> Loki, Ceph
+# exporter). Not part of bootstrap: needs the hand-made `ansible` user on each
+# node. Optionally limit: just tune-hypervisors pxmx01
+tune-hypervisors limit="hypervisors":
+    cd ansible && ansible-playbook -l {{limit}} hypervisors.yml
+
 # Configure Garage on blade02 (run before tofu init).
 garage:
     cd ansible && ansible-playbook -l bootstrap site.yml

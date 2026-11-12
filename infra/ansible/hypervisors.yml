@@ -1,0 +1,20 @@
+---
+# hypervisors.yml — observability on the Proxmox nodes, nothing else.
+#
+# Kept out of site.yml on purpose: the nodes' `ansible` user is created by hand,
+# so a freshly reinstalled node isn't reachable until that's done, and
+# `just bootstrap` must not depend on it. Run with `just tune-hypervisors`.
+#
+# Only Debian packages (no third-party apt repos on the hypervisors), and no
+# PVE configuration is touched:
+#   - prometheus-node-exporter (role node_exporter, same as every VM)
+#   - rsyslog, forwarding the journal and the PVE firewall log to Loki
+#   - Ceph's built-in Prometheus mgr module (a Ceph setting, no package)
+
+- name: Hypervisors — observability
+  hosts: hypervisors
+  become: true
+  gather_facts: true
+  roles:
+    - node_exporter
+    - hypervisor_observability

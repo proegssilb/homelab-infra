@@ -78,6 +78,16 @@
     mode: "0640"
   notify: Restart grafana
 
+# Dashboards kept in this repo (files/dashboards/). proxmox.json reads the
+# OpenTelemetry metrics PVE pushes into Prometheus (tofu/platform/proxmox_metrics.tf).
+- name: Install repo dashboards
+  ansible.builtin.copy:
+    src: dashboards/
+    dest: "{{ grafana_dashboards_dir }}/"
+    owner: grafana
+    group: grafana
+    mode: "0644"
+
 - name: Download Node Exporter Full dashboard
   ansible.builtin.get_url:
     url: "https://grafana.com/api/dashboards/1860/revisions/latest/download"

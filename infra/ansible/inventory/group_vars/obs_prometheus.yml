@@ -1,6 +1,10 @@
 ---
 prometheus_retention: "30d"
 
+# Ceph mgr nodes (active pxmx03, standby pxmx01 as of 2026-11-12; the Proxmox
+# API lists them at /nodes/<node>/ceph/mgr). Update if a mgr is added or moved.
+prometheus_ceph_mgr_hosts: [pxmx01, pxmx03]
+
 # URL of any Proxmox node — SD queries the whole cluster from one entry point.
 prometheus_proxmox_url: "https://pxmx01.i.xenrelay.com:8006"
 

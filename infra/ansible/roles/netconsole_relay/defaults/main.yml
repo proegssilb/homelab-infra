@@ -1,0 +1,8 @@
+---
+# UDP port UniFi devices send netconsole (kernel log) lines to. Set by hand in
+# the UniFi UI (Netconsole server -> this host, this port).
+netconsole_relay_port: 1515
+# Where the wrapped lines go: Alloy's RFC 5424 syslog listener on this host
+# (alloy_syslog_listeners in group_vars/obs_loki.yml).
+netconsole_relay_target: 127.0.0.1
+netconsole_relay_target_port: 1514

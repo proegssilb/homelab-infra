@@ -15,8 +15,10 @@
     - os_baseline
     - apt_cache
 
+# Proxmox nodes are in the inventory (hypervisors group) but never get the
+# baseline; they have their own playbook, hypervisors.yml.
 - name: OS baseline + observability agents — all hosts
-  hosts: all
+  hosts: all:!hypervisors
   become: true
   gather_facts: true
   roles:
@@ -52,6 +54,7 @@
   gather_facts: true
   roles:
     - loki
+    - netconsole_relay
 
 - name: Prometheus — metrics + alertmanager
   hosts: obs_prometheus

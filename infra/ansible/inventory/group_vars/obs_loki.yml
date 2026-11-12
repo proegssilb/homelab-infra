@@ -1,2 +1,16 @@
 ---
 loki_retention: "720h"
+
+# Syslog receivers, written to Loki as job="syslog".
+alloy_syslog_listeners:
+  # Proxmox nodes' rsyslog (roles/hypervisor_observability).
+  - address: "0.0.0.0:1514"
+    protocol: tcp
+    format: rfc5424
+  # UniFi gateway: firewall/activity logs (set by hand in the UniFi UI:
+  # remote syslog / SIEM server -> obs02, UDP 1514). BSD syslog over UDP.
+  - address: "0.0.0.0:1514"
+    protocol: udp
+    format: rfc3164
+    labels:
+      source: unifi
