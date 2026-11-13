@@ -10,6 +10,7 @@
          'monitor': 'https://' ~ vhost.server_name ~ hp.monitor_path | default(''),
          'description': hp.description | default(''),
          'icon': hp.icon | default(''),
+         'widget': hp.widget | default({}),
        }] %}
 {%   endfor %}
 {% endfor %}
@@ -24,6 +25,10 @@
 {%     endif %}
 {%     if row.icon %}
         icon: {{ row.icon | to_json }}
+{%     endif %}
+{%     if row.widget %}
+        widget:
+          {{ row.widget | to_nice_yaml(indent=2) | trim | indent(10) }}
 {%     endif %}
 {%   endfor %}
 {% endfor %}
