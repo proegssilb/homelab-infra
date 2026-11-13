@@ -95,6 +95,15 @@
   roles:
     - forgejo
 
+# After the Forgejo play: the server must know the runner's shared secret
+# before the runner first connects (`just bootstrap` from an empty cluster).
+- name: Forgejo Actions runner — CI
+  hosts: forgejo_runner
+  become: true
+  gather_facts: true
+  roles:
+    - forgejo_runner
+
 - name: PostgreSQL — shared database server
   hosts: postgres_primary
   become: true

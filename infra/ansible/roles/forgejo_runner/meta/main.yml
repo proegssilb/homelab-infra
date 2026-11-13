@@ -1,0 +1,8 @@
+---
+galaxy_info:
+  role_name: forgejo_runner
+  author: proegssilb
+  description: Forgejo Actions runner (Docker executor) via Docker Compose
+  min_ansible_version: "2.14"
+collections:
+  - community.docker

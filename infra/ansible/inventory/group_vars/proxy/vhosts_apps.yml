@@ -12,6 +12,12 @@ _nginx_vhosts_apps:
     upstream_servers:
       - "forgejo.{{ homelab_domain }}:3000"
     access_deny: []   # Coder workspaces clone and push here
+    # Container registry pushes (image layers) and large git pushes. nginx's
+    # 1m default answers a layer upload with 413; streaming instead of
+    # buffering keeps a multi-hundred-MB layer off proxy01's disk.
+    extra_proxy_params: |
+      client_max_body_size 4g;
+      proxy_request_buffering off;
 
   - name: authentik
     server_name: "auth.{{ homelab_domain }}"

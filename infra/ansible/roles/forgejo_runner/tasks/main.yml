@@ -1,0 +1,72 @@
+---
+- name: Install Docker
+  ansible.builtin.import_role:
+    name: docker_install
+
+# Lets jobs build arm64 images under buildx on this amd64 VM. Debian's package
+# registers the binfmt handlers with the fix-binary flag, so they work inside
+# containers without a privileged binfmt-installer container.
+- name: Install QEMU user-mode emulation for cross-arch builds
+  ansible.builtin.apt:
+    name: qemu-user-binfmt
+    state: present
+
+- name: Create runner data directory
+  ansible.builtin.file:
+    path: "{{ forgejo_runner_data_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Write runner token
+  ansible.builtin.copy:
+    content: "{{ forgejo_runner_secret | trim }}"
+    dest: "{{ forgejo_runner_data_dir }}/token.txt"
+    mode: "0600"
+  no_log: true
+  notify: Restart forgejo-runner
+
+# Must match forgejo-cli's derivation: the UUID is the ASCII bytes of the
+# secret's first 16 characters. The secret goes over stdin, never argv.
+- name: Derive runner UUID from the shared secret
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - "import sys, uuid; print(uuid.UUID(bytes=sys.stdin.read().strip()[:16].encode()))"
+    stdin: "{{ forgejo_runner_secret | trim }}"
+  register: forgejo_runner_uuid_cmd
+  changed_when: false
+  no_log: true
+
+- name: Template runner config
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: "{{ forgejo_runner_data_dir }}/config.yml"
+    mode: "0600"
+  vars:
+    forgejo_runner_uuid: "{{ forgejo_runner_uuid_cmd.stdout }}"
+  notify: Restart forgejo-runner
+
+- name: Template docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ forgejo_runner_data_dir }}/docker-compose.yml"
+    mode: "0640"
+  notify: Restart forgejo-runner
+
+- name: Pull runner image
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ forgejo_runner_data_dir }}"
+
+# Pre-pull the job image: it is several GB, and the first job would otherwise
+# spend its timeout downloading it.
+- name: Pull job image
+  community.docker.docker_image_pull:
+    name: "{{ forgejo_runner_job_image }}"
+    # Pinned by digest, so present means current.
+    pull: not_present
+
+- name: Start runner
+  community.docker.docker_compose_v2:
+    project_src: "{{ forgejo_runner_data_dir }}"
+    state: present
