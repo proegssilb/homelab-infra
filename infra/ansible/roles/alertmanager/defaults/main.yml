@@ -4,3 +4,7 @@ alertmanager_version: "0.34.2"
 alertmanager_install_dir: /usr/local/bin
 alertmanager_config_dir: /etc/alertmanager
 alertmanager_data_dir: /var/lib/alertmanager
+# Discord webhook for the `fire` receiver (severity=critical only). Anyone with
+# the URL can post to the channel, so vault it (group_vars/obs_prometheus.yml).
+# Empty = fires go nowhere.
+alertmanager_discord_webhook_url: ""

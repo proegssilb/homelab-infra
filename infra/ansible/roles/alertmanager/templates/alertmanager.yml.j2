@@ -1,14 +1,49 @@
+# Managed by Ansible — do not edit by hand.
+#
+# Two kinds of alert (rules in roles/prometheus/files/rules/):
+#   severity=critical  "the computers are on fire": needs a human, won't fix
+#                      itself (fire.yml). Routed to the `fire` receiver.
+#   everything else    early warnings; visible in this UI and Prometheus's
+#                      /alerts, delivered nowhere.
+#
+# `fire` posts to Discord when alertmanager_discord_webhook_url (vaulted in
+# group_vars/obs_prometheus.yml) holds a Discord webhook URL; otherwise it
+# delivers nowhere.
 global:
   resolve_timeout: 5m
 
 route:
+  receiver: 'null'
   group_by: ['alertname']
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 12h
-  receiver: 'null'
+  routes:
+    - matchers: ['severity="critical"']
+      receiver: fire
+      # One message per kind of fire, not one per node/pool/disk.
+      group_by: ['alertname']
+      group_wait: 1m
+      group_interval: 10m
+      # A fire that's still burning gets repeated twice a day.
+      repeat_interval: 12h
 
 receivers:
   - name: 'null'
+  - name: fire
+{% if alertmanager_discord_webhook_url | trim is match('https://(discord|discordapp)\\.com/api/webhooks/') %}
+    discord_configs:
+      - webhook_url: "{{ alertmanager_discord_webhook_url | trim }}"
+        # Also post when the fire is out.
+        send_resolved: true
+{% endif %}
 
-inhibit_rules: []
+# While the cluster is losing quorum or Ceph is unreachable, the alerts those
+# cause (a node down, every service down) add nothing.
+inhibit_rules:
+  - source_matchers: ['alertname="HypervisorsQuorumAtRisk"']
+    target_matchers: ['alertname=~"HypervisorDown|WebServiceDown|AllWebServicesDown"']
+  - source_matchers: ['alertname="AllWebServicesDown"']
+    target_matchers: ['alertname="WebServiceDown"']
+  - source_matchers: ['alertname="CephUnreachable"']
+    target_matchers: ['alertname=~"Ceph.+"']

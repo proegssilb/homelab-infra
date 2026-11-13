@@ -7,16 +7,23 @@
     home: "{{ alertmanager_data_dir }}"
     create_home: false
 
-- name: Create alertmanager directories
+- name: Create alertmanager config directory
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ alertmanager_config_dir }}"
     state: directory
     owner: root
     group: alertmanager
     mode: "0750"
-  loop:
-    - "{{ alertmanager_config_dir }}"
-    - "{{ alertmanager_data_dir }}"
+
+# Alertmanager writes silences and its notification log here; root-owned, it
+# couldn't, so silences vanished and sent fires could repeat on every restart.
+- name: Create alertmanager data directory
+  ansible.builtin.file:
+    path: "{{ alertmanager_data_dir }}"
+    state: directory
+    owner: alertmanager
+    group: alertmanager
+    mode: "0750"
 
 - name: Download alertmanager archive
   ansible.builtin.get_url:
@@ -41,6 +48,15 @@
     mode: "0755"
   notify: Restart alertmanager
 
+- name: Install amtool binary
+  ansible.builtin.copy:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.linux-amd64/amtool"
+    dest: "{{ alertmanager_install_dir }}/amtool"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Template alertmanager config
   ansible.builtin.template:
     src: alertmanager.yml.j2
@@ -48,6 +64,8 @@
     owner: root
     group: alertmanager
     mode: "0640"
+    # A config Alertmanager rejects never replaces the running one.
+    validate: "{{ alertmanager_install_dir }}/amtool check-config %s"
   notify: Restart alertmanager
 
 - name: Install alertmanager systemd unit

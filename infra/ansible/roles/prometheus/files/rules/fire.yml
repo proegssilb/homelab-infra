@@ -1,0 +1,129 @@
+# Managed by Ansible (prometheus role) — do not edit by hand.
+#
+# "The computers are on fire": situations that don't fix themselves and need a
+# human. Every rule here is severity=critical, which Alertmanager routes to the
+# `fire` receiver (roles/alertmanager). Keep this file to that bar: anything
+# that can recover on its own (a Ceph blip, a VM HA restarts) belongs in a
+# warning rule elsewhere, or nowhere. The `for:` durations are long on purpose.
+groups:
+  - name: fire-ceph
+    rules:
+      # PGs down/incomplete: some data can't be read or written at all.
+      - alert: CephDataUnavailable
+        expr: sum(ceph_pg_down) + sum(ceph_pg_incomplete) > 0
+        for: 15m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $value }} Ceph placement groups down or incomplete: some data is unavailable"
+
+      # Scrub found replicas that disagree; Ceph won't repair on its own.
+      - alert: CephDataInconsistent
+        expr: sum(ceph_pg_inconsistent) > 0
+        for: 30m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $value }} Ceph placement groups inconsistent: needs `ceph pg repair` after checking the disk"
+
+      # Ceph marks a dead OSD out and rebalances; still down after 30 min means
+      # a dead disk or host, and less redundancy until it's replaced.
+      - alert: CephOSDDown
+        expr: count(ceph_osd_up == 0) > 0
+        for: 30m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $value }} Ceph OSD(s) down for 30 minutes (dead disk or host?)"
+
+      # Ceph's own nearfull point. At the full point writes stop cluster-wide,
+      # and every VM on that pool stalls.
+      - alert: CephPoolNearlyFull
+        expr: ceph_pool_percent_used * on (pool_id) group_left(name) ceph_pool_metadata > 0.85
+        for: 15m
+        labels: {severity: critical}
+        annotations:
+          summary: "Ceph pool {{ $labels.name }} {{ $value | humanizePercentage }} full; writes stop when it fills"
+
+      - alert: CephHealthError
+        expr: max(ceph_health_status) == 2
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "Ceph health HEALTH_ERR for 10 minutes"
+
+      # No Ceph metrics at all: no active mgr, or the monitors lost quorum.
+      - alert: CephUnreachable
+        expr: absent(ceph_health_status)
+        for: 30m
+        labels: {severity: critical}
+        annotations:
+          summary: "No Ceph metrics for 30 minutes: no active mgr, or monitors lost quorum"
+
+  - name: fire-hypervisors
+    rules:
+      # HA has moved guests off long before this; a node gone for 15 min is
+      # hardware, power or a hung kernel.
+      - alert: HypervisorDown
+        expr: up{job="hypervisors"} == 0
+        for: 15m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.instance }} unreachable for 15 minutes"
+
+      # 6 nodes: losing a third more loses Proxmox quorum, and with it HA and
+      # every config change.
+      - alert: HypervisorsQuorumAtRisk
+        expr: count(up{job="hypervisors"} == 0) >= 2
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $value }} Proxmox nodes down at once: cluster quorum at risk"
+
+      - alert: HypervisorOverheating
+        expr: max by (instance, chip, sensor) (node_hwmon_temp_celsius{job="hypervisors"} / on (instance, chip, sensor) node_hwmon_temp_crit_celsius{job="hypervisors"}) > 0.95
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.instance }} {{ $labels.chip }}/{{ $labels.sensor }} at {{ $value | humanizePercentage }} of its critical temperature"
+
+      - alert: HypervisorZpoolDegraded
+        expr: node_zfs_zpool_state{job="hypervisors", state!="online"} == 1
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.instance }} ZFS pool {{ $labels.zpool }} is {{ $labels.state }}"
+
+      # A full table breaks new connections for every guest on the node; the
+      # cause (usually one guest flooding) needs stopping.
+      - alert: HypervisorConntrackNearlyFull
+        expr: node_nf_conntrack_entries{job="hypervisors"} / node_nf_conntrack_entries_limit{job="hypervisors"} > 0.9
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.instance }} conntrack table {{ $value | humanizePercentage }} full; new connections for its guests will fail soon"
+
+  - name: fire-lab
+    rules:
+      # Every vhost failing at once: proxy01/keepalived, or the network.
+      - alert: AllWebServicesDown
+        expr: sum(probe_success) == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "Every web service fails its probe through the proxy"
+
+      # One service down this long is past what HA restarts fix.
+      - alert: WebServiceDown
+        expr: probe_success == 0
+        for: 30m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.target }} ({{ $labels.instance }}) unreachable for 30 minutes"
+
+      # A full disk stops whatever writes to it (databases, Prometheus, Ceph mons).
+      - alert: FilesystemAlmostFull
+        expr: |
+          node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs|squashfs|overlay|nsfs|fuse.*", mountpoint!~"/boot.*"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|ramfs|squashfs|overlay|nsfs|fuse.*", mountpoint!~"/boot.*"} < 0.05
+        for: 30m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.instance }} {{ $labels.mountpoint }} has {{ $value | humanizePercentage }} free"

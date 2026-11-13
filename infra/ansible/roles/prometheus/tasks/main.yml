@@ -121,6 +121,7 @@
     validate: "{{ prometheus_install_dir }}/promtool check rules %s"
   loop:
     - hypervisors.yml
+    - fire.yml
   notify: Restart prometheus
 
 - name: Template prometheus config
