@@ -106,7 +106,7 @@ Roles apply to groups, not individual hosts. Key assignments:
 - `hypervisors` (pxmx01–05, grunt; static in `inventory/hosts.yml`) → **not in site.yml**: `hypervisors.yml` via `just tune-hypervisors [limit]`, observability only (Debian `prometheus-node-exporter`, `rsyslog` forwarding the journal + `/var/log/pve-firewall.log` to Alloy's syslog listener on obs02, Ceph mgr Prometheus module). Debian packages only, no PVE config touched. Kept out of `just bootstrap` because each node's `ansible` user (key login, passwordless sudo; `sudo` isn't installed on PVE by default) is created by hand.
 - `bootstrap` (blade02 only) → garage
 - `proxy` → keepalived, certbot, nginx_reverse_proxy
-- `obs_prometheus` → prometheus, alertmanager, graphite_exporter, unpoller (alert rules: `roles/prometheus/files/rules/`, checked by promtool before install; Alertmanager routes to `null` until there's an alerting plan)
+- `obs_prometheus` → prometheus, alertmanager, graphite_exporter, unpoller (alert rules: `roles/prometheus/files/rules/`, checked by promtool before install. `fire.yml` = severity=critical, "needs a human, won't fix itself"; keep that bar. Alertmanager (config checked by amtool) routes critical to the `fire` receiver, which has no delivery yet, and everything else to `null`)
 - `obs_loki` → loki
 - `obs_grafana` → grafana
 - `auth` → authentik

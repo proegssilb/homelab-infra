@@ -1,14 +1,16 @@
 # Managed by Ansible (prometheus role) — do not edit by hand.
 #
-# Alerts for the Proxmox nodes and Ceph (data from hypervisors.yml). Nothing is
-# routed yet (Alertmanager's receiver is 'null'): these show as pending/firing
-# in Prometheus (/alerts) and Alertmanager until an alerting plan exists.
+# Early warnings for the Proxmox nodes and Ceph (data from hypervisors.yml).
+# severity=warning: Alertmanager sends these nowhere; they show in Prometheus
+# (/alerts) and Alertmanager's UI. The "human must intervene" versions are
+# severity=critical in fire.yml.
 groups:
   - name: hypervisors
     rules:
       # Each node's conntrack table is shared by every guest on it (bridged
       # traffic is tracked). A full table breaks new connections for all of
-      # them, e.g. when one workspace floods connections.
+      # them, e.g. when one workspace floods connections. Critical at 90%
+      # (fire.yml).
       - alert: HypervisorConntrackFilling
         expr: node_nf_conntrack_entries{job="hypervisors"} / node_nf_conntrack_entries_limit{job="hypervisors"} > 0.75
         for: 5m
@@ -17,14 +19,7 @@ groups:
         annotations:
           summary: "{{ $labels.instance }} conntrack table {{ $value | humanizePercentage }} full"
 
-      - alert: HypervisorConntrackNearlyFull
-        expr: node_nf_conntrack_entries{job="hypervisors"} / node_nf_conntrack_entries_limit{job="hypervisors"} > 0.9
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "{{ $labels.instance }} conntrack table {{ $value | humanizePercentage }} full; new connections for its guests will fail soon"
-
+      # Critical after 15 minutes (HypervisorDown, fire.yml).
       - alert: HypervisorExporterDown
         expr: up{job="hypervisors"} == 0
         for: 5m
@@ -35,7 +30,7 @@ groups:
 
   - name: ceph
     rules:
-      # ceph_health_status: 0 OK, 1 WARN, 2 ERR.
+      # ceph_health_status: 0 OK, 1 WARN, 2 ERR. ERR is critical (fire.yml).
       - alert: CephHealthWarning
         expr: max(ceph_health_status) == 1
         for: 15m
@@ -44,15 +39,8 @@ groups:
         annotations:
           summary: "Ceph health is HEALTH_WARN"
 
-      - alert: CephHealthError
-        expr: max(ceph_health_status) == 2
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Ceph health is HEALTH_ERR"
-
       # The active mgr serves the metrics; none at all means no mgr exporter.
+      # Critical after 30 minutes (CephUnreachable, fire.yml).
       - alert: CephMetricsMissing
         expr: absent(ceph_health_status)
         for: 10m
