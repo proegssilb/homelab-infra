@@ -7,6 +7,7 @@ TOKEN_ID      = "{{ prometheus_proxmox_token_id }}"
 TOKEN_SECRET  = "{{ prometheus_proxmox_token_secret }}"
 OUTPUT_FILE   = "{{ prometheus_config_dir }}/targets/proxmox.json"
 EXPORTER_PORT = 9100
+DOMAIN        = "{{ homelab_domain }}"
 
 _ctx = ssl.create_default_context()
 _ctx.check_hostname = False
@@ -35,8 +36,10 @@ for node in api_get("/nodes"):
             if "observe" not in vm.get("tags", ""):
                 continue
             name = vm["name"]
+            # Full name: not every short name resolves from obs01 (proxy01's
+            # never did). The instance label keeps the short name.
             targets.append({
-                "targets": [f"{name}:{EXPORTER_PORT}"],
+                "targets": [f"{name}.{DOMAIN}:{EXPORTER_PORT}"],
                 "labels": {"instance": name, "proxmox_node": node_name},
             })
 

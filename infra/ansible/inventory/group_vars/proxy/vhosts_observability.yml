@@ -6,6 +6,21 @@ _nginx_vhosts_observability:
       name: Grafana
       description: Dashboards & status
       icon: grafana.png
+      # Alert summary from Prometheus (rules: roles/prometheus/files/rules/).
+      # Critical alerts also post to Discord; details at obs01:9093.
+      widget:
+        type: prometheusmetric
+        url: "http://obs01.{{ homelab_domain }}:9090"
+        refreshInterval: 60000
+        metrics:
+          - label: Critical
+            query: 'count(ALERTS{alertstate="firing", severity="critical"}) or vector(0)'
+          - label: Warnings
+            query: 'count(ALERTS{alertstate="firing", severity!="critical"}) or vector(0)'
+          - label: Pending
+            query: 'count(ALERTS{alertstate="pending"}) or vector(0)'
+          - label: Targets down
+            query: 'count(up == 0) or vector(0)'
     ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
     ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
     upstream_protocol: http
