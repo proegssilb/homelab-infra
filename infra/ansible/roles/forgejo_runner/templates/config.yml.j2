@@ -1,0 +1,46 @@
+# Managed by Ansible — do not edit manually
+# Reference: `forgejo-runner generate-config`
+log:
+  level: info
+  job_level: info
+
+runner:
+  capacity: {{ forgejo_runner_capacity }}
+  timeout: 3h
+  fetch_timeout: 5s
+  fetch_interval: 2s
+  # Reported to Forgejo on connect (the connection below declares none).
+  labels:
+{% for label in forgejo_runner_labels %}
+    - "{{ label }}"
+{% endfor %}
+
+cache:
+  enabled: true
+  dir: /data/cache
+  host: "{{ ansible_default_ipv4.address }}"
+  port: {{ forgejo_runner_cache_port }}
+
+container:
+  # Empty: a fresh network per job, so `services:` (Postgres) resolve by name.
+  network: ""
+  privileged: false
+  # Mounts the host Docker socket into job containers: release jobs build
+  # images with buildx. That is root on this VM for any job, which is why the
+  # VM is a dedicated build box (see tofu/pets/main.tf).
+  docker_host: automount
+  valid_volumes: []
+  force_pull: false
+
+host:
+  workdir_parent: /data/host
+
+# Pre-registered with a shared secret: the forgejo role ran
+# `forgejo-cli actions register` with the same secret, and the UUID is derived
+# from it the same way on both sides. The token stays in a 0600 file.
+server:
+  connections:
+    forgejo:
+      url: "{{ forgejo_runner_instance_url }}/"
+      uuid: "{{ forgejo_runner_uuid }}"
+      token_url: "file:/data/token.txt"

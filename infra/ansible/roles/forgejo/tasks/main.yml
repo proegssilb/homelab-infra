@@ -122,3 +122,32 @@
       - "profile email"
   when: "'Authentik' in forgejo_auth_list.stdout"
   changed_when: false
+
+# Offline registration: the server learns each runner's shared secret here,
+# and the forgejo_runner role writes the same secret into the runner's
+# .runner file, so no one-time token ever has to be copied between hosts.
+# Idempotent by design (same secret -> same runner). Labels are left to the
+# runner's own config, which reports them on connect. The secret goes over
+# stdin so it never shows up in a process listing.
+- name: Register Forgejo Actions runner
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - -i
+      - --user
+      - "1000"
+      - forgejo-forgejo-1
+      - forgejo
+      - forgejo-cli
+      - actions
+      - register
+      - --name
+      - "{{ forgejo_runner_name }}"
+      - --secret-stdin
+      - --keep-labels
+    stdin: "{{ forgejo_runner_secret | trim }}"
+    # forgejo-cli takes stdin verbatim and wants exactly 40 characters.
+    stdin_add_newline: false
+  no_log: true
+  changed_when: false

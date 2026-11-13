@@ -57,6 +57,11 @@ locals {
 
     # Remote dev environments — Coder (demo: bundled PostgreSQL; workspaces are Proxmox VMs 1000–1999, see coder_proxmox.tf)
     coder = { vmid = 116, cores = 4, memory = 8192, disk_size = 60, node = "pxmx01", tags = ["observe", "pets", "coder_app"], ha = true, firewall = true }
+
+    # CI — Forgejo Actions runner (Docker executor; jobs get the host Docker socket, so this VM
+    # is a dedicated build box and nothing else lives here). Cattle: no HA, no backup — `just
+    # vm-rebuild runner01` re-registers it from the vault secret. VMID 117 is egress01 (agentsvc.tf).
+    runner01 = { vmid = 118, cores = 8, memory = 16384, disk_size = 100, node = "pxmx02", tags = ["observe", "pets", "forgejo_runner"] }
   }
 }
 

@@ -111,6 +111,8 @@ Roles apply to groups, not individual hosts. Key assignments:
 - `obs_grafana` → grafana
 - `auth` → authentik
 - `nextcloud_app` → nextcloud
+- `forgejo_app` → forgejo (also registers the Actions runner's shared secret, `forgejo_runner_secret`)
+- `forgejo_runner` (runner01) → forgejo_runner (Docker executor, host socket mounted into jobs, QEMU binfmt for arm64 builds; runs after the forgejo play)
 - `egress_proxy` (egress01) → egress_proxy (mitmproxy for Coder workspaces; refuses non-public destinations; destination allowlist `egress_proxy_allowlist`, in shadow mode: misses are logged as "egress would refuse", not blocked)
 - `ntp_server` (egress01) → ntp_server (chrony; workspaces' NTP, so they need no internet NTP)
 

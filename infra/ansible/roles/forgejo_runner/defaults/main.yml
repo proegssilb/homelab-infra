@@ -1,0 +1,23 @@
+---
+# https://code.forgejo.org/forgejo/runner/releases — tag and digest move together.
+forgejo_runner_version: "13.2.1"
+forgejo_runner_image: "code.forgejo.org/forgejo/runner:{{ forgejo_runner_version }}@sha256:568cea8c15ddc01fc8f330124892f572af7db37fa28344a2c1914405793bf61d"
+
+# The image every job runs in, under the GitHub-style labels workflows already
+# use. catthehacker's act images carry what GitHub's hosted runner has that
+# workflows lean on (docker CLI + buildx, node for JS actions, python3, git).
+# Pinned to a dated tag + digest, at least 14 days old like every other
+# dependency; the floating act-24.04 tag is rebuilt weekly.
+forgejo_runner_job_image: "ghcr.io/catthehacker/ubuntu:act-24.04-20260815@sha256:62d572b92f9f32d3427b6d220ad1f9dca9c7b6ffad37d295425037dbff78abaf"
+forgejo_runner_labels:
+  - "ubuntu-latest:docker://{{ forgejo_runner_job_image }}"
+  - "ubuntu-24.04:docker://{{ forgejo_runner_job_image }}"
+
+# The public vhost (proxy01), same name the forgejo role sets as ROOT_URL.
+forgejo_runner_instance_url: "https://code.{{ homelab_domain }}"
+forgejo_runner_data_dir: /opt/forgejo-runner
+# Concurrent jobs. Each is a cargo build; 8 vCPU / 16 GiB carries two.
+forgejo_runner_capacity: 2
+# Actions cache server (actions/cache, Swatinem/rust-cache). The runner runs
+# with host networking so job containers reach it on the VM's own address.
+forgejo_runner_cache_port: 4000

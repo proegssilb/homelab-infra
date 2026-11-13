@@ -1,0 +1,16 @@
+---
+# Managed by Ansible — do not edit manually
+services:
+  runner:
+    image: {{ forgejo_runner_image }}
+    restart: unless-stopped
+    # Root in the container: it drives the host Docker socket, which is
+    # root-equivalent regardless of the container user.
+    user: "0:0"
+    # Host networking so job containers reach the cache server on the VM's
+    # address (cache.host in config.yml).
+    network_mode: host
+    command: ["forgejo-runner", "daemon", "--config", "/data/config.yml"]
+    volumes:
+      - {{ forgejo_runner_data_dir }}:/data
+      - /var/run/docker.sock:/var/run/docker.sock
