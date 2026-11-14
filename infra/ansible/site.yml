@@ -181,6 +181,13 @@
   roles:
     - coder
 
+- name: MCP gateway — agentgateway (Authentik login, per-tool rules)
+  hosts: agentgateway_app
+  become: true
+  gather_facts: true
+  roles:
+    - agentgateway
+
 - name: Egress proxy — mitmproxy for Coder workspaces (agentsvc VLAN)
   hosts: egress_proxy
   become: true

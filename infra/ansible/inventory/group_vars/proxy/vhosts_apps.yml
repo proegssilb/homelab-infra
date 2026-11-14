@@ -193,3 +193,40 @@ _nginx_vhosts_apps:
     extra_proxy_params: "client_max_body_size 5g;"
     # Anonymous requests get 403 from a healthy Garage; only 5xx/no answer is down.
     probe_module: http_reachable
+
+  # MCP gateway (agentgateway on mcpgw). The MCP endpoint is https://mcp.<domain>/mcp;
+  # MCP clients log in through Authentik themselves (OAuth discovery under
+  # /.well-known/ on this host).
+  - name: mcp
+    server_name: "mcp.{{ homelab_domain }}"
+    homepage: false   # an API, not a page
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "mcpgw.{{ homelab_domain }}:3000"
+    access_deny: []   # Coder workspaces' agents are the main MCP clients
+    # Streamable HTTP answers with server-sent events: buffering would hold
+    # them back, and the default 60s read timeout would cut long tool calls.
+    extra_proxy_params: |
+      proxy_buffering off;
+      proxy_read_timeout 1h;
+    # Every MCP request needs a token: a healthy gateway answers 401.
+    probe_module: http_reachable
+
+  # agentgateway's UI (Authentik login, homelab-admins only). Default-denied
+  # to workspaces: it can change what the gateway allows.
+  - name: mcp-admin
+    server_name: "mcp-admin.{{ homelab_domain }}"
+    homepage:
+      name: MCP Gateway
+      description: agentgateway servers, policies, playground
+      icon: mdi-transit-connection-variant
+      href_path: /ui
+    ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
+    ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
+    upstream_protocol: http
+    upstream_servers:
+      - "mcpgw.{{ homelab_domain }}:4001"
+    # Logged-out visitors get a redirect or 404 off /ui; only 5xx/no answer is down.
+    probe_module: http_reachable

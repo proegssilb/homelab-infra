@@ -80,3 +80,9 @@ variable "lab_dns_servers" {
   description = "DNS servers Lab VMs get by DHCP (the UniFi gateway, which has no DNS name of its own). Set in terraform.tfvars."
   type        = list(string)
 }
+
+variable "agentgateway_ui_client_secret" {
+  description = "OIDC client secret for agentgateway's UI (Authentik app agentgateway-ui). Must match the vaulted agentgateway_ui_client_secret in ansible/inventory/group_vars/agentgateway_app.yml. Set in terraform.tfvars."
+  type        = string
+  sensitive   = true
+}

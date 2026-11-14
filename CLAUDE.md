@@ -115,6 +115,7 @@ Roles apply to groups, not individual hosts. Key assignments:
 - `forgejo_runner` (runner01) → forgejo_runner (Docker executor, host socket mounted into jobs, QEMU binfmt for arm64 builds; runs after the forgejo play)
 - `egress_proxy` (egress01) → egress_proxy (mitmproxy for Coder workspaces; refuses non-public destinations; destination allowlist `egress_proxy_allowlist`, in shadow mode: misses are logged as "egress would refuse", not blocked)
 - `ntp_server` (egress01) → ntp_server (chrony; workspaces' NTP, so they need no internet NTP)
+- `agentgateway_app` (mcpgw) → agentgateway (MCP gateway: Authentik login for MCP clients, per-tool CEL rules in `agentgateway_mcp_rules`, upstream servers in `agentgateway_mcp_targets`. Hybrid storage: the templated config file is the read-only baseline, servers/policies added in its UI live in SQLite on the VM, hence `backup = true`)
 
 ### Agent support services
 
@@ -127,8 +128,12 @@ the `coder` SDN zone as a whole. Adding a VNet to an existing zone needs
 
 proxy01 refuses the Agents and AgentSvc subnets (`coder_agents_cidr`, `agentsvc_cidr` in
 `group_vars/all/local.yml`) on every vhost by default (`nginx_vhost_default_deny` in
-`group_vars/proxy/main.yml`). Only `dev` and `code` opt out with `access_deny: []`; a new vhost
-stays closed to workspaces unless it does the same.
+`group_vars/proxy/main.yml`). Only `dev`, `code` and `mcp` opt out with `access_deny: []`; a new
+vhost stays closed to workspaces unless it does the same.
+
+The MCP gateway (mcpgw, VM 119) is on the Lab network, not `agentsvc`: like Forgejo, workspaces
+reach it only through proxy01 (`mcp.<domain>`), never directly. Its UI vhost `mcp-admin` stays
+default-denied to workspaces.
 
 The Coder server (VM 116) has its own VM firewall with outbound DROP (`tofu/pets/coder_firewall.tf`);
 a new thing Coder must reach needs a rule there.

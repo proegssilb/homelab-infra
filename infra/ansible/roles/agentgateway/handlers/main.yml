@@ -1,0 +1,8 @@
+---
+# The `config:` section of the file only applies at startup, so restart rather
+# than relying on agentgateway's file watch.
+- name: Restart agentgateway
+  community.docker.docker_compose_v2:
+    project_src: "{{ agentgateway_dir }}"
+    state: present
+    recreate: always

@@ -250,3 +250,71 @@ resource "authentik_application" "homeassistant" {
   protocol_provider = authentik_provider_oauth2.homeassistant.id
   meta_launch_url   = "https://ha.${var.domain}"
 }
+
+# ── agentgateway (MCP gateway) ─────────────────────────────────────────────────
+
+data "authentik_property_mapping_provider_scope" "offline_access" {
+  scope_name = "offline_access"
+}
+
+# What MCP clients (Claude Code, MCP Inspector, ...) log in with. Public client
+# with PKCE: Authentik has no Dynamic Client Registration, so agentgateway's
+# authentik adapter answers MCP clients' registration with this client ID, and
+# checks it as the token audience.
+resource "authentik_provider_oauth2" "agentgateway_mcp" {
+  name               = "agentgateway MCP"
+  client_id          = "agentgateway"
+  client_type        = "public"
+  authorization_flow = data.authentik_flow.default_authorization.id
+  invalidation_flow  = data.authentik_flow.default_invalidation.id
+  # The gateway verifies tokens against this app's JWKS (RS256).
+  signing_key = data.authentik_certificate_key_pair.self_signed.id
+  grant_types = ["authorization_code", "refresh_token"]
+  # MCP clients listen on a random localhost port for the OAuth callback.
+  allowed_redirect_uris = [
+    { matching_mode = "regex", redirect_uri_type = "authorization", url = "^http://localhost:[0-9]+/.*$" },
+    { matching_mode = "regex", redirect_uri_type = "authorization", url = "^http://127\\.0\\.0\\.1:[0-9]+/.*$" },
+  ]
+  # groups: the gateway's mcpAuthorization rules match on group names
+  # (homelab-admins, per-app *-admins; created by hand, not in IaC).
+  property_mappings = [
+    data.authentik_property_mapping_provider_scope.openid.id,
+    data.authentik_property_mapping_provider_scope.email.id,
+    data.authentik_property_mapping_provider_scope.profile.id,
+    authentik_property_mapping_provider_scope.groups.id,
+    data.authentik_property_mapping_provider_scope.offline_access.id,
+  ]
+}
+
+resource "authentik_application" "agentgateway_mcp" {
+  name              = "agentgateway MCP"
+  slug              = "agentgateway"
+  protocol_provider = authentik_provider_oauth2.agentgateway_mcp.id
+}
+
+# Login to agentgateway's own UI; only homelab-admins get past it.
+resource "authentik_provider_oauth2" "agentgateway_ui" {
+  name               = "agentgateway UI"
+  client_id          = "agentgateway-ui"
+  client_secret      = var.agentgateway_ui_client_secret
+  authorization_flow = data.authentik_flow.default_authorization.id
+  invalidation_flow  = data.authentik_flow.default_invalidation.id
+  signing_key        = data.authentik_certificate_key_pair.self_signed.id
+  grant_types        = ["authorization_code", "refresh_token"]
+  allowed_redirect_uris = [
+    { matching_mode = "strict", redirect_uri_type = "authorization", url = "https://mcp-admin.${var.domain}/oauth/callback" },
+  ]
+  property_mappings = [
+    data.authentik_property_mapping_provider_scope.openid.id,
+    data.authentik_property_mapping_provider_scope.email.id,
+    data.authentik_property_mapping_provider_scope.profile.id,
+    authentik_property_mapping_provider_scope.groups.id,
+  ]
+}
+
+resource "authentik_application" "agentgateway_ui" {
+  name              = "MCP Gateway"
+  slug              = "agentgateway-ui"
+  protocol_provider = authentik_provider_oauth2.agentgateway_ui.id
+  meta_launch_url   = "https://mcp-admin.${var.domain}/ui"
+}

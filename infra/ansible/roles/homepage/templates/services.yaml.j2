@@ -6,7 +6,7 @@
 {%     set ns.rows = ns.rows + [{
          'group': hp.group | default(group.name),
          'name': hp.name | default(vhost.name),
-         'href': 'https://' ~ vhost.server_name,
+         'href': 'https://' ~ vhost.server_name ~ hp.href_path | default(''),
          'monitor': 'https://' ~ vhost.server_name ~ hp.monitor_path | default(''),
          'description': hp.description | default(''),
          'icon': hp.icon | default(''),

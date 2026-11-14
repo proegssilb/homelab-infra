@@ -1,0 +1,69 @@
+---
+- name: Install Docker
+  ansible.builtin.import_role:
+    name: docker_install
+
+- name: Create app directory
+  ansible.builtin.file:
+    path: "{{ agentgateway_dir }}"
+    state: directory
+    mode: "0750"
+
+# SQLite for hybrid-mode storage: whatever is added in the UI lives here, on
+# top of the config file. It is the only state that isn't in the repo, which
+# is why the VM has backup = true (tofu/pets/main.tf).
+- name: Create data directory
+  ansible.builtin.file:
+    path: "{{ agentgateway_dir }}/data"
+    state: directory
+    owner: "{{ agentgateway_uid }}"
+    group: "{{ agentgateway_uid }}"
+    mode: "0750"
+
+# The UI session cookie key (AES-256-GCM, 64 hex chars). Generated once on the
+# VM and never rotated (force: false); it exists nowhere else.
+- name: Generate UI cookie key on first run
+  ansible.builtin.copy:
+    dest: "{{ agentgateway_dir }}/cookie.env"
+    force: false
+    mode: "0600"
+    content: |
+      OIDC_COOKIE_SECRET={{ lookup('ansible.builtin.password', '/dev/null', chars=['hexdigits'], length=64) | lower }}
+  no_log: true
+  notify: Restart agentgateway
+
+# Vaulted in group_vars/agentgateway_app.yml; the same value is in
+# tofu/pets/terraform.tfvars for the Authentik side.
+- name: Template UI client secret
+  ansible.builtin.copy:
+    dest: "{{ agentgateway_dir }}/ui.env"
+    mode: "0600"
+    content: |
+      UI_CLIENT_SECRET={{ agentgateway_ui_client_secret | trim }}
+  no_log: true
+  notify: Restart agentgateway
+
+# Holds no secrets: they're ${VAR} references, expanded from the env files.
+- name: Template agentgateway config
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ agentgateway_dir }}/config.yaml"
+    mode: "0644"
+  notify: Restart agentgateway
+
+- name: Template docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ agentgateway_dir }}/docker-compose.yml"
+    mode: "0640"
+  notify: Restart agentgateway
+
+- name: Pull agentgateway images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ agentgateway_dir }}"
+
+- name: Start agentgateway stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ agentgateway_dir }}"
+    state: present
+    remove_orphans: true

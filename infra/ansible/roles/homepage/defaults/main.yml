@@ -10,7 +10,7 @@ homepage_background: "https://images.unsplash.com/photo-1491466424936-e304919aad
 
 # Every proxy vhost becomes a row, so a new service shows up without touching
 # this role. The group comes from which vhosts_*.yml file defines the vhost;
-# a vhost can override it (and name/description/icon/monitor_path) with a
+# a vhost can override it (and name/description/icon/monitor_path/href_path) with a
 # `homepage:` block, or set `homepage: false` to stay off the page.
 homepage_vhost_groups:
   - name: Apps
