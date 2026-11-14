@@ -123,12 +123,16 @@
   when: "'Authentik' in forgejo_auth_list.stdout"
   changed_when: false
 
-# Offline registration: the server learns each runner's shared secret here,
-# and the forgejo_runner role writes the same secret into the runner's
-# .runner file, so no one-time token ever has to be copied between hosts.
-# Idempotent by design (same secret -> same runner). Labels are left to the
-# runner's own config, which reports them on connect. The secret goes over
-# stdin so it never shows up in a process listing.
+# Offline registration: the server learns the runner's shared secret here,
+# and the forgejo_runner role writes the same secret into the runner's token
+# file, so no one-time token ever has to be copied between hosts. The secret
+# goes over stdin so it never shows up in a process listing.
+#
+# Idempotent (same secret -> same runner), so it runs every play.
+# --keep-labels matters: without it `register` resets the runner's labels to
+# empty, and a runner with no labels matches no job until it restarts and
+# re-declares them. The runner declares its labels itself on connect (it
+# also re-reports its version then; `register` blanks that, harmlessly).
 - name: Register Forgejo Actions runner
   ansible.builtin.command:
     argv:
@@ -144,7 +148,11 @@
       - register
       - --name
       - "{{ forgejo_runner_name }}"
+      # A string flag whose value is ignored: the secret is read from stdin.
+      # Bare, it swallows the next argument as its value -- which is how an
+      # earlier version of this task lost --keep-labels.
       - --secret-stdin
+      - "-"
       - --keep-labels
     stdin: "{{ forgejo_runner_secret | trim }}"
     # forgejo-cli takes stdin verbatim and wants exactly 40 characters.
