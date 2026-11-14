@@ -1,0 +1,24 @@
+---
+# Managed by Ansible — do not edit manually
+services:
+  agentgateway:
+    image: {{ agentgateway_image }}
+    restart: unless-stopped
+    # Docker's default json-file driver keeps container output out of the
+    # journal, which is all Alloy ships to Loki. Find these lines with
+    # {host="{{ inventory_hostname }}", unit="docker.service"} | logfmt
+    logging:
+      driver: journald
+      options:
+        tag: agentgateway
+    user: "{{ agentgateway_uid }}:{{ agentgateway_uid }}"
+    command: ["-f", "/config/config.yaml"]
+    env_file: [cookie.env, ui.env]
+    ports:
+      - "{{ agentgateway_mcp_port }}:{{ agentgateway_mcp_port }}"
+      - "{{ agentgateway_ui_port }}:{{ agentgateway_ui_port }}"
+    volumes:
+      # Read-only on purpose: hybrid mode never writes the file anyway, and
+      # this makes sure nothing else can.
+      - ./config.yaml:/config/config.yaml:ro
+      - ./data:/data

@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=https://agentgateway.dev/schema/config
+# Managed by Ansible — do not edit manually.
+#
+# hybrid storage: this file is the read-only baseline (the IaC half). Anything
+# added in the UI is stored in /data/data.db and layered on top; the UI can add
+# to sections that exist here but can't replace what this file defines.
+config:
+  storage:
+    mode: hybrid
+  database:
+    url: sqlite:///data/data.db
+
+# Authentik's `sub` is an opaque hash, so name the caller (and their groups)
+# in every access log line. A refused tool call logs
+# reason=Authorization error="mcp: authorization denied for tool: <name>";
+# so does a tool that doesn't exist (callers can't probe for hidden tools).
+frontendPolicies:
+  accessLog:
+    add:
+      user: 'jwt.preferred_username'
+      groups: 'jwt.groups'
+      # A tool that fails still answers HTTP 200 (MCP reports isError inside
+      # the result), so without this a failed call logs like a success.
+      tool_is_error: 'mcp.tool.result.isError'
+      # Tool arguments ('mcp.tool.arguments') are deliberately not logged:
+      # they can carry private content into Loki. Opt in per need.
+
+gateways:
+  mcp:
+    port: {{ agentgateway_mcp_port }}
+  ui:
+    port: {{ agentgateway_ui_port }}
+
+# The UI and its /api, behind an Authentik login. Only the admin group gets
+# in at all (the docs' example lets everyone read; that would expose config).
+ui:
+  gateways: [ui]
+  policies:
+    oidc:
+      issuer: {{ agentgateway_authentik_url }}/application/o/{{ agentgateway_ui_client_id }}/
+      clientId: {{ agentgateway_ui_client_id }}
+      clientSecret: ${UI_CLIENT_SECRET}
+      redirectURI: https://{{ agentgateway_admin_host }}/oauth/callback
+      scopes: [profile, email, groups]
+    authorization:
+      rules:
+      - allow: '"{{ agentgateway_admin_group }}" in jwt.groups'
+
+mcp:
+  gateways: [mcp]
+  policies:
+    # Every MCP request needs an Authentik token. The authentik adapter serves
+    # the OAuth metadata MCP clients discover, and answers their client
+    # registration with the pre-registered public client (Authentik has no
+    # Dynamic Client Registration).
+    mcpAuthentication:
+      mode: strict
+      issuer: {{ agentgateway_authentik_url }}/application/o/{{ agentgateway_mcp_client_id }}/
+      audiences: [{{ agentgateway_mcp_client_id }}]
+      provider:
+        authentik: {}
+      clientId: {{ agentgateway_mcp_client_id }}
+      resourceMetadata:
+        resource: https://{{ agentgateway_mcp_host }}/mcp
+        scopesSupported: [openid, profile, email, groups, offline_access]
+        bearerMethodsSupported: [header]
+    # Rules are OR-ed; a tool no rule allows is hidden from tools/list and
+    # refused on tools/call.
+    mcpAuthorization:
+      rules:
+      - allow: 'has(jwt.groups) && "{{ agentgateway_admin_group }}" in jwt.groups'
+{% for rule in agentgateway_mcp_rules %}
+      - allow: '{{ rule }}'
+{% endfor %}
+  # Must exist even when empty: in hybrid mode the UI can only add servers to
+  # a section the file already has.
+{% if agentgateway_mcp_targets %}
+  targets:
+{% for t in agentgateway_mcp_targets %}
+  - name: {{ t.name }}
+    mcp:
+      host: {{ t.url }}
+{% endfor %}
+{% else %}
+  targets: []
+{% endif %}

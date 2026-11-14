@@ -1,0 +1,33 @@
+---
+# agentgateway (standalone) as the lab's MCP gateway: Authentik login for MCP
+# clients, CEL rules for which tools each caller may use.
+agentgateway_image: "cr.agentgateway.dev/agentgateway:v1.7.0"
+
+agentgateway_dir: /opt/agentgateway
+# The image runs as this uid; it owns the SQLite data directory.
+agentgateway_uid: 1000
+
+agentgateway_mcp_port: 3000
+agentgateway_ui_port: 4001
+
+# Public names, served by proxy01 (group_vars/proxy/vhosts_apps.yml).
+agentgateway_mcp_host: "mcp.{{ homelab_domain }}"
+agentgateway_admin_host: "mcp-admin.{{ homelab_domain }}"
+agentgateway_authentik_url: "https://auth.{{ homelab_domain }}"
+
+# Authentik clients (tofu/pets/authentik_apps.tf).
+agentgateway_mcp_client_id: "agentgateway"
+agentgateway_ui_client_id: "agentgateway-ui"
+agentgateway_ui_client_secret: ""
+
+# Authentik group allowed into the UI, and allowed every MCP tool.
+agentgateway_admin_group: "homelab-admins"
+
+# Upstream MCP servers, file-defined (the IaC half; the UI can add more on
+# top). Each entry: {name, url}. Names: lowercase, digits, '-' and '.' only.
+agentgateway_mcp_targets: []
+
+# Extra mcpAuthorization rules (CEL), OR-ed with the admin-group rule. Put
+# per-server rules here as servers are added, e.g.
+#   - 'mcp.tool.target == "anamnesis" && "anamnesis-admins" in jwt.groups'
+agentgateway_mcp_rules: []

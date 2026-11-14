@@ -62,6 +62,10 @@ locals {
     # is a dedicated build box and nothing else lives here). Cattle: no HA, no backup — `just
     # vm-rebuild runner01` re-registers it from the vault secret. VMID 117 is egress01 (agentsvc.tf).
     runner01 = { vmid = 118, cores = 8, memory = 16384, disk_size = 100, node = "pxmx02", tags = ["observe", "pets", "forgejo_runner"] }
+
+    # MCP gateway — agentgateway: Authentik login for MCP clients, per-tool CEL rules. The config
+    # file is IaC; servers/policies added in its UI live in SQLite on this VM, hence backup.
+    mcpgw = { vmid = 119, cores = 2, memory = 2048, node = "pxmx03", tags = ["observe", "pets", "agentgateway_app"], ha = true, backup = true }
   }
 }
 
