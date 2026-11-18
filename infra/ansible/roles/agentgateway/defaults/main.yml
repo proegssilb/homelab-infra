@@ -40,8 +40,22 @@ agentgateway_coder_url: "https://dev.{{ homelab_domain }}"
 agentgateway_ollama_url: "http://ollama.{{ homelab_domain }}:11434/v1"
 agentgateway_polystrata_url: "http://ollama.{{ homelab_domain }}:18081/v1"
 agentgateway_polystrata_api_key: ""   # vaulted in group_vars/agentgateway_app.yml
-# name: what clients ask for; model: what the upstream calls it.
+# name: what clients ask for; model: what the upstream calls it. Optional
+# defaults / overrides: request-body fields the gateway sets when the client
+# didn't / always (agentgateway's llm.models[].defaults and .overrides).
 agentgateway_llm_models:
   - { name: "qwen3.8-flash-next", model: "qwen3.8-flash-next-iq3_s", upstream: polystrata }
+  # Same pinned model with thinking off, for editors' utility calls (titles,
+  # commit messages, intent detection). PolyStrata runs it in its own slot
+  # ("parallel": 2 in its config), so these don't queue behind the planner
+  # or evict its cached conversation.
+  - name: "qwen3.8-flash-next-fast"
+    model: "qwen3.8-flash-next-iq3_s"
+    upstream: polystrata
+    overrides: { reasoning_effort: none }
   - { name: "qwen3.8:27b", model: "qwen3.8:27b", upstream: ollama }
   - { name: "qwen3.6:35b", model: "qwen3.6:35b", upstream: ollama }
+  # Embeddings (/llm/v1/embeddings). The Ollama model is a CPU-only copy of
+  # qwen3-embedding:0.6b (Modelfile: num_gpu 0, num_ctx 8192), so it never
+  # takes VRAM from, or swaps out, the chat models.
+  - { name: "qwen3-embedding", model: "qwen3-embedding-cpu", upstream: ollama }
