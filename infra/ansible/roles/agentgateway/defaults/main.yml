@@ -31,3 +31,17 @@ agentgateway_mcp_targets: []
 # per-server rules here as servers are added, e.g.
 #   - 'mcp.tool.target == "anamnesis" && "anamnesis-admins" in jwt.groups'
 agentgateway_mcp_rules: []
+
+# ── Local models for Coder workspaces (the `llm` section of the config) ──
+# Callers present their workspace's Coder agent token; coder-authz checks it
+# with Coder. Upstreams: Ollama and PolyStrata on the hand-managed ollama VM.
+agentgateway_authz_image: "python:3.13-alpine"
+agentgateway_coder_url: "https://dev.{{ homelab_domain }}"
+agentgateway_ollama_url: "http://ollama.{{ homelab_domain }}:11434/v1"
+agentgateway_polystrata_url: "http://ollama.{{ homelab_domain }}:18081/v1"
+agentgateway_polystrata_api_key: ""   # vaulted in group_vars/agentgateway_app.yml
+# name: what clients ask for; model: what the upstream calls it.
+agentgateway_llm_models:
+  - { name: "qwen3.8-flash-next", model: "qwen3.8-flash-next-iq3_s", upstream: polystrata }
+  - { name: "qwen3.8:27b", model: "qwen3.8:27b", upstream: ollama }
+  - { name: "qwen3.6:35b", model: "qwen3.6:35b", upstream: ollama }

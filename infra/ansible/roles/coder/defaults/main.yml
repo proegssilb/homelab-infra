@@ -75,6 +75,10 @@ coder_egress_proxy_url: ""
 coder_no_proxy: []
 coder_apt_proxy_url: ""
 coder_ntp_server: ""
+# Local models for workspaces (agentgateway's llm routes on mcpgw), OpenAI
+# base URL. Workspaces authenticate with their own Coder agent token; empty:
+# no coding-tool config is written.
+coder_llm_base_url: ""
 # Coder API token of an Owner, used to push templates. Leave empty to skip the
 # push (e.g. right after a rebuild, before the first admin exists).
 # Create: Coder UI -> Account -> Tokens, then ansible-vault encrypt_string --stdin-name coder_admin_token

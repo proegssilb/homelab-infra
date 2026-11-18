@@ -13,7 +13,7 @@ services:
         tag: agentgateway
     user: "{{ agentgateway_uid }}:{{ agentgateway_uid }}"
     command: ["-f", "/config/config.yaml"]
-    env_file: [cookie.env, ui.env]
+    env_file: [cookie.env, ui.env, llm.env]
     ports:
       - "{{ agentgateway_mcp_port }}:{{ agentgateway_mcp_port }}"
       - "{{ agentgateway_ui_port }}:{{ agentgateway_ui_port }}"
@@ -22,3 +22,20 @@ services:
       # this makes sure nothing else can.
       - ./config.yaml:/config/config.yaml:ro
       - ./data:/data
+
+  # Checks LLM callers' Coder workspace tokens for agentgateway's extAuthz.
+  # Reached only on the compose network (no published port).
+  coder-authz:
+    image: {{ agentgateway_authz_image }}
+    restart: unless-stopped
+    logging:
+      driver: journald
+      options:
+        tag: coder-authz
+    user: "{{ agentgateway_uid }}:{{ agentgateway_uid }}"
+    read_only: true
+    command: ["python", "-I", "/app/coder_authz.py"]
+    environment:
+      CODER_URL: "{{ agentgateway_coder_url }}"
+    volumes:
+      - ./coder_authz.py:/app/coder_authz.py:ro
