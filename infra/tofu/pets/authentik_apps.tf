@@ -222,8 +222,8 @@ resource "authentik_application" "anamnesis" {
 # ── Coder ──────────────────────────────────────────────────────────────────────
 # Login only: role/group sync from the IdP is a Coder Premium feature, so
 # Owners are promoted by hand in Coder (the Ansible-made coder-admin is the
-# first). Who may log in at all is an Authentik policy binding on this app,
-# made by hand like every group here.
+# first). Who may log in at all: members of the Authentik group "coder-users"
+# (policy below). Coder signups are open, so this is the gate.
 
 resource "authentik_provider_oauth2" "coder" {
   name               = "Coder"
@@ -250,6 +250,21 @@ resource "authentik_application" "coder" {
   slug              = "coder"
   protocol_provider = authentik_provider_oauth2.coder.id
   meta_launch_url   = "https://dev.${var.domain}"
+}
+
+# Only members of "coder-users" may use the app. The group and its members are
+# made by hand (the repo is public). Checked by name at login, not looked up
+# by a data source, so this plans on a fresh Authentik too; until the group
+# exists nobody gets in (fails closed).
+resource "authentik_policy_expression" "coder_users" {
+  name       = "coder-users only"
+  expression = "return ak_is_group_member(request.user, name=\"coder-users\")"
+}
+
+resource "authentik_policy_binding" "coder_users" {
+  target = authentik_application.coder.uuid
+  policy = authentik_policy_expression.coder_users.id
+  order  = 0
 }
 
 # ── Home Assistant ─────────────────────────────────────────────────────────────
