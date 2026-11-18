@@ -49,6 +49,38 @@
     mode: "2755"
   notify: Restart apt-cacher-ng
 
+# apt-cacher-ng resolves through systemd-resolved's stub (apt_cache_resolv_conf).
+# The cloud image already runs resolved; say so here so a rebuild from a
+# different image can't silently leave the proxy without DNS.
+- name: Install systemd-resolved
+  ansible.builtin.apt:
+    name: systemd-resolved
+    state: present
+
+- name: Enable and start systemd-resolved
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    enabled: true
+    state: started
+
+- name: Create apt-cacher-ng unit drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/apt-cacher-ng.service.d
+    state: directory
+    mode: "0755"
+
+# The stub resolv.conf only exists once resolved is up; start after it on boot.
+- name: Order apt-cacher-ng after systemd-resolved
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/apt-cacher-ng.service.d/resolved.conf
+    mode: "0644"
+    content: |
+      # Managed by Ansible (apt_cache)
+      [Unit]
+      Wants=systemd-resolved.service
+      After=systemd-resolved.service
+  notify: Restart apt-cacher-ng
+
 # Answer the package's install-time question (allow HTTPS tunnels to anywhere)
 # with "no"; the tunnel allowlist lives in the config file below instead.
 - name: Preseed apt-cacher-ng to refuse arbitrary HTTPS tunnels
