@@ -411,11 +411,15 @@ locals {
           "qwen3.8:27b"        = merge(local.kilo_model, { name = "Qwen3.8 27B (dense)" })
           "qwen3.6:35b"        = merge(local.kilo_model, { name = "Qwen3.6 35B (MoE, fast)" })
           "qwen3.8-flash-next" = merge(local.kilo_model, { name = "Qwen3.8 Flash-Next (planner)" })
+          # Same model, thinking off (the gateway forces reasoning_effort none),
+          # in PolyStrata's second slot: titles and summaries don't queue
+          # behind the planner or evict Ollama's cached conversations.
+          "qwen3.8-flash-next-fast" = merge(local.kilo_model, { name = "Qwen3.8 Flash-Next (fast, no thinking)", reasoning = false })
         }
       }
     }
     model         = "lab/qwen3.8:27b"
-    small_model   = "lab/qwen3.6:35b"
+    small_model   = "lab/qwen3.8-flash-next-fast"
     default_agent = "solo"
     agent = {
       plan  = { model = "lab/qwen3.8-flash-next" }
@@ -427,6 +431,37 @@ locals {
       }
     }
   })
+}
+
+# ── code-server's built-in Chat on the same models ─────────────────────────────
+# A Custom Endpoint ("vendor": "customendpoint") in the profile's
+# chatLanguageModels.json, keyed with this build's agent token like Kilo above,
+# so the file is rewritten on every build (models added to it by hand in the UI
+# don't survive a rebuild). The utility settings (titles, commit messages,
+# intent detection) take "<vendor>/<model id>"; they point at Flash-Next without
+# thinking. Without them, a signed-out code-server leaves those features off.
+locals {
+  vscode_models_path = "/home/coder/.local/share/code-server/User/chatLanguageModels.json"
+  vscode_models = jsonencode([{
+    name   = "Lab (local models)"
+    vendor = "customendpoint"
+    apiKey = coder_agent.main.token
+    models = [for id, name in {
+      "qwen3.8:27b"             = "Qwen3.8 27B (dense)"
+      "qwen3.6:35b"             = "Qwen3.6 35B (MoE, fast)"
+      "qwen3.8-flash-next"      = "Qwen3.8 Flash-Next (planner)"
+      "qwen3.8-flash-next-fast" = "Qwen3.8 Flash-Next (fast, no thinking)"
+      } : {
+      id              = id
+      name            = name
+      url             = var.llm_base_url
+      toolCalling     = true
+      vision          = false
+      maxInputTokens  = 98304
+      maxOutputTokens = 32768
+    }]
+  }])
+  vscode_utility_model = "customendpoint/qwen3.8-flash-next-fast"
 }
 
 # ── Agent ──────────────────────────────────────────────────────────────────────
@@ -506,6 +541,11 @@ module "code-server" {
   folder   = module.git-clone[0].repo_dir
   # Open VSX, through the egress proxy.
   extensions = var.llm_base_url != "" ? ["kilocode.kilo-code"] : []
+  # Merged into the User settings on every start; the user's other settings stay.
+  settings = var.llm_base_url != "" ? {
+    "chat.utilityModel"      = local.vscode_utility_model
+    "chat.utilitySmallModel" = local.vscode_utility_model
+  } : {}
 }
 
 # ── VM ─────────────────────────────────────────────────────────────────────────
@@ -730,6 +770,9 @@ resource "terraform_data" "agent_install" {
       # Kilo Code's lab config (holds this build's agent token: 0600).
       "install -d -m 0700 /home/coder/.config/kilo",
       "echo '${base64encode(local.kilo_config)}' | base64 -d | install -m 0600 /dev/stdin ${local.kilo_config_path}",
+      # code-server Chat's models (same token: 0600).
+      "mkdir -p $(dirname ${local.vscode_models_path})",
+      "echo '${base64encode(local.vscode_models)}' | base64 -d | install -m 0600 /dev/stdin ${local.vscode_models_path}",
       ] : [
       "rm -f ${local.kilo_config_path}",
       ], [
