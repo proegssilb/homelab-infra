@@ -9,12 +9,13 @@ postgresql_databases:
 postgresql_users:
   - { name: coder, password: "{{ coder_db_password | trim }}", db: coder }
 
-# Coder's address as the dynamic inventory sees it (guest agent, eth0). Falls
-# back to an address that matches nothing if Coder isn't in the inventory yet
-# (e.g. `--limit coderdb` before it exists); the next full run fixes it.
+# Coder's address, from DNS on the controller (the inventory's ansible_host
+# for coder can be its bare name, which pg_hba rejects with a /32). If the
+# name doesn't resolve yet, fall back to an address that matches nothing; the
+# next run fixes it. The VM firewall (coderdb_firewall.tf) is the outer gate.
 postgresql_allowed_subnet: >-
-  {{ (hostvars[groups['coder_app'][0]].ansible_host
-      if groups.get('coder_app') else '127.0.0.2') ~ '/32' }}
+  {{ (lookup('ansible.builtin.pipe', 'getent ahostsv4 coder.' ~ homelab_domain ~ ' || true').split()
+      | first | default('127.0.0.2', true)) ~ '/32' }}
 
 # Sized for the 4 GiB VM (pg01's defaults assume 8 GiB).
 postgresql_max_connections: 100
