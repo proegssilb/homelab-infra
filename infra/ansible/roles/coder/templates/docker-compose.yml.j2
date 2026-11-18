@@ -28,6 +28,11 @@ services:
       CODER_OIDC_CLIENT_SECRET: "{{ coder_oidc_client_secret | trim }}"
       CODER_OIDC_SIGN_IN_TEXT: "{{ coder_oidc_sign_in_text }}"
       CODER_OIDC_ALLOW_SIGNUPS: "true"
+      # Authentik runs no email-verification flow here, so its tokens carry
+      # email_verified=false and Coder would refuse every login. Authentik is
+      # the trust root (same call as mealie). Matching emails don't take over
+      # password accounts: Coder refuses a login whose type doesn't match.
+      CODER_OIDC_IGNORE_EMAIL_VERIFIED: "true"
 {% endif %}
       # Read by the bpg/proxmox provider in workspace templates.
       PROXMOX_VE_ENDPOINT: "{{ coder_proxmox_endpoint }}"
