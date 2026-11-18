@@ -238,10 +238,14 @@ resource "authentik_provider_oauth2" "coder" {
   allowed_redirect_uris = [
     { matching_mode = "strict", redirect_uri_type = "authorization", url = "https://dev.${var.domain}/api/v2/users/oidc/callback" },
   ]
+  # offline_access: Coder ends an OIDC session when the access token expires
+  # unless it holds a refresh token, and Authentik only issues one for this
+  # scope (Coder requests it, CODER_OIDC_SCOPES in roles/coder).
   property_mappings = [
     data.authentik_property_mapping_provider_scope.openid.id,
     data.authentik_property_mapping_provider_scope.email.id,
     data.authentik_property_mapping_provider_scope.profile.id,
+    data.authentik_property_mapping_provider_scope.offline_access.id,
   ]
 }
 

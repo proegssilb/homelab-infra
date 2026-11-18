@@ -27,6 +27,10 @@ services:
       CODER_OIDC_CLIENT_ID: "{{ coder_oidc_client_id }}"
       CODER_OIDC_CLIENT_SECRET: "{{ coder_oidc_client_secret | trim }}"
       CODER_OIDC_SIGN_IN_TEXT: "{{ coder_oidc_sign_in_text }}"
+      # offline_access gets a refresh token from Authentik. Without one Coder
+      # ends the session when the access token expires (minutes), however
+      # active the user is.
+      CODER_OIDC_SCOPES: "openid,profile,email,offline_access"
       CODER_OIDC_ALLOW_SIGNUPS: "true"
       # Authentik runs no email-verification flow here, so its tokens carry
       # email_verified=false and Coder would refuse every login. Authentik is
