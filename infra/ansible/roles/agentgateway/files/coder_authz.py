@@ -76,6 +76,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def handle_any(self):
         token = token_from(self.headers)
         if not token:
+            # Logged so a token-less 401 is visible: auth_header says whether
+            # an Authorization header came at all (vs. "Bearer " with nothing
+            # after it). No header values are logged.
+            log(event="no_token", method=self.command,
+                auth_header="Authorization" in self.headers,
+                api_key_header="x-api-key" in self.headers)
             return self.answer(401)
         key = hashlib.sha256(token.encode()).hexdigest()
         agent = key[:12]
