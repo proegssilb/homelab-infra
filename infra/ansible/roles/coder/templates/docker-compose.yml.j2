@@ -17,6 +17,9 @@ services:
       CODER_TELEMETRY_ENABLE: "false"
       CODER_PROMETHEUS_ENABLE: "true"
       CODER_PROMETHEUS_ADDRESS: "0.0.0.0:2112"
+      # Coder ships a default GitHub OAuth app (login via coder.com's app).
+      # Off: logins go through Authentik, which limits them to coder-users.
+      CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE: "false"
 {% if coder_oidc_issuer_url | length > 0 %}
       # Login through Authentik (tofu/pets/authentik_apps.tf). Password login
       # stays on for coder-admin, the Owner Ansible uses to push templates.
