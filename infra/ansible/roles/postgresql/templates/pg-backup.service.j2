@@ -1,8 +1,12 @@
 [Unit]
-Description=PostgreSQL database backup to TrueNAS NFS
+Description=PostgreSQL database backup (pg_dump to {{ postgresql_backup_mount }})
 After=network.target postgresql@{{ postgresql_version }}-main.service
 
 [Service]
 Type=oneshot
 User=postgres
 ExecStart=/usr/local/bin/pg-backup.sh
+# Only after a successful dump: when it last worked, for node_exporter's
+# textfile collector (alert PostgresBackupStale). "+" runs it as root, since
+# the collector directory isn't the postgres user's.
+ExecStartPost=+/bin/sh -c 'printf "pg_backup_last_success_timestamp_seconds %%s\\n" "$$(date +%%s)" > {{ node_exporter_textfile_dir }}/pg_backup.prom.tmp && mv {{ node_exporter_textfile_dir }}/pg_backup.prom.tmp {{ node_exporter_textfile_dir }}/pg_backup.prom'

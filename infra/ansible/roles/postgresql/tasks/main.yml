@@ -199,3 +199,21 @@
     enabled: true
     state: started
     daemon_reload: true
+
+# A host whose backups never succeed would otherwise never publish the metric,
+# and a missing series alerts on nothing. Seed it with 0 (= stale) once, and
+# take a first backup in the background: success replaces the 0 within
+# minutes, failure leaves PostgresBackupStale firing.
+- name: Seed the backup metric on a new host
+  ansible.builtin.copy:
+    content: "pg_backup_last_success_timestamp_seconds 0\n"
+    dest: "{{ node_exporter_textfile_dir }}/pg_backup.prom"
+    mode: "0644"
+    force: false
+  register: _pg_backup_metric_seeded
+
+- name: Take a first backup
+  when: _pg_backup_metric_seeded.changed
+  ansible.builtin.command:
+    argv: [systemctl, start, --no-block, pg-backup.service]
+  changed_when: true

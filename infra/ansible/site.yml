@@ -174,7 +174,15 @@
   roles:
     - homepage
 
-- name: Coder — remote dev environments (demo)
+# Before Coder: its database has to be up when Coder starts.
+- name: PostgreSQL for Coder — coderdb
+  hosts: coder_postgres
+  become: true
+  gather_facts: true
+  roles:
+    - postgresql
+
+- name: Coder — remote dev environments
   hosts: coder_app
   become: true
   gather_facts: true

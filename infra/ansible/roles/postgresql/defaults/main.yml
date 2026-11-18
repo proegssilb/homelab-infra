@@ -23,3 +23,6 @@ postgresql_backup_nfs_server: ""
 postgresql_backup_nfs_path: ""
 postgresql_backup_mount: /mnt/pg-backups
 postgresql_backup_nfs_opts: "nofail,noatime"
+# Where pg-backup.service records its last success (same default as the
+# node_exporter role, which every non-hypervisor host runs first).
+node_exporter_textfile_dir: /var/lib/prometheus/node-exporter

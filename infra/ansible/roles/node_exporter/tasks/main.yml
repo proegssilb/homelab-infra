@@ -4,10 +4,19 @@
     name: prometheus-node-exporter
     state: present
 
+# Other roles drop *.prom files here (e.g. postgresql's pg-backup).
+- name: Create textfile collector directory
+  ansible.builtin.file:
+    path: "{{ node_exporter_textfile_dir | default('/var/lib/prometheus/node-exporter') }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Configure node_exporter flags
   ansible.builtin.copy:
     content: |
-      ARGS="--collector.processes"
+      ARGS="--collector.processes --collector.textfile.directory={{ node_exporter_textfile_dir | default('/var/lib/prometheus/node-exporter') }}"
     dest: /etc/default/prometheus-node-exporter
     owner: root
     group: root

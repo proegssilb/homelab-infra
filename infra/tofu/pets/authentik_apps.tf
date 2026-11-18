@@ -219,6 +219,39 @@ resource "authentik_application" "anamnesis" {
   meta_launch_url   = "https://tasks.${var.domain}"
 }
 
+# ── Coder ──────────────────────────────────────────────────────────────────────
+# Login only: role/group sync from the IdP is a Coder Premium feature, so
+# Owners are promoted by hand in Coder (the Ansible-made coder-admin is the
+# first). Who may log in at all is an Authentik policy binding on this app,
+# made by hand like every group here.
+
+resource "authentik_provider_oauth2" "coder" {
+  name               = "Coder"
+  client_id          = "coder"
+  client_secret      = var.oidc_client_secrets["coder"]
+  authorization_flow = data.authentik_flow.default_authorization.id
+  invalidation_flow  = data.authentik_flow.default_invalidation.id
+  # Coder (go-oidc) checks the ID token signature against Authentik's JWKS —
+  # same RS256 fix as the other apps.
+  signing_key = data.authentik_certificate_key_pair.self_signed.id
+  grant_types = ["authorization_code", "refresh_token"]
+  allowed_redirect_uris = [
+    { matching_mode = "strict", redirect_uri_type = "authorization", url = "https://dev.${var.domain}/api/v2/users/oidc/callback" },
+  ]
+  property_mappings = [
+    data.authentik_property_mapping_provider_scope.openid.id,
+    data.authentik_property_mapping_provider_scope.email.id,
+    data.authentik_property_mapping_provider_scope.profile.id,
+  ]
+}
+
+resource "authentik_application" "coder" {
+  name              = "Coder"
+  slug              = "coder"
+  protocol_provider = authentik_provider_oauth2.coder.id
+  meta_launch_url   = "https://dev.${var.domain}"
+}
+
 # ── Home Assistant ─────────────────────────────────────────────────────────────
 
 resource "authentik_provider_oauth2" "homeassistant" {

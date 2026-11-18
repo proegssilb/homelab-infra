@@ -1,0 +1,27 @@
+---
+# coderdb — Coder's own PostgreSQL (roles/postgresql, the same role as pg01).
+# The VM (tofu/pets/main.tf) is fenced so only the Coder server reaches 5432
+# (tofu/pets/coderdb_firewall.tf); pg_hba below says the same.
+
+postgresql_databases:
+  - { name: coder, owner: coder }
+
+postgresql_users:
+  - { name: coder, password: "{{ coder_db_password | trim }}", db: coder }
+
+# Coder's address as the dynamic inventory sees it (guest agent, eth0). Falls
+# back to an address that matches nothing if Coder isn't in the inventory yet
+# (e.g. `--limit coderdb` before it exists); the next full run fixes it.
+postgresql_allowed_subnet: >-
+  {{ (hostvars[groups['coder_app'][0]].ansible_host
+      if groups.get('coder_app') else '127.0.0.2') ~ '/32' }}
+
+# Sized for the 4 GiB VM (pg01's defaults assume 8 GiB).
+postgresql_max_connections: 100
+postgresql_shared_buffers: "1GB"
+postgresql_effective_cache_size: "3GB"
+postgresql_maintenance_work_mem: "256MB"
+
+# Dumps stay on the data disk, no NFS: the VM is in a backup pool
+# (backup = true), so vzdump carries them off-host with the cluster itself.
+postgresql_backup_mount: /var/lib/postgresql/dumps

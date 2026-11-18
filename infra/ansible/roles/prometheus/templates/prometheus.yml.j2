@@ -60,6 +60,22 @@ scrape_configs:
 {% endfor %}
 
 {% endif %}
+{% if groups.get('coder_app') %}
+  # Coder's own metrics (workspace builds, agents, API). Port opened to obs01
+  # in tofu/pets/coder_firewall.tf.
+  - job_name: coder
+    static_configs:
+      - targets:
+{% for h in groups['coder_app'] %}
+          - '{{ h }}.{{ homelab_domain }}:{{ hostvars[h].coder_prometheus_port | default(2112) }}'
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '([^.:]+)[.:].*'
+        target_label: instance
+        replacement: '$1'
+
+{% endif %}
   - job_name: unpoller
     static_configs:
       - targets: ['localhost:9130']

@@ -7,19 +7,18 @@
   ansible.builtin.assert:
     that:
       - coder_access_url | length > 0
+      - coder_db_host | length > 0
       - coder_db_password | length > 0
+      - coder_admin_email | length > 0
+      - coder_admin_password | length > 0
       - coder_proxmox_endpoint | length > 0
       - coder_proxmox_password | length > 0
       - coder_workspace_ssh_public_key | length > 0
       - coder_workspace_ssh_private_key | length > 0
-    fail_msg: coder_* settings missing from group_vars/coder_app.yml or host_vars/coder.yml.
-
-# Coder runs as uid 1000 in its container and drives the host's Docker daemon
-# to create workspaces, so it needs the host's docker group on the socket.
-- name: Look up docker group GID
-  ansible.builtin.getent:
-    database: group
-    key: docker
+      - coder_oidc_issuer_url | length == 0 or coder_oidc_client_secret | trim | length > 0
+    fail_msg: >-
+      coder_* settings missing from group_vars/coder_app.yml, host_vars/coder.yml
+      or group_vars/all/main.yml (vault stubs: run `just fill-vault-stubs`).
 
 - name: Create app directory
   ansible.builtin.file:
@@ -59,6 +58,27 @@
     dest: "{{ coder_data_dir }}/coder-templates/"
     mode: "u=rwX,go=rX"
 
+- name: Move the database off the bundled container
+  ansible.builtin.include_tasks: migrate_db.yml
+
+# Coder migrates its schema when a new version starts, and there's no going
+# back from that but a restore: dump on coderdb first. Skipped on first
+# deploy (nothing recorded yet).
+- name: Read the deployed Coder version
+  ansible.builtin.slurp:
+    src: "{{ coder_data_dir }}/.version"
+  register: coder_deployed_version
+  failed_when: false
+
+- name: Dump the database before a Coder version change
+  when:
+    - coder_deployed_version.content is defined
+    - coder_deployed_version.content | b64decode | trim != coder_version
+  ansible.builtin.command:
+    argv: [systemctl, start, pg-backup.service]
+  delegate_to: "{{ groups['coder_postgres'][0] }}"
+  changed_when: true
+
 - name: Template docker-compose.yml
   ansible.builtin.template:
     src: docker-compose.yml.j2
@@ -70,10 +90,13 @@
   community.docker.docker_compose_v2_pull:
     project_src: "{{ coder_data_dir }}"
 
+# remove_orphans takes down the old bundled database container (its volume
+# stays, see migrate_db.yml).
 - name: Start Coder stack
   community.docker.docker_compose_v2:
     project_src: "{{ coder_data_dir }}"
     state: present
+    remove_orphans: true
     wait: true
 
 - name: Wait for Coder to answer
@@ -84,89 +107,153 @@
   retries: 30
   delay: 5
 
+- name: Record the deployed Coder version
+  ansible.builtin.copy:
+    content: "{{ coder_version }}\n"
+    dest: "{{ coder_data_dir }}/.version"
+    mode: "0644"
+
+# ── Owner account ──────────────────────────────────────────────────────────────
+# coder-admin must exist so `just bootstrap` can push templates with no human
+# in the loop. A fresh database has no users, and Coder lets whoever reaches
+# it first become Owner, so this also claims that right away. On an existing
+# deployment (Owners made by hand) it is added beside them.
+- name: Check that coder-admin can log in
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ coder_port }}/api/v2/users/login"
+    method: POST
+    body_format: json
+    body:
+      email: "{{ coder_admin_email }}"
+      password: "{{ coder_admin_password | trim }}"
+    status_code: [201, 401]
+  register: coder_admin_probe
+  no_log: true
+
+- name: End the probe's session
+  when: coder_admin_probe.status == 201
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ coder_port }}/api/v2/users/logout"
+    method: POST
+    headers:
+      Coder-Session-Token: "{{ coder_admin_probe.json.session_token }}"
+  failed_when: false
+  no_log: true
+
+# Straight into the database (the container already has
+# CODER_PG_CONNECTION_URL); made an Owner of every organization. Fails if
+# coder-admin exists with another password: then the vault and Coder
+# disagree, fix with `coder reset-password coder-admin` in the container.
+- name: Create coder-admin (Owner)
+  when: coder_admin_probe.status == 401
+  ansible.builtin.command:
+    argv: [docker, compose, exec, -T,
+           -e, CODER_USERNAME, -e, CODER_EMAIL, -e, CODER_PASSWORD,
+           coder, coder, server, create-admin-user]
+    chdir: "{{ coder_data_dir }}"
+  environment:
+    CODER_USERNAME: "{{ coder_admin_username }}"
+    CODER_EMAIL: "{{ coder_admin_email }}"
+    CODER_PASSWORD: "{{ coder_admin_password | trim }}"
+  changed_when: true
+
+# ── Template push ──────────────────────────────────────────────────────────────
 # Push only when the template source or its variables changed since the last
 # successful push: write the wanted state to .pending, compare to .pushed.
-- name: Push Proxmox VM template
-  when: coder_admin_token | length > 0
+- name: Require the workspace subnet
+  ansible.builtin.assert:
+    that: coder_agents_cidr is match('^\d{1,3}(\.\d{1,3}){3}/\d{1,2}$')
+    fail_msg: "Set coder_agents_cidr (the Agents VLAN subnet) in group_vars/all/local.yml."
+
+# Without these the template's Forgejo provider can't configure and
+# every workspace build would fail.
+- name: Require the Forgejo deploy-key settings
+  ansible.builtin.assert:
+    that:
+      - coder_forgejo_keys_url is match('^https://')
+      - coder_forgejo_keys_token | trim | length > 0
+      - coder_forgejo_ssh_url_prefix is match('^ssh://.*/$')
+      - coder_forgejo_web_url_prefix is match('^https://.*/$')
+      - coder_egress_proxy_url is match('^http://')
+      - coder_apt_proxy_url is match('^http://')
+      - coder_ntp_server | length > 0
+    fail_msg: >-
+      Set coder_forgejo_keys_url / _ssh_url_prefix / _web_url_prefix
+      (group_vars/coder_app.yml) and coder_forgejo_keys_token (from
+      forgejo_keys_client_token: run `just fill-vault-stubs`).
+
+# A file, not --variable flags: the CLI splits flag values on commas.
+- name: Write proxmox-vm template variables
+  ansible.builtin.copy:
+    content: |
+      clone_template_vmid: "{{ coder_proxmox_template.clone_template_vmid }}"
+      clone_template_node: "{{ coder_proxmox_template.clone_template_node }}"
+      nodes: "{{ coder_proxmox_template.nodes | join(',') }}"
+      datastore: "{{ coder_proxmox_template.datastore }}"
+      bridge: "{{ coder_proxmox_template.bridge }}"
+      vlan_id: "{{ coder_proxmox_template.vlan_id | default(0) }}"
+      pool: "{{ coder_proxmox_template.pool }}"
+      vmid_min: "{{ coder_proxmox_template.vmid_min }}"
+      vmid_max: "{{ coder_proxmox_template.vmid_max }}"
+      cpu_type: "{{ coder_proxmox_template.cpu_type }}"
+      disk_iops: "{{ coder_proxmox_template.disk_iops }}"
+      disk_iops_burst: "{{ coder_proxmox_template.disk_iops_burst }}"
+      disk_read_mbps: "{{ coder_proxmox_template.disk_read_mbps }}"
+      disk_read_mbps_burst: "{{ coder_proxmox_template.disk_read_mbps_burst }}"
+      disk_write_mbps: "{{ coder_proxmox_template.disk_write_mbps }}"
+      disk_write_mbps_burst: "{{ coder_proxmox_template.disk_write_mbps_burst }}"
+      ssh_sources: "{{ coder_workspace_ssh_sources | join(',') }}"
+      agents_cidr: "{{ coder_agents_cidr }}"
+      forgejo_ssh_url_prefix: "{{ coder_forgejo_ssh_url_prefix }}"
+      forgejo_web_url_prefix: "{{ coder_forgejo_web_url_prefix }}"
+      egress_proxy_url: "{{ coder_egress_proxy_url }}"
+      no_proxy: "{{ coder_no_proxy | join(',') }}"
+      apt_proxy_url: "{{ coder_apt_proxy_url }}"
+      ntp_server: "{{ coder_ntp_server }}"
+      llm_base_url: "{{ coder_llm_base_url }}"
+    dest: "{{ coder_data_dir }}/coder-templates/proxmox-vm.vars.yml"
+    mode: "0644"
+
+- name: Record wanted template state
+  ansible.builtin.copy:
+    content: |
+      {{ lookup('ansible.builtin.file', 'coder-templates/proxmox-vm/main.tf') | hash('sha256') }}
+      {{ coder_proxmox_template | to_json }}
+      {{ coder_workspace_ssh_sources | to_json }} {{ coder_agents_cidr }}
+      {{ coder_forgejo_ssh_url_prefix }} {{ coder_forgejo_web_url_prefix }}
+      {{ coder_egress_proxy_url }} {{ coder_no_proxy | to_json }} {{ coder_apt_proxy_url }} {{ coder_ntp_server }} {{ coder_llm_base_url }}
+    dest: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
+    mode: "0644"
+
+- name: Read pushed template state
+  ansible.builtin.slurp:
+    src: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pushed"
+  register: coder_template_pushed
+  failed_when: false
+
+- name: Read wanted template state
+  ansible.builtin.slurp:
+    src: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
+  register: coder_template_pending
+
+- name: Push proxmox-vm template
+  when: coder_template_pushed.content | default('') != coder_template_pending.content
   block:
-    - name: Require the workspace subnet
-      ansible.builtin.assert:
-        that: coder_agents_cidr is match('^\d{1,3}(\.\d{1,3}){3}/\d{1,2}$')
-        fail_msg: "Set coder_agents_cidr (the Agents VLAN subnet) in group_vars/all/local.yml."
-
-    # Without these the template's Forgejo provider can't configure and
-    # every workspace build would fail.
-    - name: Require the Forgejo deploy-key settings
-      ansible.builtin.assert:
-        that:
-          - coder_forgejo_keys_url is match('^https://')
-          - coder_forgejo_keys_token | trim | length > 0
-          - coder_forgejo_ssh_url_prefix is match('^ssh://.*/$')
-          - coder_forgejo_web_url_prefix is match('^https://.*/$')
-          - coder_egress_proxy_url is match('^http://')
-          - coder_apt_proxy_url is match('^http://')
-          - coder_ntp_server | length > 0
-        fail_msg: >-
-          Set coder_forgejo_keys_url / _ssh_url_prefix / _web_url_prefix
-          (group_vars/coder_app.yml) and coder_forgejo_keys_token (from
-          forgejo_keys_client_token: run `just fill-vault-stubs`).
-
-    # A file, not --variable flags: the CLI splits flag values on commas.
-    - name: Write proxmox-vm template variables
-      ansible.builtin.copy:
-        content: |
-          clone_template_vmid: "{{ coder_proxmox_template.clone_template_vmid }}"
-          clone_template_node: "{{ coder_proxmox_template.clone_template_node }}"
-          nodes: "{{ coder_proxmox_template.nodes | join(',') }}"
-          datastore: "{{ coder_proxmox_template.datastore }}"
-          bridge: "{{ coder_proxmox_template.bridge }}"
-          vlan_id: "{{ coder_proxmox_template.vlan_id | default(0) }}"
-          pool: "{{ coder_proxmox_template.pool }}"
-          vmid_min: "{{ coder_proxmox_template.vmid_min }}"
-          vmid_max: "{{ coder_proxmox_template.vmid_max }}"
-          cpu_type: "{{ coder_proxmox_template.cpu_type }}"
-          disk_iops: "{{ coder_proxmox_template.disk_iops }}"
-          disk_iops_burst: "{{ coder_proxmox_template.disk_iops_burst }}"
-          disk_read_mbps: "{{ coder_proxmox_template.disk_read_mbps }}"
-          disk_read_mbps_burst: "{{ coder_proxmox_template.disk_read_mbps_burst }}"
-          disk_write_mbps: "{{ coder_proxmox_template.disk_write_mbps }}"
-          disk_write_mbps_burst: "{{ coder_proxmox_template.disk_write_mbps_burst }}"
-          ssh_sources: "{{ coder_workspace_ssh_sources | join(',') }}"
-          agents_cidr: "{{ coder_agents_cidr }}"
-          forgejo_ssh_url_prefix: "{{ coder_forgejo_ssh_url_prefix }}"
-          forgejo_web_url_prefix: "{{ coder_forgejo_web_url_prefix }}"
-          egress_proxy_url: "{{ coder_egress_proxy_url }}"
-          no_proxy: "{{ coder_no_proxy | join(',') }}"
-          apt_proxy_url: "{{ coder_apt_proxy_url }}"
-          ntp_server: "{{ coder_ntp_server }}"
-          llm_base_url: "{{ coder_llm_base_url }}"
-        dest: "{{ coder_data_dir }}/coder-templates/proxmox-vm.vars.yml"
-        mode: "0644"
-
-    - name: Record wanted template state
-      ansible.builtin.copy:
-        content: |
-          {{ lookup('ansible.builtin.file', 'coder-templates/proxmox-vm/main.tf') | hash('sha256') }}
-          {{ coder_proxmox_template | to_json }}
-          {{ coder_workspace_ssh_sources | to_json }} {{ coder_agents_cidr }}
-          {{ coder_forgejo_ssh_url_prefix }} {{ coder_forgejo_web_url_prefix }}
-          {{ coder_egress_proxy_url }} {{ coder_no_proxy | to_json }} {{ coder_apt_proxy_url }} {{ coder_ntp_server }} {{ coder_llm_base_url }}
-        dest: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
-        mode: "0644"
-
-    - name: Read pushed template state
-      ansible.builtin.slurp:
-        src: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pushed"
-      register: coder_template_pushed
-      failed_when: false
-
-    - name: Read wanted template state
-      ansible.builtin.slurp:
-        src: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
-      register: coder_template_pending
+    # A session for this push only, logged out again below: no long-lived
+    # Owner token in the vault.
+    - name: Log in as coder-admin
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ coder_port }}/api/v2/users/login"
+        method: POST
+        body_format: json
+        body:
+          email: "{{ coder_admin_email }}"
+          password: "{{ coder_admin_password | trim }}"
+        status_code: 201
+      register: coder_login
+      no_log: true
 
     - name: Push proxmox-vm template to Coder
-      when: coder_template_pushed.content | default('') != coder_template_pending.content
       ansible.builtin.command:
         argv: "{{ ['docker', 'compose', 'exec', '-T',
                    '-e', 'CODER_URL=http://127.0.0.1:7080',
@@ -179,7 +266,7 @@
       # Token goes in via the environment (`-e NAME` inherits it), so it never
       # appears in argv or in task output — no need for no_log.
       environment:
-        CODER_SESSION_TOKEN: "{{ coder_admin_token | trim }}"
+        CODER_SESSION_TOKEN: "{{ coder_login.json.session_token }}"
       changed_when: true
 
     - name: Mark template state as pushed
@@ -188,3 +275,14 @@
         dest: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pushed"
         remote_src: true
         mode: "0644"
+
+  always:
+    - name: Log coder-admin out
+      when: coder_login.json.session_token is defined
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ coder_port }}/api/v2/users/logout"
+        method: POST
+        headers:
+          Coder-Session-Token: "{{ coder_login.json.session_token }}"
+      failed_when: false
+      no_log: true

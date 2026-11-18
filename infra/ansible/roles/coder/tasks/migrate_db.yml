@@ -1,0 +1,67 @@
+---
+# One-time move of Coder's database from the bundled postgres container (the
+# demo layout: service "database", volume coder_coder_data) to coderdb. Runs
+# before the new compose file replaces the old one, so the old service is
+# still defined. Skipped on fresh installs (no old volume) and once done
+# (marker file). The old volume is kept; remove it by hand once satisfied:
+#   docker volume rm coder_coder_data
+
+- name: Look for the bundled database volume
+  community.docker.docker_volume_info:
+    name: coder_coder_data
+  register: coder_old_db_volume
+
+- name: Check whether the database already moved to coderdb
+  ansible.builtin.stat:
+    path: "{{ coder_data_dir }}/.db-on-coderdb"
+  register: coder_db_moved
+
+- name: Move the bundled database to coderdb
+  when:
+    - coder_old_db_volume.exists
+    - not coder_db_moved.stat.exists
+  # PGPASSWORD reaches the container by name (`-e PGPASSWORD`), never in argv.
+  environment:
+    PGPASSWORD: "{{ coder_db_password | trim }}"
+  block:
+    - name: Stop Coder so nothing writes during the copy
+      ansible.builtin.command:
+        argv: [docker, compose, stop, coder]
+        chdir: "{{ coder_data_dir }}"
+      changed_when: true
+
+    - name: Make sure the bundled database is running
+      ansible.builtin.command:
+        argv: [docker, compose, up, --detach, --wait, database]
+        chdir: "{{ coder_data_dir }}"
+      changed_when: false
+
+    # Never restore over a database Coder already initialised (e.g. a Coder
+    # started against coderdb by hand): that would mix two histories.
+    - name: Require an empty coder database on coderdb
+      ansible.builtin.command:
+        argv: [docker, compose, exec, -T, -e, PGPASSWORD, database,
+               psql, -h, "{{ coder_db_host }}", -U, coder, -d, coder, -tAc,
+               "select count(*) from pg_tables where schemaname = 'public'"]
+        chdir: "{{ coder_data_dir }}"
+      register: coder_target_tables
+      changed_when: false
+      failed_when: >-
+        coder_target_tables.rc != 0 or coder_target_tables.stdout | trim != '0'
+
+    # Dump from the local socket, restore over the network to coderdb, both
+    # with the old container's client tools (same major version as coderdb).
+    - name: Copy the database to coderdb
+      ansible.builtin.command:
+        argv: [docker, compose, exec, -T, -e, PGPASSWORD, database,
+               bash, -o, pipefail, -c,
+               'pg_dump -U coder -Fc coder | pg_restore -h "$0" -U coder -d coder --no-owner --exit-on-error',
+               "{{ coder_db_host }}"]
+        chdir: "{{ coder_data_dir }}"
+      changed_when: true
+
+    - name: Record that the database lives on coderdb
+      ansible.builtin.copy:
+        content: "Moved from volume coder_coder_data to {{ coder_db_host }} by Ansible.\n"
+        dest: "{{ coder_data_dir }}/.db-on-coderdb"
+        mode: "0644"

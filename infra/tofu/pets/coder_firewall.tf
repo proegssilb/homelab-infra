@@ -6,11 +6,13 @@
 # workspace), this fence keeps that foothold from reaching the rest of Lab:
 # both directions default to DROP, and only what Coder needs is let through.
 #
-# In:  the reverse proxy -> Coder's HTTP port, admin SSH, node_exporter scrape.
+# In:  the reverse proxy -> Coder's HTTP port, admin SSH, node_exporter and
+#      Coder metrics scrapes.
 # Out: the reverse proxy (Proxmox API at proxmox.<domain>, Forgejo at
-#      code.<domain>, Coder's own dev.<domain>, and the Forgejo deploy-key
-#      proxy on 9443 that mints workspace keys), SSH into workspaces (agent
-#      install), the apt cache, Loki (Alloy), gateway DNS, and the internet
+#      code.<domain>, Coder's own dev.<domain>, Authentik at auth.<domain> for
+#      OIDC login, and the Forgejo deploy-key proxy on 9443 that mints
+#      workspace keys), PostgreSQL on coderdb (coderdb_firewall.tf), SSH into
+#      workspaces (agent install), the apt cache, Loki (Alloy), gateway DNS, and the internet
 #      (container images, Terraform providers, registry.coder.com modules) —
 #      "internet" meaning everything outside the private ranges.
 #
@@ -28,6 +30,7 @@ data "dns_a_record_set" "coder_peer" {
     "proxmox",    # Proxmox API (coder_proxmox_endpoint), via proxy01
     "code",       # Forgejo and the deploy-key proxy, via proxy01
     "dev",        # Coder's own access URL, via proxy01
+    "auth",       # Authentik (OIDC login), via proxy01
     "aptcache01", # apt_proxy_host
     "obs02",      # loki_url
   ])
@@ -40,7 +43,7 @@ locals {
 
   coder_peer = { for k, v in data.dns_a_record_set.coder_peer : k => join(",", v.addrs) }
   coder_via_proxy = join(",", distinct(flatten([
-    for k in ["proxmox", "code", "dev"] : data.dns_a_record_set.coder_peer[k].addrs
+    for k in ["proxmox", "code", "dev", "auth"] : data.dns_a_record_set.coder_peer[k].addrs
   ])))
 }
 
@@ -125,7 +128,7 @@ resource "proxmox_virtual_environment_firewall_rules" "coder" {
     proto   = "tcp"
     dport   = "443,9443"
     dest    = local.coder_via_proxy
-    comment = "Reverse proxy: Proxmox API, Forgejo, Coder; 9443 deploy-key proxy"
+    comment = "Reverse proxy: Proxmox API, Forgejo, Coder, Authentik; 9443 deploy-key proxy"
   }
 
   rule {
@@ -168,6 +171,35 @@ resource "proxmox_virtual_environment_firewall_rules" "coder" {
     action  = "ACCEPT"
     dest    = "+guest/${proxmox_virtual_environment_firewall_ipset.coder_internet.name}"
     comment = "Internet: images, providers, modules, NTP"
+  }
+
+  # Rules added later go here, at the end: PVE rules are positional, and an
+  # insert above would rewrite every rule below it on a DROP-policy VM.
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    proto   = "tcp"
+    dport   = "2112"
+    source  = join(",", var.agentsvc_scrape_sources)
+    comment = "Prometheus scrape of Coder's own metrics"
+  }
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    proto   = "tcp"
+    dport   = "5432"
+    dest    = local.coderdb_ip
+    comment = "PostgreSQL on coderdb"
+  }
+
+  lifecycle {
+    # An empty dest means "any" to PVE: never write the 5432 rule without
+    # coderdb's address (module output, see coderdb_firewall.tf).
+    precondition {
+      condition     = local.coderdb_ip != null
+      error_message = "No guest-agent address for the coderdb VM yet; is it running with qemu-guest-agent? Re-run the apply once it reports."
+    }
   }
 
   depends_on = [

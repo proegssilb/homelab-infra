@@ -1,12 +1,27 @@
 ---
 coder_version: "v2.38.6"
-coder_postgres_version: "17"
 coder_data_dir: /opt/coder
 coder_port: 7080
+# Coder's Prometheus endpoint (scraped by obs01; coder_firewall.tf lets it in).
+coder_prometheus_port: 2112
 # External URL workspaces and browsers use to reach Coder (set in group_vars).
 coder_access_url: ""
-# Generate: openssl rand -hex 32 | ansible-vault encrypt_string --stdin-name coder_db_password
+# Database on coderdb (group coder_postgres, roles/postgresql). The password is
+# vaulted in group_vars/all/main.yml so coderdb can read it too.
+coder_db_host: ""
 coder_db_password: ""
+
+# Owner account Ansible creates on first start (no first user yet) and logs in
+# as to push templates; also the break-glass login. Password in host_vars/coder.yml.
+coder_admin_username: coder-admin
+coder_admin_email: ""
+coder_admin_password: ""
+
+# Authentik login (tofu/pets/authentik_apps.tf). Empty issuer: password login only.
+coder_oidc_issuer_url: ""
+coder_oidc_client_id: coder
+coder_oidc_client_secret: ""
+coder_oidc_sign_in_text: Sign in with Authentik
 
 # ── Proxmox workspaces (template: files/coder-templates/proxmox-vm) ────────────
 # coder@pve is created by tofu/pets/coder_proxmox.tf, fenced to the "coder" pool.
@@ -79,7 +94,3 @@ coder_ntp_server: ""
 # base URL. Workspaces authenticate with their own Coder agent token; empty:
 # no coding-tool config is written.
 coder_llm_base_url: ""
-# Coder API token of an Owner, used to push templates. Leave empty to skip the
-# push (e.g. right after a rebuild, before the first admin exists).
-# Create: Coder UI -> Account -> Tokens, then ansible-vault encrypt_string --stdin-name coder_admin_token
-coder_admin_token: ""
