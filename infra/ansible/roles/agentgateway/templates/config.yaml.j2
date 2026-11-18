@@ -24,6 +24,9 @@ frontendPolicies:
       tool_is_error: 'mcp.tool.result.isError'
       # Tool arguments ('mcp.tool.arguments') are deliberately not logged:
       # they can carry private content into Loki. Opt in per need.
+      # LLM routes: which workspace agent (a short hash of its Coder token,
+      # set by coder-authz) and which model. Prompts are not logged.
+      coder_agent: 'extauthz.agent'
 
 gateways:
   mcp:
@@ -84,3 +87,44 @@ mcp:
 {% else %}
   targets: []
 {% endif %}
+
+# Local models for Coder workspaces, at https://{{ agentgateway_mcp_host }}/llm/v1/...
+# (OpenAI chat completions and Anthropic messages). The caller's key is its
+# workspace's Coder agent token; coder-authz (files/coder_authz.py, next to
+# this container) asks Coder whether it belongs to a live workspace, and
+# agentgateway fails closed when it can't tell. Only the models listed here
+# are served. The upstreams are on the ollama VM, whose Proxmox firewall only
+# lets mcpgw in (tofu/pets/ollama_firewall.tf).
+llm:
+  gateways: [mcp]
+  pathPrefix: /llm
+  policies:
+    extAuthz:
+      host: coder-authz:8080
+      includeRequestHeaders: [authorization, x-api-key]
+      protocol:
+        http:
+          path: '"/check"'
+          metadata:
+            agent: 'response.headers["x-coder-agent"]'
+      failureMode:
+        denyWithStatus: 503
+  models:
+{% for m in agentgateway_llm_models %}
+  - name: {{ m.name }}
+{% if m.upstream == 'polystrata' %}
+    provider: openAI
+    params:
+      model: {{ m.model }}
+      baseUrl: {{ agentgateway_polystrata_url }}
+      apiKey: ${POLYSTRATA_API_KEY}
+{% else %}
+    provider: ollama
+    params:
+      model: {{ m.model }}
+      baseUrl: {{ agentgateway_ollama_url }}
+{% endif %}
+    # The workspace's token stops here.
+    requestHeaders:
+      remove: [x-api-key{% if m.upstream != 'polystrata' %}, authorization{% endif %}]
+{% endfor %}

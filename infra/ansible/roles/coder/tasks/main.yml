@@ -139,6 +139,7 @@
           no_proxy: "{{ coder_no_proxy | join(',') }}"
           apt_proxy_url: "{{ coder_apt_proxy_url }}"
           ntp_server: "{{ coder_ntp_server }}"
+          llm_base_url: "{{ coder_llm_base_url }}"
         dest: "{{ coder_data_dir }}/coder-templates/proxmox-vm.vars.yml"
         mode: "0644"
 
@@ -149,7 +150,7 @@
           {{ coder_proxmox_template | to_json }}
           {{ coder_workspace_ssh_sources | to_json }} {{ coder_agents_cidr }}
           {{ coder_forgejo_ssh_url_prefix }} {{ coder_forgejo_web_url_prefix }}
-          {{ coder_egress_proxy_url }} {{ coder_no_proxy | to_json }} {{ coder_apt_proxy_url }} {{ coder_ntp_server }}
+          {{ coder_egress_proxy_url }} {{ coder_no_proxy | to_json }} {{ coder_apt_proxy_url }} {{ coder_ntp_server }} {{ coder_llm_base_url }}
         dest: "{{ coder_data_dir }}/coder-templates/.proxmox-vm.pending"
         mode: "0644"
 

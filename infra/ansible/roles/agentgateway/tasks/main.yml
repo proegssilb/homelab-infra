@@ -43,6 +43,23 @@
   no_log: true
   notify: Restart agentgateway
 
+# PolyStrata's API key (vaulted in group_vars/agentgateway_app.yml).
+- name: Template LLM upstream key
+  ansible.builtin.copy:
+    dest: "{{ agentgateway_dir }}/llm.env"
+    mode: "0600"
+    content: |
+      POLYSTRATA_API_KEY={{ agentgateway_polystrata_api_key | trim }}
+  no_log: true
+  notify: Restart agentgateway
+
+- name: Install the Coder token check (coder-authz)
+  ansible.builtin.copy:
+    src: coder_authz.py
+    dest: "{{ agentgateway_dir }}/coder_authz.py"
+    mode: "0644"
+  notify: Restart agentgateway
+
 # Holds no secrets: they're ${VAR} references, expanded from the env files.
 - name: Template agentgateway config
   ansible.builtin.template:

@@ -169,6 +169,12 @@ variable "no_proxy" {
   type        = string
 }
 
+variable "llm_base_url" {
+  description = "OpenAI-compatible base URL of the lab's local models (agentgateway on mcpgw), e.g. https://mcp.example.com/llm/v1. The workspace's own agent token is the API key. Empty: no Kilo Code config is written."
+  type        = string
+  default     = ""
+}
+
 variable "apt_proxy_url" {
   description = "apt proxy for workspaces (the lab apt cache), e.g. http://aptcache01.example.com:3142."
   type        = string
@@ -373,6 +379,56 @@ resource "forgejo_deploy_key" "workspace" {
   read_only     = false
 }
 
+# ── Coding agent: Kilo Code on the lab's local models ──────────────────────────
+# Kilo Code (code-server extension) talks to agentgateway's LLM routes on mcpgw,
+# which take this workspace's Coder agent token as the API key and check it with
+# Coder (roles/agentgateway, coder_authz.py). The token is the one the agent
+# runs with, so the key lives and dies with the workspace build.
+#
+# Agents: build (qwen3.6, fast MoE: executes plans), plan (Flash-Next on
+# PolyStrata: plans bigger, less-defined tasks) and solo (qwen3.8 dense, the
+# "just do it" default). The file is KILO_CONFIG (agent env below), merged over
+# the user's own ~/.config/kilo/kilo.jsonc, so it can be rewritten on every
+# start (new token) without clobbering their settings.
+locals {
+  kilo_config_path = "/home/coder/.config/kilo/lab.jsonc"
+  kilo_model       = { tool_call = true, reasoning = true, limit = { context = 131072, output = 32768 } }
+  kilo_config = jsonencode({
+    "$schema"         = "https://app.kilo.ai/config.json"
+    enabled_providers = ["lab"]
+    share             = "disabled"
+    autoupdate        = false
+    provider = {
+      lab = {
+        npm  = "@ai-sdk/openai-compatible"
+        name = "Lab (local models)"
+        options = {
+          baseURL = var.llm_base_url
+          apiKey  = coder_agent.main.token
+          timeout = 3600000 # long prompts: prefill alone can take minutes
+        }
+        models = {
+          "qwen3.8:27b"        = merge(local.kilo_model, { name = "Qwen3.8 27B (dense)" })
+          "qwen3.6:35b"        = merge(local.kilo_model, { name = "Qwen3.6 35B (MoE, fast)" })
+          "qwen3.8-flash-next" = merge(local.kilo_model, { name = "Qwen3.8 Flash-Next (planner)" })
+        }
+      }
+    }
+    model         = "lab/qwen3.8:27b"
+    small_model   = "lab/qwen3.6:35b"
+    default_agent = "solo"
+    agent = {
+      plan  = { model = "lab/qwen3.8-flash-next" }
+      build = { model = "lab/qwen3.6:35b" }
+      solo = {
+        description = "Just do it: one capable model, no separate plan"
+        mode        = "primary"
+        model       = "lab/qwen3.8:27b"
+      }
+    }
+  })
+}
+
 # ── Agent ──────────────────────────────────────────────────────────────────────
 
 resource "coder_agent" "main" {
@@ -394,7 +450,7 @@ resource "coder_agent" "main" {
   # every destination is logged (phase 1 of gap 3). Both spellings, since
   # tools disagree on which they read. The agent service itself is not
   # proxied: it talks to Coder directly.
-  env = {
+  env = merge({
     HTTP_PROXY          = var.egress_proxy_url
     HTTPS_PROXY         = var.egress_proxy_url
     NO_PROXY            = var.no_proxy
@@ -406,7 +462,7 @@ resource "coder_agent" "main" {
     GIT_AUTHOR_EMAIL    = local.agent_git_email
     GIT_COMMITTER_NAME  = local.agent_git_name
     GIT_COMMITTER_EMAIL = local.agent_git_email
-  }
+  }, var.llm_base_url != "" ? { KILO_CONFIG = local.kilo_config_path } : {})
 
   metadata {
     display_name = "CPU"
@@ -448,6 +504,8 @@ module "code-server" {
   version  = "~> 1.3"
   agent_id = coder_agent.main.id
   folder   = module.git-clone[0].repo_dir
+  # Open VSX, through the egress proxy.
+  extensions = var.llm_base_url != "" ? ["kilocode.kilo-code"] : []
 }
 
 # ── VM ─────────────────────────────────────────────────────────────────────────
@@ -668,6 +726,13 @@ resource "terraform_data" "agent_install" {
       ], [
       # git-clone module needs git; the cloud image doesn't ship it.
       "command -v git >/dev/null || { sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git >/dev/null; }",
+      ], var.llm_base_url != "" ? [
+      # Kilo Code's lab config (holds this build's agent token: 0600).
+      "install -d -m 0700 /home/coder/.config/kilo",
+      "echo '${base64encode(local.kilo_config)}' | base64 -d | install -m 0600 /dev/stdin ${local.kilo_config_path}",
+      ] : [
+      "rm -f ${local.kilo_config_path}",
+      ], [
       "sudo install -d -m 0755 /opt/coder-agent",
       "echo '${base64encode(coder_agent.main.init_script)}' | base64 -d | sudo tee /opt/coder-agent/init >/dev/null",
       "sudo chmod 0755 /opt/coder-agent/init",
