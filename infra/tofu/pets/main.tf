@@ -55,8 +55,15 @@ locals {
     # Browser start page — Homepage (stateless Docker; rows generated from the proxy vhosts)
     homepage = { vmid = 115, cores = 1, memory = 1024, node = "pxmx02", tags = ["observe", "pets", "homepage_app"], ha = true }
 
-    # Remote dev environments — Coder (demo: bundled PostgreSQL; workspaces are Proxmox VMs 1000–1999, see coder_proxmox.tf)
-    coder = { vmid = 116, cores = 4, memory = 8192, disk_size = 60, node = "pxmx01", tags = ["observe", "pets", "coder_app"], ha = true, firewall = true }
+    # Remote dev environments — Coder. Workspaces are Proxmox VMs 1000–1999 (coder_proxmox.tf).
+    # Its database is on coderdb, so this VM holds little state; backup still covers the
+    # workspace SSH key dir and anything an Owner left in the coder container's home.
+    coder = { vmid = 116, cores = 4, memory = 8192, disk_size = 60, node = "pxmx01", tags = ["observe", "pets", "coder_app"], ha = true, backup = true, firewall = true }
+
+    # Coder's PostgreSQL, on its own VM (roles/postgresql, like pg01): Coder's DB holds every
+    # workspace's Terraform state, and Coder is the lab's most exposed host, so it gets a DB
+    # box that serves it alone rather than a path to pg01 (coderdb_firewall.tf: 5432 from coder only).
+    coderdb = { vmid = 120, cores = 2, memory = 4096, node = "pxmx05", tags = ["observe", "pets", "coder_postgres"], data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }], ha = true, backup = true, firewall = true }
 
     # CI — Forgejo Actions runner (Docker executor; jobs get the host Docker socket, so this VM
     # is a dedicated build box and nothing else lives here). Cattle: no HA, no backup — `just

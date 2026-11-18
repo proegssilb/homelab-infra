@@ -1,0 +1,17 @@
+# Managed by Ansible (prometheus role) — do not edit by hand.
+#
+# Database backups (roles/postgresql: pg-backup.service on pg01 and coderdb
+# writes pg_backup_last_success_timestamp_seconds via node_exporter's textfile
+# collector). severity=warning: shows in Prometheus and Alertmanager's UI.
+groups:
+  - name: backups
+    rules:
+      # The timer runs daily at 02:00, so >36h means at least one run failed
+      # or never happened. A new host starts at 0 until its first backup.
+      - alert: PostgresBackupStale
+        expr: time() - pg_backup_last_success_timestamp_seconds > 36 * 3600
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }}: last successful pg_dump {{ $value | humanizeDuration }} ago"

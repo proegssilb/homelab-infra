@@ -2,6 +2,12 @@
 # Public alias is dev.*, not coder.* — the latter is the VM's own DHCP DNS name.
 coder_access_url: "https://dev.{{ homelab_domain }}"
 
+# coderdb (tofu/pets/main.tf, group coder_postgres).
+coder_db_host: "coderdb.{{ homelab_domain }}"
+
+coder_admin_email: "coder-admin@{{ homelab_domain }}"
+coder_oidc_issuer_url: "https://auth.{{ homelab_domain }}/application/o/coder/"
+
 # Via the proxy for a valid cert; any node answers (sticky on PVEAuthCookie).
 coder_proxmox_endpoint: "https://proxmox.{{ homelab_domain }}/"
 
