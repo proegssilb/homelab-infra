@@ -764,8 +764,11 @@ resource "terraform_data" "agent_install" {
       ] : [
       "rm -f ${local.deploy_key_path}",
       ], [
-      # git-clone module needs git; the cloud image doesn't ship it.
-      "command -v git >/dev/null || { sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git >/dev/null; }",
+      # git-clone module needs git; the cloud image doesn't ship it. remote-exec
+      # only fails on the script's last command, so exit explicitly: a workspace
+      # without git should fail its build, not start. --error-on=any: apt-get
+      # update otherwise exits 0 when every index fetch fails.
+      "command -v git >/dev/null || { sudo apt-get -o DPkg::Lock::Timeout=300 update -qq --error-on=any && sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y -qq git >/dev/null; } || { echo 'git install failed' >&2; exit 1; }",
       ], var.llm_base_url != "" ? [
       # Kilo Code's lab config (holds this build's agent token: 0600).
       "install -d -m 0700 /home/coder/.config/kilo",
