@@ -128,19 +128,20 @@ groups:
         annotations:
           summary: "{{ $labels.instance }} {{ $labels.mountpoint }} has {{ $value | humanizePercentage }} free"
 
-  # UPSes: network cards (job "ups", roles/snmp_exporter) and USB UPSes read
-  # by NUT (job "ups_nut", roles/ups_usb). Every rule matches all three
-  # metric sets: standard UPS-MIB names (upsOutputSource, upsBatteryStatus,
-  # upsEstimatedMinutesRemaining), the vendor MIB's (upsBasic*, upsAdv*), and
-  # NUT's (network_ups_tools_*). Warnings are in ups.yml.
+  # UPSes: network cards (job "ups", roles/snmp_exporter, each with its
+  # vendor's stock module) and USB UPSes read by NUT (job "ups_nut",
+  # roles/ups_usb). Every rule matches all three metric sets: one card MIB's
+  # (upsBasic*, upsAdv*), the other's (upsBase*, upsAdvance*; runtime in
+  # hundredths of a second), and NUT's (network_ups_tools_*). Warnings are in
+  # ups.yml.
   - name: fire-ups
     rules:
       # A blip is a warning (UpsOnBattery). Five minutes on battery is a real
       # outage: someone decides what to shut down before the battery does.
       - alert: UpsOnBatteryProlonged
         expr: |
-          (upsOutputSource{job="ups"} == 5)
-            or (upsBasicOutputStatus{job="ups", upsBasicOutputStatus="onBattery"} == 1)
+          (upsBasicOutputStatus{job="ups", upsBasicOutputStatus="onBattery"} == 1)
+            or (upsBaseOutputStatus{job="ups"} == 3)
             or (network_ups_tools_ups_status{job="ups_nut", flag="OB"} == 1)
         for: 5m
         labels: {severity: critical}
@@ -152,10 +153,10 @@ groups:
       # battery; on battery it means shutdown is close.
       - alert: UpsBatteryLow
         expr: |
-          (upsBatteryStatus{job="ups"} >= 3)
-            or (upsBasicBatteryStatus{job="ups", upsBasicBatteryStatus=~"batteryLow|batteryInFaultCondition|noBatteryPresent"} == 1)
-            or (upsEstimatedMinutesRemaining{job="ups"} < 10)
+          (upsBasicBatteryStatus{job="ups", upsBasicBatteryStatus=~"batteryLow|batteryInFaultCondition|noBatteryPresent"} == 1)
+            or (upsBaseBatteryStatus{job="ups"} >= 3)
             or (upsAdvBatteryRunTimeRemaining_seconds{job="ups"} < 600)
+            or (upsAdvanceBatteryRunTimeRemaining{job="ups"} < 60000)
             or (network_ups_tools_ups_status{job="ups_nut", flag="LB"} == 1)
             or (network_ups_tools_battery_runtime{job="ups_nut"} < 600)
         for: 2m
