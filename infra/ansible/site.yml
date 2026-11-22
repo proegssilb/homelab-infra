@@ -65,6 +65,7 @@
     - alertmanager
     - graphite_exporter
     - blackbox_exporter
+    - snmp_exporter
     - unpoller
 
 - name: Grafana — dashboards
@@ -166,6 +167,13 @@
   gather_facts: true
   roles:
     - homeassistant
+
+- name: UPS over USB — what the passed-through UPS reports
+  hosts: ups_usb
+  become: true
+  gather_facts: true
+  roles:
+    - ups_usb
 
 - name: Homepage — browser start page
   hosts: homepage_app

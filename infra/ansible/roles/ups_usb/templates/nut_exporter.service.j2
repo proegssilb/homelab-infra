@@ -1,0 +1,19 @@
+[Unit]
+Description=NUT Prometheus exporter
+After=network.target nut-server.service
+Wants=nut-server.service
+
+[Service]
+Type=simple
+User=nut_exporter
+# Empty vars_enable = every numeric NUT variable. upsd is local and allows
+# reads without a login.
+ExecStart={{ ups_usb_nut_exporter_install_dir }}/nut_exporter \
+  --nut.server=127.0.0.1 \
+  --nut.vars_enable= \
+  --web.listen-address={{ ups_usb_nut_exporter_listen }}
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

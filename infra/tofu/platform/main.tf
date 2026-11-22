@@ -39,6 +39,10 @@ locals {
     # access entirely. A VM rather than an LXC so the cache gets its own data
     # disk; the cache is disposable, so no backup.
     aptcache01 = { vmid = 230, cores = 1, memory = 1024, tags = ["platform", "apt_cache", "observe"], node = "pxmx05", data_disks = [{ size = 100, datastore = "ceph-hdd-pool" }], ha = true }
+
+    # Reads the UPS that's plugged into pxmx01 by USB (ups_usb.tf). Pinned to
+    # pxmx01 with no HA: a passed-through USB device can't migrate.
+    upsmon01 = { vmid = 213, cores = 1, memory = 1024, tags = ["platform", "ups_usb", "observe"], node = "pxmx01", usb_mappings = [proxmox_hardware_mapping_usb.ups_pxmx01.name] }
   }
 }
 
@@ -124,7 +128,8 @@ module "vm" {
   cores  = lookup(each.value, "cores", 2)
   memory = lookup(each.value, "memory", 4096)
 
-  data_disks = try(each.value.data_disks, [])
+  data_disks   = try(each.value.data_disks, [])
+  usb_mappings = try(each.value.usb_mappings, [])
 
   ansible_user    = var.ansible_user
   ansible_ssh_key = var.ansible_ssh_key

@@ -122,6 +122,7 @@
   loop:
     - hypervisors.yml
     - backups.yml
+    - ups.yml
     - fire.yml
   notify: Restart prometheus
 

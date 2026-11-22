@@ -1,0 +1,17 @@
+---
+# https://github.com/prometheus/snmp_exporter/releases — update as needed.
+# The stock snmp.yml ships in the same tarball, so its modules always match the
+# binary.
+snmp_exporter_version: "0.31.0"
+snmp_exporter_release: "snmp_exporter-{{ snmp_exporter_version }}.linux-amd64"
+snmp_exporter_install_dir: /usr/local/bin
+snmp_exporter_config_dir: /etc/snmp_exporter
+# Only Prometheus on this host talks to it.
+snmp_exporter_http_listen: "127.0.0.1:9116"
+
+# SNMPv3 credentials for the UPS cards (group_vars/obs_prometheus.yml).
+# The auth entry's name is what Prometheus passes as ?auth=.
+snmp_exporter_ups_auth_name: ups_v3
+snmp_exporter_ups_username: ""
+snmp_exporter_ups_auth_password: ""
+snmp_exporter_ups_priv_password: ""

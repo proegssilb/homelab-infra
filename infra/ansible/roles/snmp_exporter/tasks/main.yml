@@ -1,0 +1,93 @@
+---
+- name: Create snmp_exporter system user
+  ansible.builtin.user:
+    name: snmp_exporter
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Download snmp_exporter archive
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/snmp_exporter/releases/download/v{{ snmp_exporter_version }}/{{ snmp_exporter_release }}.tar.gz"
+    dest: "/tmp/{{ snmp_exporter_release }}.tar.gz"
+    mode: "0644"
+
+- name: Extract snmp_exporter archive
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ snmp_exporter_release }}.tar.gz"
+    dest: /tmp/
+    remote_src: true
+    creates: "/tmp/{{ snmp_exporter_release }}/"
+
+- name: Install snmp_exporter binary
+  ansible.builtin.copy:
+    src: "/tmp/{{ snmp_exporter_release }}/snmp_exporter"
+    dest: "{{ snmp_exporter_install_dir }}/snmp_exporter"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart snmp_exporter
+
+- name: Create snmp_exporter config directory
+  ansible.builtin.file:
+    path: "{{ snmp_exporter_config_dir }}"
+    state: directory
+    owner: root
+    group: snmp_exporter
+    mode: "0750"
+
+# The release's generated modules (standard UPS-MIB, vendor UPS MIBs, ...).
+- name: Install stock snmp.yml
+  ansible.builtin.copy:
+    src: "/tmp/{{ snmp_exporter_release }}/snmp.yml"
+    dest: "{{ snmp_exporter_config_dir }}/snmp.yml"
+    remote_src: true
+    owner: root
+    group: snmp_exporter
+    mode: "0640"
+  notify: Restart snmp_exporter
+
+- name: Install GET-only UPS-MIB module
+  ansible.builtin.copy:
+    src: ups_mib_get.yml
+    dest: "{{ snmp_exporter_config_dir }}/ups_mib_get.yml"
+    owner: root
+    group: snmp_exporter
+    mode: "0640"
+    validate: >-
+      {{ snmp_exporter_install_dir }}/snmp_exporter --dry-run
+      --config.file={{ snmp_exporter_config_dir }}/snmp.yml --config.file=%s
+  notify: Restart snmp_exporter
+
+- name: Template SNMPv3 auth config
+  ansible.builtin.template:
+    src: ups_auth.yml.j2
+    dest: "{{ snmp_exporter_config_dir }}/ups_auth.yml"
+    owner: root
+    group: snmp_exporter
+    mode: "0640"
+    # A config the exporter would reject never replaces the running one.
+    validate: >-
+      {{ snmp_exporter_install_dir }}/snmp_exporter --dry-run
+      --config.file={{ snmp_exporter_config_dir }}/snmp.yml --config.file=%s
+  no_log: true
+  notify: Restart snmp_exporter
+
+- name: Install snmp_exporter systemd unit
+  ansible.builtin.template:
+    src: snmp_exporter.service.j2
+    dest: /etc/systemd/system/snmp_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart snmp_exporter
+
+- name: Enable and start snmp_exporter
+  ansible.builtin.systemd:
+    name: snmp_exporter
+    enabled: true
+    state: started
+    daemon_reload: true

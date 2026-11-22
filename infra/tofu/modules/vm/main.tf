@@ -57,6 +57,13 @@ resource "proxmox_virtual_environment_vm" "vm" {
     }
   }
 
+  dynamic "usb" {
+    for_each = var.usb_mappings
+    content {
+      mapping = usb.value
+    }
+  }
+
   network_device {
     mac_address = local.mac_address
     bridge      = var.bridge
