@@ -68,9 +68,8 @@ alertmanager_discord_webhook_url: !vault |
 # two card addresses on UDP 161 only). The cards hold the same user, set by
 # hand in each card's UI: SNMPv3 user `snmp_exporter_ups_username`, SHA auth,
 # AES privacy, read-only. Addresses and MIB modules are vaulted because they
-# would name the hardware. A module is one from snmp_exporter's stock snmp.yml,
-# or ups_mib_get (roles/snmp_exporter/files) for a card that can't do GETBULK
-# over SNMPv3.
+# would name the hardware. Each module is the card vendor's one from
+# snmp_exporter's stock snmp.yml.
 snmp_exporter_ups_username: prometheus
 snmp_exporter_ups_auth_password: !vault |
           $ANSIBLE_VAULT;1.1;AES256
@@ -105,11 +104,11 @@ prometheus_ups_targets:
           3862
     module: !vault |
           $ANSIBLE_VAULT;1.1;AES256
-          39326337366239313565343037376534646233376335656535393538643764616131333437336433
-          3637386161646339323863616263626162636561333737360a363531656365646161646561323531
-          62333832363365316662616130396330373436326537623063303131366466666362386264393863
-          6363386466376539640a376432346136316231393435643465383836316339316163376661656439
-          6136
+          37636433323032653637323038326630636463633865393036343236393561653036393061353630
+          3366393265356266356431346363363934316631636537330a663636623563666564363762316235
+          37653236643839383964306236643930356635316362656137383937653865316333613564646539
+          3038613561383239340a313362663030373965313163323864396365643630386136363634323834
+          6566
   - name: ups-a5313e
     address: !vault |
           $ANSIBLE_VAULT;1.1;AES256

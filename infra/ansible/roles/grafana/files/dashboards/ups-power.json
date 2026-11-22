@@ -141,7 +141,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "upsOutputPercentLoad{job=\"ups\"}",
+          "expr": "upsAdvanceOutputLoad{job=\"ups\"}",
           "legendFormat": "{{instance}}",
           "refId": "B"
         }
@@ -209,7 +209,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(increase(upsHighPrecOutputEnergyUsage{job=\"ups\"}[24h]) or increase(upsAdvanceOutputEnergy{job=\"ups\"}[24h]))",
+          "expr": "(increase(upsHighPrecOutputEnergyUsage{job=\"ups\"}[24h]) or increase(upsAdvanceOutputEnergy{job=\"ups\"}[24h]) / 10)",
           "legendFormat": "{{instance}}",
           "refId": "A"
         },
@@ -218,7 +218,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum((increase(upsHighPrecOutputEnergyUsage{job=\"ups\"}[24h]) or increase(upsAdvanceOutputEnergy{job=\"ups\"}[24h])))",
+          "expr": "sum((increase(upsHighPrecOutputEnergyUsage{job=\"ups\"}[24h]) or increase(upsAdvanceOutputEnergy{job=\"ups\"}[24h]) / 10))",
           "legendFormat": "Total",
           "refId": "B"
         }
@@ -278,7 +278,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(increase(upsHighPrecOutputEnergyUsage{job=\"ups\"}[30d]) or increase(upsAdvanceOutputEnergy{job=\"ups\"}[30d]))",
+          "expr": "(increase(upsHighPrecOutputEnergyUsage{job=\"ups\"}[30d]) or increase(upsAdvanceOutputEnergy{job=\"ups\"}[30d]) / 10)",
           "legendFormat": "{{instance}}",
           "refId": "A"
         },
@@ -287,7 +287,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum((increase(upsHighPrecOutputEnergyUsage{job=\"ups\"}[30d]) or increase(upsAdvanceOutputEnergy{job=\"ups\"}[30d])))",
+          "expr": "sum((increase(upsHighPrecOutputEnergyUsage{job=\"ups\"}[30d]) or increase(upsAdvanceOutputEnergy{job=\"ups\"}[30d]) / 10))",
           "legendFormat": "Total",
           "refId": "B"
         }
@@ -443,7 +443,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "upsOutputPercentLoad{job=\"ups\"}",
+          "expr": "upsAdvanceOutputLoad{job=\"ups\"}",
           "legendFormat": "{{instance}}",
           "refId": "B"
         }
@@ -498,7 +498,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(increase(upsHighPrecOutputEnergyUsage{job=\"ups\"}[1d]) or increase(upsAdvanceOutputEnergy{job=\"ups\"}[1d]))",
+          "expr": "(increase(upsHighPrecOutputEnergyUsage{job=\"ups\"}[1d]) or increase(upsAdvanceOutputEnergy{job=\"ups\"}[1d]) / 10)",
           "legendFormat": "{{instance}}",
           "refId": "A",
           "interval": "1d"
@@ -573,7 +573,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "upsInputVoltage{job=\"ups\"}",
+          "expr": "upsAdvanceInputLineVoltage{job=\"ups\"} / 10",
           "legendFormat": "{{instance}} in",
           "refId": "C"
         },
@@ -582,7 +582,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "upsOutputVoltage{job=\"ups\"}",
+          "expr": "upsAdvanceOutputVoltage{job=\"ups\"} / 10",
           "legendFormat": "{{instance}} out",
           "refId": "D"
         }
@@ -658,7 +658,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "upsEstimatedMinutesRemaining{job=\"ups\"} * 60",
+          "expr": "upsAdvanceBatteryRunTimeRemaining{job=\"ups\"} / 100",
           "legendFormat": "{{instance}}",
           "refId": "B"
         },
@@ -743,7 +743,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "upsEstimatedChargeRemaining{job=\"ups\"}",
+          "expr": "upsAdvanceBatteryCapacity{job=\"ups\"}",
           "legendFormat": "{{instance}}",
           "refId": "B"
         },
@@ -829,7 +829,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "upsEstimatedMinutesRemaining{job=\"ups\"} * 60",
+          "expr": "upsAdvanceBatteryRunTimeRemaining{job=\"ups\"} / 100",
           "legendFormat": "{{instance}}",
           "refId": "B"
         },
@@ -880,8 +880,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Battery temperature",
-      "description": "Heat shortens battery life.",
+      "title": "Temperature",
+      "description": "Battery temperature where the UPS reports it, otherwise the UPS's internal temperature (ups240's battery sensor reads 0). Heat shortens battery life.",
       "id": 15,
       "datasource": {
         "type": "prometheus",
@@ -902,7 +902,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "upsBatteryTemperature{job=\"ups\"}",
+          "expr": "upsTemperature{job=\"ups\"}",
           "legendFormat": "{{instance}}",
           "refId": "B"
         }

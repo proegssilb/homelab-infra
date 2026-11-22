@@ -8,7 +8,6 @@ User=snmp_exporter
 # Stock modules + our auths; the exporter merges every --config.file.
 ExecStart={{ snmp_exporter_install_dir }}/snmp_exporter \
   --config.file={{ snmp_exporter_config_dir }}/snmp.yml \
-  --config.file={{ snmp_exporter_config_dir }}/ups_mib_get.yml \
   --config.file={{ snmp_exporter_config_dir }}/ups_auth.yml \
   --web.listen-address={{ snmp_exporter_http_listen }}
 Restart=on-failure

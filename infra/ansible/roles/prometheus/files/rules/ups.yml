@@ -1,9 +1,10 @@
 # Managed by Ansible (prometheus role) — do not edit by hand.
 #
-# Early warnings for the UPSes: network cards (job "ups", snmp_exporter) and
-# USB UPSes read by NUT (job "ups_nut", roles/ups_usb). Every rule matches
-# each metric set that has the value: standard UPS-MIB names (ups*), the
-# vendor MIB's (upsBasic*, upsAdv*), NUT's (network_ups_tools_*).
+# Early warnings for the UPSes: network cards (job "ups", snmp_exporter, each
+# with its vendor's stock module) and USB UPSes read by NUT (job "ups_nut",
+# roles/ups_usb). Every rule matches each metric set that has the value: one
+# card MIB's (upsBasic*, upsAdv*), the other's (upsBase*, upsAdvance*), and
+# NUT's (network_ups_tools_*).
 # severity=warning: Alertmanager sends these nowhere; they show in Prometheus
 # (/alerts) and Alertmanager's UI. Outages and low battery are critical
 # (fire.yml, fire-ups).
@@ -24,8 +25,8 @@ groups:
       # Any time on battery. Becomes UpsOnBatteryProlonged (critical) at 5 minutes.
       - alert: UpsOnBattery
         expr: |
-          (upsOutputSource{job="ups"} == 5)
-            or (upsBasicOutputStatus{job="ups", upsBasicOutputStatus="onBattery"} == 1)
+          (upsBasicOutputStatus{job="ups", upsBasicOutputStatus="onBattery"} == 1)
+            or (upsBaseOutputStatus{job="ups"} == 3)
             or (network_ups_tools_ups_status{job="ups_nut", flag="OB"} == 1)
         labels:
           severity: warning
@@ -35,6 +36,7 @@ groups:
       - alert: UpsBatteryNeedsReplacing
         expr: |
           (upsAdvBattery_needsreplacing{job="ups"} == 1)
+            or (upsAdvanceBatteryReplaceIndicator{job="ups"} == 2)
             or (network_ups_tools_ups_status{job="ups_nut", flag="RB"} == 1)
         for: 1h
         labels:
@@ -42,32 +44,32 @@ groups:
         annotations:
           summary: "{{ $labels.instance }} reports its battery needs replacing"
 
-      # upsTestResultsSummary: 1 pass, 2 warning, 3 error.
+      # upsAdvanceTestDiagnosticsResults: 1 ok, 2 failed.
       - alert: UpsSelfTestFailed
         expr: |
-          (upsTestResultsSummary{job="ups"} == 3)
-            or (upsAdvTestDiagnosticsResults_info{job="ups", upsAdvTestDiagnosticsResults="failed"} == 1)
+          (upsAdvTestDiagnosticsResults_info{job="ups", upsAdvTestDiagnosticsResults="failed"} == 1)
+            or (upsAdvanceTestDiagnosticsResults{job="ups"} == 2)
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "{{ $labels.instance }} failed its last self-test"
 
-      # Standard UPS-MIB only: the UPS has active alarms (the vendor MIB's
-      # equivalents are the battery and self-test rules above).
-      - alert: UpsAlarmsPresent
-        expr: upsAlarmsPresent{job="ups"} > 0
+      # upsStatus (upsBase*/upsAdvance* card MIB): 1 normal, 2 overheat,
+      # 3 hardware fault.
+      - alert: UpsHardwareFault
+        expr: upsStatus{job="ups"} > 1
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.instance }} has {{ $value }} active alarm(s)"
+          summary: "{{ $labels.instance }} reports overheat or a hardware fault (upsStatus {{ $value }})"
 
       # Little headroom left: runtime drops and an overload trips the output.
       - alert: UpsLoadHigh
         expr: |
-          (upsOutputPercentLoad{job="ups"} > 80)
-            or (upsAdvOutputLoad{job="ups"} > 80)
+          (upsAdvOutputLoad{job="ups"} > 80)
+            or (upsAdvanceOutputLoad{job="ups"} > 80)
         for: 15m
         labels:
           severity: warning

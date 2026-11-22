@@ -48,16 +48,13 @@
     mode: "0640"
   notify: Restart snmp_exporter
 
-- name: Install GET-only UPS-MIB module
-  ansible.builtin.copy:
-    src: ups_mib_get.yml
-    dest: "{{ snmp_exporter_config_dir }}/ups_mib_get.yml"
-    owner: root
-    group: snmp_exporter
-    mode: "0640"
-    validate: >-
-      {{ snmp_exporter_install_dir }}/snmp_exporter --dry-run
-      --config.file={{ snmp_exporter_config_dir }}/snmp.yml --config.file=%s
+# Retired: a GET-only UPS-MIB module for a card whose old firmware ignored
+# GETBULK over SNMPv3. The unit no longer loads it; the restart that follows
+# runs after the unit is updated.
+- name: Remove retired GET-only UPS-MIB module
+  ansible.builtin.file:
+    path: "{{ snmp_exporter_config_dir }}/ups_mib_get.yml"
+    state: absent
   notify: Restart snmp_exporter
 
 - name: Template SNMPv3 auth config

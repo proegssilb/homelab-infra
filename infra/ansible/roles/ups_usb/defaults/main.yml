@@ -1,9 +1,10 @@
 ---
 # NUT's name for the UPS (upsc <name>@localhost); the exporter's ?ups=.
 ups_usb_nut_name: ups
-# usbhid-ups: Debian's NUT doesn't build apc_modbus (nut-scanner's first
-# suggestion), and usbhid-ups is the long-standing driver for this UPS's
-# USB HID interface. vendorid:productid as in tofu/platform/ups_usb.tf.
+# usbhid-ups: Debian's NUT has no USB-capable build of the Modbus driver
+# nut-scanner suggests first, and usbhid-ups is the long-standing driver for
+# this UPS's USB HID interface. vendorid:productid as in
+# tofu/platform/ups_usb.tf.
 ups_usb_nut_driver: usbhid-ups
 ups_usb_vendorid: "051d"
 ups_usb_productid: "0003"
