@@ -1,0 +1,17 @@
+---
+# NUT's name for the UPS (upsc <name>@localhost); the exporter's ?ups=.
+ups_usb_nut_name: ups
+# usbhid-ups: Debian's NUT doesn't build apc_modbus (nut-scanner's first
+# suggestion), and usbhid-ups is the long-standing driver for this UPS's
+# USB HID interface. vendorid:productid as in tofu/platform/ups_usb.tf.
+ups_usb_nut_driver: usbhid-ups
+ups_usb_vendorid: "051d"
+ups_usb_productid: "0003"
+
+# https://github.com/DRuggeri/nut_exporter/releases — update as needed
+ups_usb_nut_exporter_version: "3.3.0"
+ups_usb_nut_exporter_asset: "nut_exporter-v{{ ups_usb_nut_exporter_version }}-linux-amd64"
+ups_usb_nut_exporter_url: "https://github.com/DRuggeri/nut_exporter/releases/download/v{{ ups_usb_nut_exporter_version }}/{{ ups_usb_nut_exporter_asset }}"
+ups_usb_nut_exporter_install_dir: /usr/local/bin
+# obs01's Prometheus scrapes this (job ups_nut).
+ups_usb_nut_exporter_listen: ":9199"

@@ -1,0 +1,130 @@
+---
+# NUT for the UPS passed through by USB (tofu/platform/ups_usb.tf): the
+# driver and upsd (localhost only), plus nut_exporter for Prometheus (obs01,
+# job ups_nut). Monitoring only: no upsmon, so nothing here shuts hosts down.
+#
+# The template's cloud kernel is built without USB support (no
+# /sys/bus/usb), so the passed-through device is invisible. Swap in the
+# generic kernel; removing the cloud one leaves GRUB a single choice.
+- name: Install the generic kernel (has USB support)
+  ansible.builtin.apt:
+    name: linux-image-amd64
+    state: present
+
+- name: Gather installed packages
+  ansible.builtin.package_facts:
+
+- name: Allow removing the running cloud kernel non-interactively
+  ansible.builtin.debconf:
+    name: linux-base
+    question: linux-base/removing-running-kernel
+    vtype: boolean
+    value: "false"
+
+- name: Remove the cloud kernel
+  ansible.builtin.apt:
+    name: "{{ ansible_facts.packages.keys() | select('match', '^linux-image-(.*-)?cloud-amd64$') | list }}"
+    state: absent
+    purge: true
+  when: ansible_facts.packages.keys() | select('match', '^linux-image-(.*-)?cloud-amd64$') | list | length > 0
+
+- name: Reboot into the generic kernel
+  ansible.builtin.reboot:
+  when: ansible_facts.kernel is search('cloud')
+
+# nut-server's udev rules give the nut user the UPS's USB device; a device
+# attached before the package arrived needs the rules re-applied.
+- name: Install USB tools and NUT
+  ansible.builtin.apt:
+    name:
+      - usbutils
+      - nut-server
+    state: present
+  notify: Reload udev rules for the UPS
+
+- name: Run NUT standalone (driver and upsd on this host)
+  ansible.builtin.lineinfile:
+    path: /etc/nut/nut.conf
+    regexp: '^MODE='
+    line: MODE=standalone
+  notify:
+    - Restart NUT driver
+    - Restart NUT server
+
+- name: Configure the UPS for NUT
+  ansible.builtin.template:
+    src: ups.conf.j2
+    dest: /etc/nut/ups.conf
+    owner: root
+    group: nut
+    mode: "0640"
+  notify:
+    - Restart NUT driver
+    - Restart NUT server
+
+- name: Apply udev rules and NUT config before starting NUT
+  ansible.builtin.meta: flush_handlers
+
+# nut-driver-enumerator (a oneshot) turns ups.conf sections into
+# nut-driver@<name> units at boot; the handler re-runs it when ups.conf
+# changes. Starting it here would re-run it every time.
+- name: Enable NUT driver enumerator
+  ansible.builtin.systemd:
+    name: nut-driver-enumerator.service
+    enabled: true
+
+- name: Enable and start NUT driver and server
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - nut-driver.target
+    - nut-server.service
+
+# upsmon would shut this VM down on low battery; nothing is configured for it.
+- name: Keep upsmon off
+  ansible.builtin.systemd:
+    name: nut-monitor.service
+    enabled: false
+    state: stopped
+
+- name: Create nut_exporter system user
+  ansible.builtin.user:
+    name: nut_exporter
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Install nut_exporter binary
+  ansible.builtin.get_url:
+    url: "{{ ups_usb_nut_exporter_url }}"
+    dest: "{{ ups_usb_nut_exporter_install_dir }}/nut_exporter-{{ ups_usb_nut_exporter_version }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Point nut_exporter at the installed version
+  ansible.builtin.file:
+    src: "{{ ups_usb_nut_exporter_install_dir }}/nut_exporter-{{ ups_usb_nut_exporter_version }}"
+    dest: "{{ ups_usb_nut_exporter_install_dir }}/nut_exporter"
+    state: link
+  notify: Restart nut_exporter
+
+- name: Install nut_exporter systemd unit
+  ansible.builtin.template:
+    src: nut_exporter.service.j2
+    dest: /etc/systemd/system/nut_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart nut_exporter
+
+- name: Enable and start nut_exporter
+  ansible.builtin.systemd:
+    name: nut_exporter
+    enabled: true
+    state: started
+    daemon_reload: true

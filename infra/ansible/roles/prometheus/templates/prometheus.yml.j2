@@ -84,6 +84,44 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9108']
 
+{% if prometheus_ups_targets | length > 0 %}
+  # UPS network cards over SNMPv3, through snmp_exporter on this host. Each
+  # card names its own module (standard UPS-MIB or a vendor MIB); the
+  # instance label is the card's name, not its address. Old cards answer
+  # slowly, hence the longer timeout.
+  - job_name: ups
+    metrics_path: /snmp
+    scrape_timeout: 30s
+    params:
+      auth: [{{ prometheus_ups_auth_name }}]
+    static_configs:
+{% for t in prometheus_ups_targets %}
+      - targets: [{{ t.address | to_json }}]
+        labels:
+          __param_module: {{ t.module | to_json }}
+          instance: {{ t.name | to_json }}
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: {{ prometheus_snmp_exporter_address }}
+
+{% endif %}
+{% if prometheus_nut_targets | length > 0 %}
+  # USB UPSes through NUT: nut_exporter runs on the host the UPS is plugged
+  # into. The instance label is the UPS's name, not the exporter host.
+  - job_name: ups_nut
+    metrics_path: /ups_metrics
+    static_configs:
+{% for t in prometheus_nut_targets %}
+      - targets: [{{ t.address | to_json }}]
+        labels:
+          __param_ups: {{ t.ups | to_json }}
+          instance: {{ t.name | to_json }}
+{% endfor %}
+
+{% endif %}
   - job_name: static
     file_sd_configs:
       - files:

@@ -1,0 +1,12 @@
+# Managed by Ansible (snmp_exporter role) — do not edit by hand.
+# Loaded alongside the stock snmp.yml (modules); this file only adds the
+# SNMPv3 user the UPS cards share.
+auths:
+  {{ snmp_exporter_ups_auth_name }}:
+    version: 3
+    security_level: authPriv
+    username: {{ snmp_exporter_ups_username | to_json }}
+    password: {{ snmp_exporter_ups_auth_password | to_json }}
+    auth_protocol: SHA
+    priv_protocol: AES
+    priv_password: {{ snmp_exporter_ups_priv_password | to_json }}

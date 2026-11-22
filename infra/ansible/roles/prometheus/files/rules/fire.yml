@@ -127,3 +127,38 @@ groups:
         labels: {severity: critical}
         annotations:
           summary: "{{ $labels.instance }} {{ $labels.mountpoint }} has {{ $value | humanizePercentage }} free"
+
+  # UPSes: network cards (job "ups", roles/snmp_exporter) and USB UPSes read
+  # by NUT (job "ups_nut", roles/ups_usb). Every rule matches all three
+  # metric sets: standard UPS-MIB names (upsOutputSource, upsBatteryStatus,
+  # upsEstimatedMinutesRemaining), the vendor MIB's (upsBasic*, upsAdv*), and
+  # NUT's (network_ups_tools_*). Warnings are in ups.yml.
+  - name: fire-ups
+    rules:
+      # A blip is a warning (UpsOnBattery). Five minutes on battery is a real
+      # outage: someone decides what to shut down before the battery does.
+      - alert: UpsOnBatteryProlonged
+        expr: |
+          (upsOutputSource{job="ups"} == 5)
+            or (upsBasicOutputStatus{job="ups", upsBasicOutputStatus="onBattery"} == 1)
+            or (network_ups_tools_ups_status{job="ups_nut", flag="OB"} == 1)
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.instance }} on battery for 5 minutes: power outage"
+
+      # The UPS itself says the battery is low, depleted or faulty, or it
+      # estimates under 10 minutes of runtime. On mains that means a dying
+      # battery; on battery it means shutdown is close.
+      - alert: UpsBatteryLow
+        expr: |
+          (upsBatteryStatus{job="ups"} >= 3)
+            or (upsBasicBatteryStatus{job="ups", upsBasicBatteryStatus=~"batteryLow|batteryInFaultCondition|noBatteryPresent"} == 1)
+            or (upsEstimatedMinutesRemaining{job="ups"} < 10)
+            or (upsAdvBatteryRunTimeRemaining_seconds{job="ups"} < 600)
+            or (network_ups_tools_ups_status{job="ups_nut", flag="LB"} == 1)
+            or (network_ups_tools_battery_runtime{job="ups_nut"} < 600)
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.instance }} battery low or under 10 minutes of runtime"

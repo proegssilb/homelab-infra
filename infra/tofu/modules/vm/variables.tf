@@ -86,6 +86,12 @@ variable "data_disks" {
   default = []
 }
 
+variable "usb_mappings" {
+  description = "Cluster USB hardware mapping names (proxmox_hardware_mapping_usb) to pass through. A mapping, not a raw host device: raw devices need root@pam. A VM with a USB device can't migrate, so don't put it under HA."
+  type        = list(string)
+  default     = []
+}
+
 variable "pool_id" {
   description = "Proxmox resource pool to assign the VM to (e.g. ha-prod, la-prod). Null means no pool assignment."
   type        = string
