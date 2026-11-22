@@ -8,6 +8,10 @@
 # rules apply. Every OID must exist on the card: such cards fail a whole GET
 # with noSuchName when one OID is missing (upsInputLineBads isn't here for
 # that reason).
+#
+# Plus two values from the card's own enterprise MIB, because the standard
+# MIB's output power reads 0 there: upsAdvanceOutputPower (real power, W)
+# and upsAdvanceOutputEnergy (cumulative output energy, kWh).
 modules:
   ups_mib_get:
     get:
@@ -25,7 +29,19 @@ modules:
       - 1.3.6.1.2.1.33.1.4.4.1.5.1
       - 1.3.6.1.2.1.33.1.6.1.0
       - 1.3.6.1.2.1.33.1.7.3.0
+      - 1.3.6.1.4.1.3808.1.1.1.4.2.5.0
+      - 1.3.6.1.4.1.3808.1.1.1.4.2.6.0
     metrics:
+      - name: upsAdvanceOutputPower
+        oid: 1.3.6.1.4.1.3808.1.1.1.4.2.5
+        type: gauge
+        help: The total output active power of the UPS system in W. - 1.3.6.1.4.1.3808.1.1.1.4.2.5
+      - name: upsAdvanceOutputEnergy
+        oid: 1.3.6.1.4.1.3808.1.1.1.4.2.6
+        type: gauge
+        help: The total output energy of the UPS system, in kWh (since the card's last energy
+          meter reset). - 1.3.6.1.4.1.3808.1.1.1.4.2.6
+        scale: 0.1
       - name: upsBatteryStatus
         oid: 1.3.6.1.2.1.33.1.2.1
         type: gauge
