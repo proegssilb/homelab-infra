@@ -1,0 +1,12 @@
+[Unit]
+Description=Copy the Tofu state bucket to {{ tofu_state_backup_mount }}
+After=network-online.target garage.service
+Wants=network-online.target
+RequiresMountsFor={{ tofu_state_backup_mount }}
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tofu-state-backup.sh
+# Only after a successful copy: when it last worked, for node_exporter's
+# textfile collector (alert TofuStateBackupStale).
+ExecStartPost=/bin/sh -c 'printf "tofu_state_backup_last_success_timestamp_seconds %%s\\n" "$$(date +%%s)" > {{ node_exporter_textfile_dir }}/tofu_state_backup.prom.tmp && mv {{ node_exporter_textfile_dir }}/tofu_state_backup.prom.tmp {{ node_exporter_textfile_dir }}/tofu_state_backup.prom'

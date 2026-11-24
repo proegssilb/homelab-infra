@@ -9,12 +9,17 @@
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+# Secrets (API tokens, Garage keys, sensitive TF_VARs) come from Bitwarden, not
+# .env: `bw` runs a command with the env vars listed in secrets.env.map. It asks
+# for the master password at most once per 15 minutes (scripts/bw-run).
+bw := justfile_directory() + "/scripts/bw-run --env-map " + justfile_directory() + "/secrets.env.map --"
+
 # ── Internal helpers ───────────────────────────────────────────────────────────
 
 # Init a tofu state directory, injecting the Garage endpoint from the environment.
 # GARAGE_ENDPOINT must be set (e.g. http://blade02.home.domain:3900).
 _tofu-init state:
-    cd tofu/{{state}} && tofu init -backend-config="endpoint=${GARAGE_ENDPOINT}"
+    cd tofu/{{state}} && {{bw}} tofu init -backend-config="endpoint=${GARAGE_ENDPOINT}"
 
 # ── Day 1 ──────────────────────────────────────────────────────────────────────
 
@@ -31,62 +36,62 @@ bootstrap:
 # Bring up all VMs in a named cluster/group.
 cluster-up cluster:
     just _tofu-init {{cluster}}
-    cd tofu/{{cluster}} && tofu apply -auto-approve -parallelism=2
+    cd tofu/{{cluster}} && {{bw}} tofu apply -auto-approve -parallelism=2
     just tune-all {{cluster}}
 
 # ── Day 2 ──────────────────────────────────────────────────────────────────────
 
 # Rebuild a single node within a cluster.
 node-rebuild vm cluster:
-    cd tofu/{{cluster}} && tofu apply -auto-approve -target=module.vm["{{vm}}"]
+    cd tofu/{{cluster}} && {{bw}} tofu apply -auto-approve -target=module.vm["{{vm}}"]
     just tune {{vm}}
 
 # Rebuild a lone VM (no join step).
 vm-rebuild vm state="pets":
-    cd tofu/{{state}} && tofu apply -auto-approve -target=module.vm["{{vm}}"]
+    cd tofu/{{state}} && {{bw}} tofu apply -auto-approve -target=module.vm["{{vm}}"]
     just tune {{vm}}
 
 # Time Proxmox start -> service answering on the persistent bench VM.
 # Needs `just cluster-up bench` first; see scripts/boot-bench.py.
 boot-bench runs="5":
     just _tofu-init bench
-    ./scripts/boot-bench.py --runs {{runs}}
+    {{bw}} ./scripts/boot-bench.py --runs {{runs}}
 
 # Time docker alone (container start, daemon start) on the running bench VM.
 docker-bench runs="5":
     just _tofu-init bench
-    ./scripts/boot-bench.py --docker --runs {{runs}}
+    {{bw}} ./scripts/boot-bench.py --docker --runs {{runs}}
 
 # ── OS tuning ──────────────────────────────────────────────────────────────────
 
 # Run baseline OS tuning against a single host.
 tune host:
-    cd ansible && ansible-playbook -l {{host}} site.yml
+    cd ansible && {{bw}} ansible-playbook -l {{host}} site.yml
 
 # Run baseline OS tuning against all hosts in a group.
 tune-all group:
-    cd ansible && ansible-playbook -l {{group}} site.yml
+    cd ansible && {{bw}} ansible-playbook -l {{group}} site.yml
 
 # Observability on the Proxmox nodes (node_exporter, rsyslog -> Loki, Ceph
 # exporter). Not part of bootstrap: needs the hand-made `ansible` user on each
 # node. Optionally limit: just tune-hypervisors pxmx01
 tune-hypervisors limit="hypervisors":
-    cd ansible && ansible-playbook -l {{limit}} hypervisors.yml
+    cd ansible && {{bw}} ansible-playbook -l {{limit}} hypervisors.yml
 
 # Configure Garage on blade02 (run before tofu init).
 garage:
-    cd ansible && ansible-playbook -l bootstrap site.yml
+    cd ansible && {{bw}} ansible-playbook -l bootstrap site.yml
 
 # ── Tofu helpers ───────────────────────────────────────────────────────────────
 
 # Run tofu plan for a state group (no changes applied).
 plan state:
     just _tofu-init {{state}}
-    cd tofu/{{state}} && tofu plan -parallelism=2
+    cd tofu/{{state}} && {{bw}} tofu plan -parallelism=2
 
 # Destroy all VMs in a state group. Requires confirmation.
 destroy state:
-    cd tofu/{{state}} && tofu destroy -parallelism=2
+    cd tofu/{{state}} && {{bw}} tofu destroy -parallelism=2
 
 # ── Database ───────────────────────────────────────────────────────────────────
 
@@ -94,7 +99,7 @@ destroy state:
 # Use when 'just tune pg01' doesn't fix a credential mismatch.
 # Prereq: roles must already exist — run 'just tune pg01' first if they don't.
 fix-db-passwords:
-    cd ansible && ansible-playbook fix-db-passwords.yml
+    cd ansible && {{bw}} ansible-playbook fix-db-passwords.yml
 
 # ── Quality ────────────────────────────────────────────────────────────────────
 
@@ -158,12 +163,29 @@ lint:
 fill-vault-stubs:
     ./scripts/fill-vault-stubs.py
 
+# ── Bitwarden ──────────────────────────────────────────────────────────────────
+
+# Lock the vault now instead of waiting for the 15-minute timeout.
+bw-lock:
+    ./scripts/bw-run --lock
+
+# Copy every ansible-vault value into Bitwarden (names printed, never values).
+# The vault stays authoritative for Ansible until Phase 6 of the bootc
+# migration; re-run after rotating a vaulted secret.
+vault-to-bitwarden *args:
+    ./scripts/bw-run --reason "copy ansible-vault values into Bitwarden" -- ./scripts/vault-to-bitwarden.py {{args}}
+
+# Copy Tofu's secrets (.env keys in secrets.env.map, sensitive tfvars) into
+# Bitwarden. `just secrets-to-bitwarden --check` lists any still left in files.
+secrets-to-bitwarden *args:
+    ./scripts/bw-run --reason "copy Tofu secrets into Bitwarden" -- ./scripts/secrets-to-bitwarden.py {{args}}
+
 # ── Inventory ──────────────────────────────────────────────────────────────────
 
 # List hosts visible via the dynamic inventory.
 _inventory-list:
-    ansible-inventory --list | jq 'keys'
+    cd ansible && {{bw}} ansible-inventory --list | jq 'keys'
 
 # Graph the inventory groups.
 _inventory-graph:
-    ansible-inventory --graph
+    cd ansible && {{bw}} ansible-inventory --graph

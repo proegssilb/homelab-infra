@@ -1,0 +1,27 @@
+---
+# Nightly copy of the Tofu state bucket (Garage on blade02, replication 1) to the backup NAS.
+# Off until the NAS export exists (a manual step); then set
+# tofu_state_backup_enabled: true in group_vars/bootstrap.yml.
+tofu_state_backup_enabled: false
+tofu_state_backup_nfs_server: ""
+tofu_state_backup_nfs_path: ""
+# NFSv4.2 needs only TCP 2049 (one UniFi allow, blade02 -> the NAS); v3 would
+# also need the portmapper and dynamic mountd ports.
+tofu_state_backup_nfs_opts: "nofail,noatime,nfsvers=4.2"
+tofu_state_backup_mount: /mnt/tofu-state-backup
+
+tofu_state_backup_bucket: tofu-state
+# Read-only Garage key the backup reads the bucket with. Created on blade02 by
+# tofu-state-backup-key; its secret never leaves the host.
+tofu_state_backup_key_name: tofu-state-backup
+tofu_state_backup_s3_endpoint: "http://127.0.0.1:3900"
+tofu_state_backup_s3_region: garage
+# The CLI dials the local RPC port, so the key helper keeps working even if
+# rpc_public_addr ever goes stale (it did once, after a subnet move).
+tofu_state_backup_garage_rpc: "127.0.0.1:3901"
+
+tofu_state_backup_keep_days: 30
+tofu_state_backup_on_calendar: "03:30"
+
+# Where the success timestamp goes (same default as the node_exporter role).
+node_exporter_textfile_dir: /var/lib/prometheus/node-exporter

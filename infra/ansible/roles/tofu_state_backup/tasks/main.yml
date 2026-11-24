@@ -1,0 +1,90 @@
+---
+# Nightly Tofu state backup: Garage bucket on this host -> the backup NAS over NFS.
+# Touches nothing in Garage's own config (blade02's Garage is hand-made);
+# it only adds a read-only key for the state bucket.
+
+- name: Skip until the NAS export is configured and enabled
+  ansible.builtin.meta: end_role
+  when: not tofu_state_backup_enabled or tofu_state_backup_nfs_server == ""
+
+- name: Install rclone and the NFS client
+  ansible.builtin.apt:
+    name: [rclone, nfs-common]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create backup mount point
+  ansible.builtin.file:
+    path: "{{ tofu_state_backup_mount }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when: tofu_state_backup_mount not in (ansible_mounts | map(attribute='mount') | list)
+
+- name: Mount the NAS state-backup share
+  ansible.posix.mount:
+    path: "{{ tofu_state_backup_mount }}"
+    src: "{{ tofu_state_backup_nfs_server }}:{{ tofu_state_backup_nfs_path }}"
+    fstype: nfs
+    state: mounted
+    opts: "{{ tofu_state_backup_nfs_opts }}"
+
+- name: Install the Garage key helper
+  ansible.builtin.template:
+    src: tofu-state-backup-key.sh.j2
+    dest: /usr/local/sbin/tofu-state-backup-key
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Ensure the read-only Garage key and rclone config
+  ansible.builtin.command: /usr/local/sbin/tofu-state-backup-key
+  register: tofu_state_backup_key
+  changed_when: tofu_state_backup_key.stdout == "changed"
+  no_log: true
+
+- name: Install the backup script
+  ansible.builtin.template:
+    src: tofu-state-backup.sh.j2
+    dest: /usr/local/bin/tofu-state-backup.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install the backup service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - tofu-state-backup.service
+    - tofu-state-backup.timer
+  notify: Reload systemd
+
+- name: Flush handlers so systemd sees the new units
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the backup timer
+  ansible.builtin.systemd:
+    name: tofu-state-backup.timer
+    enabled: true
+    state: started
+
+# Start at 0 so TofuStateBackupStale fires if the first run never succeeds.
+- name: Seed the backup metric on a new host
+  ansible.builtin.copy:
+    content: "tofu_state_backup_last_success_timestamp_seconds 0\n"
+    dest: "{{ node_exporter_textfile_dir }}/tofu_state_backup.prom"
+    mode: "0644"
+    force: false
+  register: tofu_state_backup_metric_seeded
+
+- name: Take a first backup
+  when: tofu_state_backup_metric_seeded.changed
+  ansible.builtin.command:
+    argv: [systemctl, start, --no-block, tofu-state-backup.service]
+  changed_when: true

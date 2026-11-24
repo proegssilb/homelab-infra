@@ -1,0 +1,7 @@
+---
+# Copy this file to local.yml and fill in your values.
+# local.yml is gitignored — never commit it.
+
+# NFS export for the nightly Tofu state backup (roles/tofu_state_backup).
+tofu_state_backup_nfs_server: "nas.i.example.com"
+tofu_state_backup_nfs_path: "/mnt/pool/tofu-state-backup"

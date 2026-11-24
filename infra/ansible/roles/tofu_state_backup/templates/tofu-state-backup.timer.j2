@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly Tofu state backup to the backup NAS
+
+[Timer]
+OnCalendar={{ tofu_state_backup_on_calendar }}
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -48,8 +48,17 @@ source .env                                         # from repo root
 export ANSIBLE_VAULT_PASSWORD_FILE=infra/ansible/.vault-password
 ```
 
-The `.env` file (gitignored) holds URLs and credentials needed to interact with proxmox
-and tofu's shared state.
+The `.env` file (gitignored) holds URLs and other non-secret settings (endpoints, `GARAGE_ENDPOINT`).
+Credentials (Proxmox/Authentik tokens, Garage keys, sensitive `TF_VAR_*`) come from Bitwarden:
+every Tofu and Ansible recipe in the justfile runs through `scripts/bw-run --env-map
+secrets.env.map`, which shows a GUI unlock dialog naming the calling process chain (terminal
+prompt when there's no display) and keeps the vault unlocked for 15 minutes after the last use
+(kernel keyring, `BW_RUN_TIMEOUT`). `just bw-lock` locks it at once. `secrets.env.map` lists
+env var → item name only (folder `homelab`).
+
+**Agents must never read secret values**: don't `cat`/`grep`/`head` `.env`, `terraform.tfvars`,
+vault plaintext or `bw get` output. The scripts that move secrets (`vault-to-bitwarden.py`,
+`secrets-to-bitwarden.py`) print item names only; use their `--dry-run` / `--check` modes.
 
 ### Encrypting a new secret
 
@@ -104,9 +113,9 @@ Roles apply to groups, not individual hosts. Key assignments:
 - `apt_cache` (aptcache01) → os_baseline, apt_cache — first play, ahead of `all`
 - `all:!hypervisors` → os_baseline, node_exporter, alloy
 - `hypervisors` (pxmx01–05, grunt; static in `inventory/hosts.yml`) → **not in site.yml**: `hypervisors.yml` via `just tune-hypervisors [limit]`, observability only (Debian `prometheus-node-exporter`, `rsyslog` forwarding the journal + `/var/log/pve-firewall.log` to Alloy's syslog listener on obs02, Ceph mgr Prometheus module). Debian packages only, no PVE config touched. Kept out of `just bootstrap` because each node's `ansible` user (key login, passwordless sudo; `sudo` isn't installed on PVE by default) is created by hand.
-- `bootstrap` (blade02 only) → garage
+- `bootstrap` (blade02 only) → garage, tofu_state_backup (off until `tofu_state_backup_enabled`; needs the backup NAS export)
 - `proxy` → keepalived, certbot, nginx_reverse_proxy
-- `obs_prometheus` → prometheus, alertmanager, graphite_exporter, blackbox_exporter, snmp_exporter, unpoller (snmp_exporter polls the two UPS network cards on the Management VLAN over SNMPv3, job `ups`; targets, per-card MIB module and credentials are vaulted in `group_vars/obs_prometheus.yml`, the SNMPv3 user is set by hand on each card, and UniFi "Lab: obs01 -> UPS cards SNMP" allows only obs01 -> the two card addresses on UDP 161. Alert rules: `roles/prometheus/files/rules/`, checked by promtool before install. `fire.yml` = severity=critical, "needs a human, won't fix itself"; keep that bar. Alertmanager (config checked by amtool) routes critical to the `fire` receiver, which has no delivery yet, and everything else to `null`)
+- `obs_prometheus` → prometheus, alertmanager, graphite_exporter, blackbox_exporter, snmp_exporter, unpoller (snmp_exporter polls the two UPS network cards on the Management VLAN over SNMPv3, job `ups`; targets, per-card MIB module and credentials are vaulted in `group_vars/obs_prometheus.yml`, the SNMPv3 user is set by hand on each card, and UniFi "Lab: obs01 -> UPS cards SNMP" allows only obs01 -> the two card addresses on UDP 161. Alert rules: `roles/prometheus/files/rules/`, checked by promtool before install. `fire.yml` = severity=critical, "needs a human, won't fix itself"; keep that bar. Alertmanager (config checked by amtool) routes critical to the `fire` receiver, which posts to Discord (webhook vaulted as `alertmanager_discord_webhook_url`), and everything else to `null`)
 - `ups_usb` (upsmon01, VM 213, pinned to pxmx01, no HA) → ups_usb (the UPS plugged into pxmx01 by USB, passed through by the cluster USB mapping in `tofu/platform/ups_usb.tf`; the template's cloud kernel has no USB support, so the role swaps in the generic kernel and reboots once; NUT reads it with `usbhid-ups` (Debian's NUT has no USB-capable build of this UPS's Modbus driver, and the UPS's firmware has no Modbus option anyway, so no load/voltage/temperature from it), upsd on localhost only, no upsmon, so nothing shuts down on low battery; nut_exporter on :9199 is scraped by obs01 as job `ups_nut`, instance `ups-pxmx01`, and the UPS rules cover its `network_ups_tools_*` metrics)
 - `obs_loki` → loki
 - `obs_grafana` → grafana
@@ -164,7 +173,14 @@ Every Ansible-managed host fetches packages through `aptcache01` (apt-cacher-ng,
 LAN Clients → keepalived VIP (proxy01 HA LXC)
                └─ nginx → Proxmox nodes / internal services
 blade02     → Garage S3 (stores all Tofu remote state) — NOT automated, manual pet
+               └─ tofu_state_backup: nightly rclone copy of the bucket → backup NAS over NFS (30 days)
 ```
+
+`/etc/garage.toml` on blade02 matches the garage role's template, so `just garage` only rewrites it
+when blade02's address changes (it derives `rpc_public_addr` from facts; a stale one makes the bare
+`garage` CLI hang). The role leaves blade02's Garage binary alone (`garage_version` in its host_vars
+is unused there). Prometheus scrapes blade02 through the static `bootstrap` job (proxmox SD only
+finds guests).
 
 Proxmox nodes: pxmx01–pxmx05. Storage pools in use: `ceph-ssd-pool` (fast), `ceph-hdd-pool` (bulk), `local-lvm` (default root).
 
@@ -204,3 +220,11 @@ In the VM module, the OS disk is `scsi1` and data disks start at `scsi2`, so the
 ### Secrets
 
 All secrets use ansible-vault AES256 encryption. Vault-encrypted values live inline in `host_vars/` and `group_vars/` files. The vault password file (`.vault-password`) is gitignored. The repo is public — nothing sensitive is committed in plaintext.
+
+**Bitwarden copy (bootc migration, until Phase 6)**: every vaulted value is also an item in
+Bitwarden folder `homelab`, named `<scope>/<var>` (`obs_prometheus/alertmanager_discord_webhook_url`,
+`blade02/garage_rpc_secret`; list entries add `/<index>/<key>`). The vault stays authoritative
+for Ansible; bootc VMs read Bitwarden once they migrate. After adding or rotating a vaulted
+secret, run `just vault-to-bitwarden` (it reports `exists-DIFFERENT` by name; add
+`--update <name>` to overwrite). Tofu's secrets live only in Bitwarden (`env/<NAME>`,
+`<state>/<var>`).

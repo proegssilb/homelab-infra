@@ -1,0 +1,29 @@
+#!/bin/bash
+# Managed by Ansible — do not edit manually.
+#
+# Copy the Tofu state bucket into a dated directory on the backup NAS, keep
+# {{ tofu_state_backup_keep_days }} days. State files can hold secrets; the NAS
+# share is the backup crown jewel and is restricted to blade02.
+set -euo pipefail
+
+MOUNT="{{ tofu_state_backup_mount }}"
+DEST="${MOUNT}/$(date +%F)"
+CONF=/etc/tofu-state-backup/rclone.conf
+
+# The NFS mount is `nofail`: if the NAS was unreachable at boot, don't quietly
+# fill blade02's own disk instead.
+if ! mountpoint -q "$MOUNT"; then
+  echo "$MOUNT is not mounted; refusing to back up to the local disk" >&2
+  exit 1
+fi
+
+rclone --config "$CONF" copy "garage:{{ tofu_state_backup_bucket }}" "$DEST"
+
+# A copy without state files means something is wrong upstream.
+if ! find "$DEST" -name '*.tfstate' -size +0 | grep -q .; then
+  echo "no .tfstate files copied to $DEST" >&2
+  exit 1
+fi
+
+find "$MOUNT" -mindepth 1 -maxdepth 1 -type d -name '20??-??-??' \
+  -mtime +{{ tofu_state_backup_keep_days }} -exec rm -rf {} +

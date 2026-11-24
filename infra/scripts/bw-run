@@ -1,0 +1,305 @@
+#!/usr/bin/env python3
+"""Run a command with the Bitwarden vault unlocked, sudo-style.
+
+    scripts/bw-run [--reason TEXT] [--env-map FILE] -- COMMAND [ARGS...]
+    scripts/bw-run --lock
+
+Asks for the master password (GUI dialog when a display is available,
+otherwise the terminal), then runs COMMAND with BW_SESSION in *its*
+environment only. The dialog shows which process chain asked, worked out
+from /proc rather than from arguments. That is a heads-up against surprise
+prompts, not a security boundary.
+
+Sudo-style timeout: after an unlock, the session token is kept in the kernel
+user keyring (memory only, readable only by this uid) and expires
+BW_RUN_TIMEOUT seconds (default 900) after the last use. Runs inside that
+window don't prompt. A transient systemd user timer runs `bw lock` at expiry
+as a backstop. BW_RUN_TIMEOUT=0 prompts on every run and locks afterwards.
+Without keyctl, it prompts on every run.
+
+--env-map FILE adds environment variables to COMMAND from Bitwarden items:
+one `ENV_NAME=item name` per line (# comments allowed). Values come from the
+item's password, or its notes for multi-line values.
+
+Never prints the password, the session token, or any value.
+"""
+
+import html
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import bwlib  # noqa: E402
+
+KEY_NAME = "homelab-bw"
+AUTOLOCK_UNIT = "bw-run-autolock"
+DEFAULT_TIMEOUT = 900
+
+
+def die(msg: str, code: int = 1):
+    print(f"bw-run: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+# ── Caller chain ──────────────────────────────────────────────────────────────
+
+def _proc_info(pid: int) -> tuple[int, str] | None:
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+        # comm is in parentheses and may contain spaces; ppid follows the last ')'
+        ppid = int(stat.rsplit(")", 1)[1].split()[1])
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+        cmd = " ".join(a.decode(errors="replace") for a in raw.split(b"\0") if a)
+        if not cmd:
+            cmd = stat.split("(", 1)[1].rsplit(")", 1)[0]
+        return ppid, cmd
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+def caller_chain(levels: int = 6) -> list[str]:
+    chain, pid = [], os.getppid()
+    for _ in range(levels):
+        info = _proc_info(pid)
+        if info is None or pid <= 1:
+            break
+        ppid, cmd = info
+        chain.append(cmd if len(cmd) <= 90 else cmd[:87] + "...")
+        pid = ppid
+    return list(reversed(chain))  # outermost first
+
+
+def describe_caller(reason: str | None, command: list[str], timeout: int) -> str:
+    lines = ["Requested by (outermost first):"]
+    lines += [f"  {'  ' * i}→ {c}" for i, c in enumerate(caller_chain())]
+    lines.append(f"In: {os.getcwd()}")
+    if command:
+        lines.append(f"To run: {' '.join(command)[:120]}")
+    if reason:
+        lines.append(f"Reason: {reason}")
+    if timeout > 0:
+        lines.append(f"The vault stays unlocked for {timeout // 60} min after the last use.")
+    return "\n".join(lines)
+
+
+# ── Password prompt ───────────────────────────────────────────────────────────
+
+def ask_password(description: str) -> str:
+    gui = (os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY")) and shutil.which("zenity")
+    if gui:
+        # Not `zenity --password`: that dialog silently ignores --text, so the
+        # caller info never shows. An entry dialog with hidden text does show it.
+        proc = subprocess.run(
+            ["zenity", "--entry", "--hide-text", "--width=640",
+             "--title=Unlock Bitwarden (homelab)",
+             f"--text={html.escape(description)}\n\nBitwarden master password:"],
+            capture_output=True, text=True,
+        )
+        if proc.returncode != 0:
+            die("unlock cancelled", 2)
+        return proc.stdout.rstrip("\n")
+    try:
+        tty = open("/dev/tty", "r+")
+    except OSError:
+        die("no display and no terminal to ask for the master password on")
+    import termios
+    tty.write(description + "\nBitwarden master password: ")
+    tty.flush()
+    fd = tty.fileno()
+    old = termios.tcgetattr(fd)
+    new = termios.tcgetattr(fd)
+    new[3] &= ~termios.ECHO
+    try:
+        termios.tcsetattr(fd, termios.TCSADRAIN, new)
+        pw = tty.readline().rstrip("\n")
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        tty.write("\n")
+        tty.close()
+    if not pw:
+        die("unlock cancelled", 2)
+    return pw
+
+
+# ── Kernel keyring ────────────────────────────────────────────────────────────
+
+def _keyctl(*args, stdin: str | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(["keyctl", *args], input=stdin, capture_output=True, text=True)
+
+
+def keyring_available() -> bool:
+    return shutil.which("keyctl") is not None
+
+
+def keyring_get() -> tuple[str, str] | None:
+    """(key id, token) if a live token is stored, else None."""
+    found = _keyctl("search", "@u", "user", KEY_NAME)
+    if found.returncode != 0:
+        return None
+    key_id = found.stdout.strip()
+    token = _keyctl("pipe", key_id)
+    if token.returncode != 0 or not token.stdout:
+        return None
+    return key_id, token.stdout
+
+
+def keyring_put(token: str, timeout: int) -> None:
+    added = _keyctl("padd", "user", KEY_NAME, "@u", stdin=token)
+    if added.returncode != 0:
+        return
+    key_id = added.stdout.strip()
+    # possessor: all; user (same uid, other sessions such as Claude's shell):
+    # view/read/search/setattr (setattr lets a later run reset the timeout)
+    _keyctl("setperm", key_id, "0x3f2b0000")
+    _keyctl("timeout", key_id, str(timeout))
+
+
+def keyring_touch(key_id: str, timeout: int) -> None:
+    _keyctl("timeout", key_id, str(timeout))
+
+
+def keyring_drop() -> None:
+    found = _keyctl("search", "@u", "user", KEY_NAME)
+    if found.returncode == 0:
+        _keyctl("unlink", found.stdout.strip(), "@u")
+
+
+# ── Autolock backstop ─────────────────────────────────────────────────────────
+
+def arm_autolock(timeout: int) -> None:
+    if not shutil.which("systemd-run"):
+        return
+    subprocess.run(["systemctl", "--user", "stop", f"{AUTOLOCK_UNIT}.timer"],
+                   capture_output=True)
+    subprocess.run(["systemctl", "--user", "reset-failed", f"{AUTOLOCK_UNIT}.service"],
+                   capture_output=True)
+    subprocess.run(
+        ["systemd-run", "--user", "--quiet", "--collect", f"--unit={AUTOLOCK_UNIT}",
+         f"--on-active={timeout}", bwlib.bw_path(), "lock"],
+        capture_output=True,
+    )
+
+
+def disarm_autolock() -> None:
+    subprocess.run(["systemctl", "--user", "stop", f"{AUTOLOCK_UNIT}.timer"], capture_output=True)
+
+
+def bw_lock() -> None:
+    subprocess.run([bwlib.bw_path(), "lock"], capture_output=True)
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+def unlock(description: str) -> str:
+    pw = ask_password(description)
+    env = dict(os.environ, BW_RUN_PW=pw)
+    del pw
+    proc = subprocess.run(
+        [bwlib.bw_path(), "unlock", "--passwordenv", "BW_RUN_PW", "--raw"],
+        capture_output=True, text=True, env=env,
+    )
+    env.pop("BW_RUN_PW", None)
+    if proc.returncode != 0 or not proc.stdout.strip():
+        die("unlock failed (wrong password?)")
+    return proc.stdout.strip()
+
+
+def load_env_map(path: str, session: str) -> dict:
+    os.environ["BW_SESSION"] = session
+    try:
+        vault = bwlib.Vault()
+        out = {}
+        for n, line in enumerate(Path(path).read_text().splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                die(f"{path}:{n}: expected ENV_NAME=item name")
+            env_name, item = (s.strip() for s in line.split("=", 1))
+            out[env_name] = vault.get(item)
+        return out
+    except bwlib.BitwardenError as e:
+        die(str(e))
+    finally:
+        os.environ.pop("BW_SESSION", None)
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    reason = env_map = None
+    while args and args[0] != "--":
+        flag = args.pop(0)
+        if flag == "--lock":
+            keyring_drop()
+            disarm_autolock()
+            bw_lock()
+            print("bw-run: vault locked", file=sys.stderr)
+            return 0
+        if flag in ("--reason", "--env-map") and args:
+            if flag == "--reason":
+                reason = args.pop(0)
+            else:
+                env_map = args.pop(0)
+        else:
+            die(f"unknown option {flag!r}; usage: bw-run [--reason T] [--env-map F] -- CMD...")
+    if not args or args[0] != "--" or len(args) < 2:
+        die("usage: bw-run [--reason TEXT] [--env-map FILE] -- COMMAND [ARGS...]")
+    command = args[1:]
+
+    try:
+        state = bwlib.status()
+    except bwlib.BitwardenError as e:
+        die(str(e))
+    if state == "unauthenticated":
+        die("not logged in to Bitwarden: run `bw login` once in your own terminal")
+
+    timeout = int(os.environ.get("BW_RUN_TIMEOUT", DEFAULT_TIMEOUT))
+    use_keyring = timeout > 0 and keyring_available()
+
+    session = None
+    if use_keyring:
+        held = keyring_get()
+        if held:
+            key_id, token = held
+            if bwlib.status(env=dict(os.environ, BW_SESSION=token)) == "unlocked":
+                session = token
+                keyring_touch(key_id, timeout)
+            else:
+                keyring_drop()
+    if session is None:
+        bw_lock()  # a token nobody holds any more must not stay valid
+        session = unlock(describe_caller(reason, command, timeout if use_keyring else 0))
+        subprocess.run([bwlib.bw_path(), "sync"], capture_output=True,
+                       env=dict(os.environ, BW_SESSION=session))
+        if use_keyring:
+            keyring_put(session, timeout)
+
+    if use_keyring:
+        arm_autolock(timeout)
+
+    child_env = dict(os.environ, BW_SESSION=session)
+    if env_map:
+        child_env.update(load_env_map(env_map, session))
+    try:
+        rc = subprocess.run(command, env=child_env).returncode
+    except FileNotFoundError:
+        die(f"command not found: {command[0]}", 127)
+    finally:
+        if use_keyring:
+            arm_autolock(timeout)  # re-arm from the end of a long run
+            held = keyring_get()
+            if held:
+                keyring_touch(held[0], timeout)
+        else:
+            bw_lock()
+    return rc
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)

@@ -29,6 +29,17 @@ scrape_configs:
           - {{ prometheus_config_dir }}/targets/proxmox.json
         refresh_interval: 5m
 
+{% if groups.get('bootstrap') %}
+  # blade02 and other bootstrap nodes: not Proxmox guests, so proxmox SD misses
+  # them. Carries the Tofu state backup's success metric.
+  - job_name: bootstrap
+    static_configs:
+      - targets:
+{% for h in groups['bootstrap'] %}
+          - '{{ h }}.{{ homelab_domain }}:9100'
+{% endfor %}
+
+{% endif %}
 {% if groups.get('hypervisors') %}
   # Proxmox nodes: Debian's node_exporter (hypervisors.yml). Static, from the
   # inventory's hypervisors group; they aren't guests, so proxmox SD misses them.

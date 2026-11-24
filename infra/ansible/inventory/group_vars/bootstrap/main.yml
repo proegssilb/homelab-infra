@@ -1,0 +1,9 @@
+---
+# The bootstrap node is configured by `just garage` before any platform VM
+# exists, so it can't depend on aptcache01. It fetches packages directly.
+apt_proxy_host: ""
+
+# Nightly Tofu state backup to the backup NAS (roles/tofu_state_backup). Flip to true once
+# the NAS dataset + NFS export (restricted to blade02) exists. Server and
+# path are in local.yml (gitignored; see local.yml.example).
+tofu_state_backup_enabled: true

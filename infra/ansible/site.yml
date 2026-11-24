@@ -32,6 +32,7 @@
   gather_facts: true
   roles:
     - garage
+    - tofu_state_backup
 
 - name: Garage — general-purpose app object storage
   hosts: garage_app
