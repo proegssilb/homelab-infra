@@ -11,6 +11,10 @@
 #          Any branch push touching the image runs it: Forgejo only lists (and offers
 #          "Run workflow" for) workflows on the default branch, so dispatch can't reach
 #          a workflow that exists only on a branch.
+#
+# Auth: secrets.PACKAGE_TOKEN, a Forgejo access token of the repo owner with only the
+# package scope (copy in Bitwarden: forgejo/actions-package-token). The automatic
+# Actions token can log in to the registry but is refused on push (401 on blob upload).
 name: bootc-base
 
 on:
@@ -50,7 +54,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Registry login
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login "${{ steps.n.outputs.host }}" -u "${{ github.actor }}" --password-stdin
+        run: echo "${{ secrets.PACKAGE_TOKEN }}" | docker login "${{ steps.n.outputs.host }}" -u "${{ steps.n.outputs.owner }}" --password-stdin
 
       - name: Build and push the image
         id: build
@@ -98,7 +102,7 @@ jobs:
           c=$(docker create -v "$v-out:/output" "$PODMAN" true)
           docker cp "$c:/output/qcow2/disk.qcow2" ./bootc-base.qcow2
           docker rm "$c" >/dev/null
-          curl -fsS --user "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+          curl -fsS --user "${{ steps.n.outputs.owner }}:${{ secrets.PACKAGE_TOKEN }}" \
             --upload-file ./bootc-base.qcow2 \
             "${{ steps.n.outputs.pkg }}/${{ steps.n.outputs.tag }}/bootc-base.qcow2"
           rm -f ./bootc-base.qcow2
