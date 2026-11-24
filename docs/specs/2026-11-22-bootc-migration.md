@@ -172,7 +172,15 @@ Phase 1 progress and decisions (2026-11-24):
   and a local disk boots and passes all 14 checks of `images/bootc-base/test/boot-test.sh`
   (cloud-init hostname + static IP, guest agent, node_exporter + image metric, Alloy, Podman,
   sshd, no failed units, bootc status).
-- Steps 2–3 (`.forgejo/workflows/bootc-base.yml`) are written, not yet run: need Actions on.
+- Steps 2–3 done (2026-11-24, CI runs 1–8 on runner01): build + push, disk image, KVM boot
+  test, upgrade test (`bootc switch` + reboot from the previous disk), then publish. Verified:
+  a deliberately broken image (node_exporter off, run 7) fails the boot test; anonymous pulls
+  of image and disk work. Learned on the way: the automatic Actions token can't push packages
+  (owner token `PACKAGE_TOKEN`, package scope only, copy in Bitwarden); a separate `docker push`
+  of bootc's big layers dies on proxy01's idle keep-alive, so build and push are one
+  `buildx --push`; bootc-image-builder under Docker needs `--cgroupns=host`; the disk is
+  published only after both tests, so a broken disk never becomes an upgrade base or install
+  source. Branch runs (no canary) upgrade-test from the newest earlier disk.
 - **For step 4**: CI's disk is built from the image *by digest*, so a VM installed from it would
   track that digest and never update. Step 4 must point VMs at the `canary`/`stable` tag (at
   install time or with a first-boot `bootc switch`).

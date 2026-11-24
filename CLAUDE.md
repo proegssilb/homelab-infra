@@ -241,9 +241,16 @@ every directory a package leaves in `/var` gets a tmpfiles.d entry.
   `out/`), then the boot test: `podman build -t localhost/bootc-test:dev -f images/bootc-test/Containerfile
   images/bootc-base && podman run --rm --device /dev/kvm -v "$PWD/images/bootc-base/out:/work:ro,z"
   localhost/bootc-test:dev /work/qcow2/disk.qcow2`.
-- CI (`.forgejo/workflows/bootc-base.yml`, on any branch push touching the image): builds, publishes the qcow2 as a Forgejo generic package,
-  boot-tests it, upgrade-tests from `:canary`, and tags `:canary` on main. Branches only get
-  `branch-<sha>`.
+- CI (`.forgejo/workflows/bootc-base.yml`, any branch push touching the image): build + push,
+  qcow2 via bootc-image-builder, KVM boot test, upgrade test (from `:canary`; on branches from the
+  newest earlier disk), and only then publishes the qcow2 as generic package `bootc-base-disk`
+  and (main only) tags `:canary`. Branches get `branch-<sha>` only. A broken disk must never be
+  published: if one is, delete that `bootc-base-disk` version, or the next branch run upgrades
+  from it and fails.
+- CI gotchas (each cost a run): pushes use `secrets.PACKAGE_TOKEN` (owner token, package scope;
+  the automatic token gets 401 on push); build and push are one `buildx --push` (a separate
+  `docker push` of the big layers hits proxy01's idle keep-alive); bootc-image-builder under
+  Docker needs `--cgroupns=host`; job logs aren't public, so read the run in the Forgejo UI.
 
 ### Secrets
 
