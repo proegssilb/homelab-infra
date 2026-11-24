@@ -106,7 +106,10 @@ jobs:
           # BIB builds from containers-storage; fill it with podman first.
           docker run --rm --privileged -v "$v-store:/var/lib/containers/storage" "$PODMAN" \
             podman pull -q "$src"
-          docker run --rm --privileged \
+          # BIB runs the image under its own podman to read it; inside Docker's private
+          # cgroup namespace that nested podman can't set up cgroups ("controller
+          # `pids` is not available"), so share the host's.
+          docker run --rm --privileged --cgroupns=host \
             -v "$v-store:/var/lib/containers/storage" -v "$v-out:/output" \
             "$BIB" --type qcow2 --rootfs xfs "$src"
 
