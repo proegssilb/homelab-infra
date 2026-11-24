@@ -7,13 +7,15 @@
 # main  -> bootc-base:<sha12> + :candidate; disk image as a generic package; boot test,
 #          upgrade test from :canary; pass -> retag :canary. (:stable is promoted by hand
 #          until the promotion job exists.)
-# other -> bootc-base:branch-<sha12> only (workflow_dispatch on the branch); same tests,
-#          never tagged candidate/canary.
+# other -> bootc-base:branch-<sha12> only; same tests, never tagged candidate/canary.
+#          Any branch push touching the image runs it: Forgejo only lists (and offers
+#          "Run workflow" for) workflows on the default branch, so dispatch can't reach
+#          a workflow that exists only on a branch.
 name: bootc-base
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
     paths:
       - images/bootc-base/**
       - images/bootc-test/**

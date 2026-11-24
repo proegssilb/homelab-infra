@@ -241,7 +241,7 @@ every directory a package leaves in `/var` gets a tmpfiles.d entry.
   `out/`), then the boot test: `podman build -t localhost/bootc-test:dev -f images/bootc-test/Containerfile
   images/bootc-base && podman run --rm --device /dev/kvm -v "$PWD/images/bootc-base/out:/work:ro,z"
   localhost/bootc-test:dev /work/qcow2/disk.qcow2`.
-- CI (`.forgejo/workflows/bootc-base.yml`): builds, publishes the qcow2 as a Forgejo generic package,
+- CI (`.forgejo/workflows/bootc-base.yml`, on any branch push touching the image): builds, publishes the qcow2 as a Forgejo generic package,
   boot-tests it, upgrade-tests from `:canary`, and tags `:canary` on main. Branches only get
   `branch-<sha>`.
 
