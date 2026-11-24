@@ -1,0 +1,11 @@
+[Unit]
+Description=Publish the booted bootc image as a node_exporter textfile metric
+# Feeds canary promotion and the per-VM image panel: which image each VM booted.
+After=local-fs.target systemd-tmpfiles-setup.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/bootc-image-metric
+
+[Install]
+WantedBy=multi-user.target

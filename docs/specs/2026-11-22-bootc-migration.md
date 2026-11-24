@@ -163,6 +163,22 @@ Each phase leaves the lab working.
 - `bootc-image-builder` disk image, Tofu upload, copy to blade02
 - VM module: static IP from VMID, OS disk replaceable while keeping data disks
 
+Phase 1 progress and decisions (2026-11-24):
+- **Forgejo is now the primary remote**; GitHub is a publish-only push mirror (SSH deploy key,
+  no token anywhere). GitHub is never a fallback for Forgejo.
+- Base image `quay.io/fedora/fedora-bootc:45`; VMs pull it **anonymously** (package public on
+  Forgejo, nothing secret or site-specific in it).
+- Step 1 done: `images/bootc-base/` builds clean under `bootc container lint --fatal-warnings`,
+  and a local disk boots and passes all 14 checks of `images/bootc-base/test/boot-test.sh`
+  (cloud-init hostname + static IP, guest agent, node_exporter + image metric, Alloy, Podman,
+  sshd, no failed units, bootc status).
+- Steps 2–3 (`.forgejo/workflows/bootc-base.yml`) are written, not yet run: need Actions on.
+- **For step 4**: CI's disk is built from the image *by digest*, so a VM installed from it would
+  track that digest and never update. Step 4 must point VMs at the `canary`/`stable` tag (at
+  install time or with a first-boot `bootc switch`).
+- greenboot is installed but its bootc rollback behaviour is still unverified (empirical test in
+  phases 1–2, as planned).
+
 **2. Pilot**: ittools (112), stateless. Proves cloud-init last mile, static IP, DNS record,
 secret push and automatic updates end to end.
 

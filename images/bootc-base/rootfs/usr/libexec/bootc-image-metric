@@ -1,0 +1,36 @@
+#!/usr/bin/python3
+"""Write bootc_booted_image_info{image,digest,version} 1 for node_exporter.
+
+The booted digest changes only at boot, so this runs once per boot. Atomic
+write (temp file + rename) so node_exporter never reads half a file.
+"""
+import json
+import os
+import subprocess
+
+OUT_DIR = "/var/lib/prometheus/node-exporter"
+OUT = os.path.join(OUT_DIR, "bootc_image.prom")
+
+
+def esc(v: str) -> str:
+    return v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+status = json.loads(subprocess.run(["bootc", "status", "--json"], check=True,
+                                   capture_output=True, text=True).stdout)
+booted = ((status.get("status") or {}).get("booted") or {}).get("image") or {}
+labels = {
+    "image": ((booted.get("image") or {}).get("image")) or "unknown",
+    "digest": booted.get("imageDigest") or "unknown",
+    "version": booted.get("version") or "unknown",
+}
+line = "bootc_booted_image_info{%s} 1\n" % ",".join(f'{k}="{esc(v)}"' for k, v in labels.items())
+
+os.makedirs(OUT_DIR, exist_ok=True)
+tmp = OUT + ".tmp"
+with open(tmp, "w") as fh:
+    fh.write("# HELP bootc_booted_image_info The bootc image this VM booted.\n")
+    fh.write("# TYPE bootc_booted_image_info gauge\n")
+    fh.write(line)
+os.chmod(tmp, 0o644)
+os.replace(tmp, OUT)

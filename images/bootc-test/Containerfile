@@ -1,0 +1,13 @@
+# Test runner for images/bootc-base/test/boot-test.sh: boots a bootc disk image
+# under KVM and checks it over SSH. Run with --device /dev/kvm (CI: a sibling
+# container on runner01; locally: podman on the workstation).
+FROM registry.fedoraproject.org/fedora:45
+
+RUN dnf -y install --setopt=install_weak_deps=False \
+        qemu-system-x86-core qemu-img \
+        xorriso openssh-clients python3 curl \
+    && dnf clean all
+
+COPY test/boot-test.sh /usr/local/bin/boot-test.sh
+
+ENTRYPOINT ["/usr/local/bin/boot-test.sh"]

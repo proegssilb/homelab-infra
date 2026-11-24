@@ -1,0 +1,3 @@
+# Same flags and textfile directory as the Debian hosts (roles/node_exporter), so
+# textfile metrics and alert rules carry over unchanged.
+ARGS="--collector.processes --collector.textfile.directory=/var/lib/prometheus/node-exporter"

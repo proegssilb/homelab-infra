@@ -68,6 +68,15 @@ ansible-vault encrypt_string '<value>' --name key_name
 
 Paste the output into the relevant `host_vars/` or `group_vars/` file.
 
+### Git remotes
+
+Forgejo (`minifig/homelab-infra` on `code.<domain>`) is the primary remote and the only place to
+push. GitHub is a publish-only push mirror (Forgejo pushes to it over SSH with a deploy key, on every
+commit). Never push to GitHub directly and never pull the repo from GitHub as a workaround: a Forgejo
+outage is an incident to fix, not to route around. CI runs on Forgejo Actions (runner01) from
+`.forgejo/workflows/`; once that directory exists Forgejo ignores `.github/workflows/`, which keeps
+running on GitHub off the mirror.
+
 ## Architecture
 
 ### Ergonomics affordances
@@ -216,6 +225,25 @@ This pattern has burned the codebase twice. Do not revert to `each.value.vmid`.
 Always use `/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsiN` instead of `/dev/sdX` when referencing disks in Ansible roles or scripts. The `sdX` name depends on PCI probe order at boot and is not stable — this project has directly observed the same `scsi2` data disk mapping to `sda` on some VMs and `sdb` on others depending on which PCI SCSI controller the kernel enumerated first.
 
 In the VM module, the OS disk is `scsi1` and data disks start at `scsi2`, so the first (and usually only) data disk is always `/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2`.
+
+### bootc image pipeline (migration in progress)
+
+`images/bootc-base/` is the template image for bootc VMs (Fedora bootc, pinned major; see
+`docs/specs/2026-11-22-bootc-migration.md`). It holds only what every VM shares and nothing
+site-specific: hostname, network, keys, the domain and log endpoints come from cloud-init (Alloy reads
+`/etc/alloy/endpoints.env` and doesn't start without it). Rules that `bootc container lint
+--fatal-warnings` enforces at build time: service users are pinned in `usr/lib/sysusers.d/homelab.conf`
+and created before the RPMs install (a random UID would orphan their `/var` files on update), and
+every directory a package leaves in `/var` gets a tmpfiles.d entry.
+
+- Local loop: `podman build -t localhost/bootc-base:dev images/bootc-base`, then
+  `sudo images/bootc-base/build-disk.sh` (bootc-image-builder needs root; output in the gitignored
+  `out/`), then the boot test: `podman build -t localhost/bootc-test:dev -f images/bootc-test/Containerfile
+  images/bootc-base && podman run --rm --device /dev/kvm -v "$PWD/images/bootc-base/out:/work:ro,z"
+  localhost/bootc-test:dev /work/qcow2/disk.qcow2`.
+- CI (`.forgejo/workflows/bootc-base.yml`): builds, publishes the qcow2 as a Forgejo generic package,
+  boot-tests it, upgrade-tests from `:canary`, and tags `:canary` on main. Branches only get
+  `branch-<sha>`.
 
 ### Secrets
 

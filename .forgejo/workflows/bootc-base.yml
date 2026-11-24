@@ -1,0 +1,139 @@
+# Build, test and publish the bootc template image (docs/specs/2026-11-22-bootc-migration.md).
+#
+# On runner01: jobs get the host's Docker socket, so the privileged pieces
+# (bootc-image-builder, the KVM boot test) run as sibling containers and share
+# data through named Docker volumes, never host paths.
+#
+# main  -> bootc-base:<sha12> + :candidate; disk image as a generic package; boot test,
+#          upgrade test from :canary; pass -> retag :canary. (:stable is promoted by hand
+#          until the promotion job exists.)
+# other -> bootc-base:branch-<sha12> only (workflow_dispatch on the branch); same tests,
+#          never tagged candidate/canary.
+name: bootc-base
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - images/bootc-base/**
+      - images/bootc-test/**
+      - .forgejo/workflows/bootc-base.yml
+  schedule:
+    - cron: "17 4 * * 1"   # weekly: pick up Fedora updates without a repo change
+  workflow_dispatch:
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      BIB: quay.io/centos-bootc/bootc-image-builder:latest
+      PODMAN: quay.io/podman/stable:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Names and tags
+        id: n
+        run: |
+          host="${GITHUB_SERVER_URL#https://}"
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          short="${GITHUB_SHA::12}"
+          if [ "$GITHUB_REF" = refs/heads/main ]; then tag="$short"; main=1; else tag="branch-$short"; main=0; fi
+          {
+            echo "host=$host"; echo "owner=$owner"; echo "tag=$tag"; echo "main=$main"
+            echo "image=$host/$owner/bootc-base"
+            echo "tester=$host/$owner/bootc-test"
+            echo "pkg=$GITHUB_SERVER_URL/api/packages/$owner/generic/bootc-base-disk"
+            echo "vol=bootc-${GITHUB_RUN_ID}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Registry login
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login "${{ steps.n.outputs.host }}" -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push the image
+        id: build
+        run: |
+          set -euo pipefail
+          ref="${{ steps.n.outputs.image }}:${{ steps.n.outputs.tag }}"
+          docker build --pull \
+            --build-arg VERSION="${{ steps.n.outputs.tag }}" \
+            --build-arg REVISION="$GITHUB_SHA" \
+            --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            -t "$ref" images/bootc-base
+          docker push "$ref"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$ref" | cut -d@ -f2)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          if [ "${{ steps.n.outputs.main }}" = 1 ]; then
+            docker tag "$ref" "${{ steps.n.outputs.image }}:candidate"
+            docker push "${{ steps.n.outputs.image }}:candidate"
+          fi
+
+      - name: Build and push the test runner
+        run: |
+          set -euo pipefail
+          ref="${{ steps.n.outputs.tester }}:${{ steps.n.outputs.tag }}"
+          docker build --pull -t "$ref" -f images/bootc-test/Containerfile images/bootc-base
+          docker push "$ref"
+
+      - name: Disk image (bootc-image-builder)
+        run: |
+          set -euo pipefail
+          v="${{ steps.n.outputs.vol }}"
+          src="${{ steps.n.outputs.image }}@${{ steps.build.outputs.digest }}"
+          docker volume create "$v-store" >/dev/null
+          docker volume create "$v-out" >/dev/null
+          # BIB builds from containers-storage; fill it with podman first.
+          docker run --rm --privileged -v "$v-store:/var/lib/containers/storage" "$PODMAN" \
+            podman pull -q "$src"
+          docker run --rm --privileged \
+            -v "$v-store:/var/lib/containers/storage" -v "$v-out:/output" \
+            "$BIB" --type qcow2 --rootfs xfs "$src"
+
+      - name: Publish the disk image
+        run: |
+          set -euo pipefail
+          v="${{ steps.n.outputs.vol }}"
+          c=$(docker create -v "$v-out:/output" "$PODMAN" true)
+          docker cp "$c:/output/qcow2/disk.qcow2" ./bootc-base.qcow2
+          docker rm "$c" >/dev/null
+          curl -fsS --user "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+            --upload-file ./bootc-base.qcow2 \
+            "${{ steps.n.outputs.pkg }}/${{ steps.n.outputs.tag }}/bootc-base.qcow2"
+          rm -f ./bootc-base.qcow2
+
+      - name: Boot test
+        run: |
+          docker run --rm --device /dev/kvm -v "${{ steps.n.outputs.vol }}-out:/work:ro" \
+            "${{ steps.n.outputs.tester }}:${{ steps.n.outputs.tag }}" \
+            /work/qcow2/disk.qcow2 --expect-digest "${{ steps.build.outputs.digest }}"
+
+      - name: Upgrade test from canary
+        run: |
+          set -euo pipefail
+          image="${{ steps.n.outputs.image }}"
+          if ! rev=$(docker buildx imagetools inspect "$image:canary" --format '{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null) || [ -z "$rev" ]; then
+            echo "::notice::no bootc-base:canary yet; skipping the upgrade test"
+            exit 0
+          fi
+          v="${{ steps.n.outputs.vol }}"
+          docker volume create "$v-old" >/dev/null
+          docker run --rm -v "$v-old:/old" "$PODMAN" \
+            curl -fsS -o /old/disk.qcow2 "${{ steps.n.outputs.pkg }}/${rev::12}/bootc-base.qcow2"
+          docker run --rm --device /dev/kvm -v "$v-old:/work:ro" \
+            "${{ steps.n.outputs.tester }}:${{ steps.n.outputs.tag }}" \
+            /work/disk.qcow2 \
+            --upgrade-to "$image:${{ steps.n.outputs.tag }}" \
+            --upgrade-digest "${{ steps.build.outputs.digest }}"
+
+      - name: Tag canary
+        if: steps.n.outputs.main == '1'
+        run: |
+          docker buildx imagetools create \
+            -t "${{ steps.n.outputs.image }}:canary" \
+            "${{ steps.n.outputs.image }}@${{ steps.build.outputs.digest }}"
+
+      - name: Clean up volumes
+        if: always()
+        run: |
+          v="${{ steps.n.outputs.vol }}"
+          docker volume rm -f "$v-store" "$v-out" "$v-old" >/dev/null 2>&1 || true

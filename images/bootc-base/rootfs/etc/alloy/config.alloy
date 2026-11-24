@@ -1,0 +1,28 @@
+// Ship the systemd journal to Loki. Same labels as roles/alloy on the Debian
+// hosts. The Loki URL is site-specific, so cloud-init writes it to
+// /etc/alloy/endpoints.env (LOKI_URL=...); without that file Alloy doesn't start.
+
+loki.source.journal "default" {
+  forward_to    = [loki.write.endpoint.receiver]
+  relabel_rules = loki.relabel.journal.rules
+
+  labels = {
+    job  = "systemd-journal",
+    host = constants.hostname,
+  }
+}
+
+loki.relabel "journal" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+}
+
+loki.write "endpoint" {
+  endpoint {
+    url = sys.env("LOKI_URL") + "/loki/api/v1/push"
+  }
+}

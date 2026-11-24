@@ -1,0 +1,45 @@
+# Template image for every bootc VM in the lab (docs/specs/2026-11-22-bootc-migration.md).
+#
+# Only what every VM shares lives here. Nothing site-specific: hostname, network,
+# SSH keys, the domain and the log endpoints all arrive per VM through cloud-init.
+# Major Fedora bumps are deliberate commits.
+FROM quay.io/fedora/fedora-bootc:45
+
+ARG VERSION=dev
+ARG REVISION=unknown
+
+# Repo definitions and the pinned Grafana key go in first so dnf can use them,
+# and the pinned users before any RPM creates them with a random UID.
+COPY rootfs/etc/yum.repos.d/ /etc/yum.repos.d/
+COPY rootfs/etc/pki/rpm-gpg/ /etc/pki/rpm-gpg/
+COPY rootfs/usr/lib/sysusers.d/ /usr/lib/sysusers.d/
+RUN systemd-sysusers
+
+RUN dnf -y install \
+        cloud-init \
+        qemu-guest-agent \
+        node-exporter \
+        alloy \
+        greenboot \
+        greenboot-default-health-checks \
+    && dnf clean all \
+    && rm -rf /var/cache/* /var/lib/dnf /var/log/dnf* /var/log/hawkey.log \
+              /var/lib/alloy /run/dnf /run/cloud-init
+
+# Config last, so it replaces the packages' defaults.
+COPY rootfs/ /
+
+RUN systemctl enable \
+        cloud-init-local.service cloud-init-network.service \
+        cloud-config.service cloud-final.service \
+        prometheus-node-exporter.service \
+        alloy.service \
+        bootc-image-metric.service \
+    && rm -rf /var/cache/* \
+    && bootc container lint --fatal-warnings
+
+LABEL org.opencontainers.image.title="bootc-base" \
+      org.opencontainers.image.description="Template image for the lab's bootc VMs" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}" \
+      containers.bootc="1"
