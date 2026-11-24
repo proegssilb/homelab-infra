@@ -4,10 +4,11 @@
 # (bootc-image-builder, the KVM boot test) run as sibling containers and share
 # data through named Docker volumes, never host paths.
 #
-# main  -> bootc-base:<sha12> + :candidate; disk image as a generic package; boot test,
-#          upgrade test from :canary; pass -> retag :canary. (:stable is promoted by hand
-#          until the promotion job exists.)
-# other -> bootc-base:branch-<sha12> only; same tests, never tagged candidate/canary.
+# main  -> bootc-base:<sha12> + :candidate; disk image; boot test; upgrade test from
+#          :canary; only if both pass: disk published as a generic package and the image
+#          retagged :canary. (:stable is promoted by hand until the promotion job exists.)
+# other -> bootc-base:branch-<sha12>; same tests (upgrading from the newest earlier disk
+#          when there's no canary); disk published if they pass; never candidate/canary.
 #          Any branch push touching the image runs it: Forgejo only lists (and offers
 #          "Run workflow" for) workflows on the default branch, so dispatch can't reach
 #          a workflow that exists only on a branch.
@@ -113,18 +114,6 @@ jobs:
             -v "$v-store:/var/lib/containers/storage" -v "$v-out:/output" \
             "$BIB" --type qcow2 --rootfs xfs "$src"
 
-      - name: Publish the disk image
-        run: |
-          set -euo pipefail
-          v="${{ steps.n.outputs.vol }}"
-          c=$(docker create -v "$v-out:/output" "$PODMAN" true)
-          docker cp "$c:/output/qcow2/disk.qcow2" ./bootc-base.qcow2
-          docker rm "$c" >/dev/null
-          curl -fsS --user "${{ steps.n.outputs.owner }}:${{ secrets.PACKAGE_TOKEN }}" \
-            --upload-file ./bootc-base.qcow2 \
-            "${{ steps.n.outputs.pkg }}/${{ steps.n.outputs.tag }}/bootc-base.qcow2"
-          rm -f ./bootc-base.qcow2
-
       - name: Boot test
         run: |
           docker run --rm --device /dev/kvm -v "${{ steps.n.outputs.vol }}-out:/work:ro" \
@@ -162,6 +151,20 @@ jobs:
             /work/disk.qcow2 \
             --upgrade-to "$image:${{ steps.n.outputs.tag }}" \
             --upgrade-digest "${{ steps.build.outputs.digest }}"
+
+      # Only after both tests: a broken disk must never become an upgrade base or an
+      # install source.
+      - name: Publish the disk image
+        run: |
+          set -euo pipefail
+          v="${{ steps.n.outputs.vol }}"
+          c=$(docker create -v "$v-out:/output" "$PODMAN" true)
+          docker cp "$c:/output/qcow2/disk.qcow2" ./bootc-base.qcow2
+          docker rm "$c" >/dev/null
+          curl -fsS --user "${{ steps.n.outputs.owner }}:${{ secrets.PACKAGE_TOKEN }}" \
+            --upload-file ./bootc-base.qcow2 \
+            "${{ steps.n.outputs.pkg }}/${{ steps.n.outputs.tag }}/bootc-base.qcow2"
+          rm -f ./bootc-base.qcow2
 
       - name: Tag canary
         if: steps.n.outputs.main == '1'
