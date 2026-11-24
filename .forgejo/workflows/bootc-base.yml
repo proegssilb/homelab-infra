@@ -131,18 +131,32 @@ jobs:
             "${{ steps.n.outputs.tester }}:${{ steps.n.outputs.tag }}" \
             /work/qcow2/disk.qcow2 --expect-digest "${{ steps.build.outputs.digest }}"
 
-      - name: Upgrade test from canary
+      # Upgrade from what VMs run now (:canary). Branches have no canary of their own,
+      # so when none exists they upgrade from the newest earlier disk package instead.
+      - name: Upgrade test
         run: |
           set -euo pipefail
           image="${{ steps.n.outputs.image }}"
-          if ! rev=$(docker buildx imagetools inspect "$image:canary" --format '{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null) || [ -z "$rev" ]; then
-            echo "::notice::no bootc-base:canary yet; skipping the upgrade test"
+          base=""
+          if rev=$(docker buildx imagetools inspect "$image:canary" --format '{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null) && [ -n "$rev" ]; then
+            base="${rev::12}"; echo "upgrading from :canary ($base)"
+          elif [ "${{ steps.n.outputs.main }}" != 1 ]; then
+            base=$(curl -fsS "$GITHUB_SERVER_URL/api/v1/packages/${{ steps.n.outputs.owner }}?type=generic&q=bootc-base-disk&limit=50" \
+              | python3 -c 'import json, sys
+          cur = sys.argv[1]
+          old = sorted((p for p in json.load(sys.stdin) if p["name"] == "bootc-base-disk" and p["version"] != cur),
+                       key=lambda p: p["created_at"])
+          print(old[-1]["version"] if old else "")' "${{ steps.n.outputs.tag }}")
+            [ -n "$base" ] && echo "no :canary; upgrading from the newest earlier disk ($base)"
+          fi
+          if [ -z "$base" ]; then
+            echo "::notice::nothing to upgrade from yet; skipping the upgrade test"
             exit 0
           fi
           v="${{ steps.n.outputs.vol }}"
           docker volume create "$v-old" >/dev/null
           docker run --rm -v "$v-old:/old" "$PODMAN" \
-            curl -fsS -o /old/disk.qcow2 "${{ steps.n.outputs.pkg }}/${rev::12}/bootc-base.qcow2"
+            curl -fsS -o /old/disk.qcow2 "${{ steps.n.outputs.pkg }}/$base/bootc-base.qcow2"
           docker run --rm --device /dev/kvm -v "$v-old:/work:ro" \
             "${{ steps.n.outputs.tester }}:${{ steps.n.outputs.tag }}" \
             /work/disk.qcow2 \
