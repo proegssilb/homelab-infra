@@ -32,7 +32,7 @@ COPY rootfs/ /
 RUN systemctl enable \
         cloud-init-local.service cloud-init-network.service \
         cloud-config.service cloud-final.service \
-        \
+        prometheus-node-exporter.service \
         alloy.service \
         bootc-image-metric.service \
     && rm -rf /var/cache/* \
