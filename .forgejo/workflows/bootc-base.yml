@@ -56,30 +56,45 @@ jobs:
       - name: Registry login
         run: echo "${{ secrets.PACKAGE_TOKEN }}" | docker login "${{ steps.n.outputs.host }}" -u "${{ steps.n.outputs.owner }}" --password-stdin
 
+      # Build and push in one BuildKit export (like anamnesis's release workflow). A
+      # separate `docker push` spends minutes compressing bootc's large layers before
+      # its first upload, by which time proxy01 has closed the idle keep-alive
+      # connection ("server closed idle connection"), and it doesn't retry. Retries
+      # here are cheap: the rebuild comes from cache. --provenance=false keeps a plain
+      # image manifest (no attestation index) for bootc and bootc-image-builder.
       - name: Build and push the image
         id: build
         run: |
           set -euo pipefail
           ref="${{ steps.n.outputs.image }}:${{ steps.n.outputs.tag }}"
-          docker build --pull \
-            --build-arg VERSION="${{ steps.n.outputs.tag }}" \
-            --build-arg REVISION="$GITHUB_SHA" \
-            --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            -t "$ref" -f images/bootc-base/Containerfile images/bootc-base
-          docker push "$ref"
-          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$ref" | cut -d@ -f2)
+          for attempt in 1 2 3; do
+            if docker buildx build --pull --push --provenance=false --metadata-file meta.json \
+                 --build-arg VERSION="${{ steps.n.outputs.tag }}" \
+                 --build-arg REVISION="$GITHUB_SHA" \
+                 --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+                 -t "$ref" -f images/bootc-base/Containerfile images/bootc-base; then
+              break
+            fi
+            [ "$attempt" = 3 ] && exit 1
+            echo "::warning::build/push attempt $attempt failed; retrying"; sleep 15
+          done
+          digest=$(python3 -c 'import json; print(json.load(open("meta.json"))["containerimage.digest"])')
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           if [ "${{ steps.n.outputs.main }}" = 1 ]; then
-            docker tag "$ref" "${{ steps.n.outputs.image }}:candidate"
-            docker push "${{ steps.n.outputs.image }}:candidate"
+            docker buildx imagetools create -t "${{ steps.n.outputs.image }}:candidate" \
+              "${{ steps.n.outputs.image }}@$digest"
           fi
 
       - name: Build and push the test runner
         run: |
           set -euo pipefail
           ref="${{ steps.n.outputs.tester }}:${{ steps.n.outputs.tag }}"
-          docker build --pull -t "$ref" -f images/bootc-test/Containerfile images/bootc-base
-          docker push "$ref"
+          for attempt in 1 2 3; do
+            docker buildx build --pull --push --provenance=false \
+              -t "$ref" -f images/bootc-test/Containerfile images/bootc-base && break
+            [ "$attempt" = 3 ] && exit 1
+            echo "::warning::build/push attempt $attempt failed; retrying"; sleep 15
+          done
 
       - name: Disk image (bootc-image-builder)
         run: |
