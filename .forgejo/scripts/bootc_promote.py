@@ -91,8 +91,15 @@ def main() -> int:
     if stable is None:
         print(f"promote: no :stable yet; seeding it from :canary ({canary[:19]})")
         reasons = []
+    elif not a.prometheus:
+        reasons = ["no Prometheus URL (Actions variable PROMETHEUS_URL)"]
     else:
-        reasons = check(a.prometheus, canary, a.soak_hours)
+        # Can't see the canary VMs = don't promote; never fail the image build over
+        # it. A promotion that stays blocked is what BootcPromotionStalled is for.
+        try:
+            reasons = check(a.prometheus, canary, a.soak_hours)
+        except Exception as e:
+            reasons = [f"can't query Prometheus ({type(e).__name__}: {str(e)[:120]})"]
 
     if reasons:
         print("promote: not promoting :canary " + canary[:19] + ":")

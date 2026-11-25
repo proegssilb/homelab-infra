@@ -37,9 +37,14 @@ for node in api_get("/nodes"):
                 continue
             name = vm["name"]
             # Full name: not every short name resolves from obs01 (proxy01's
-            # never did). The instance label keeps the short name.
+            # never did). The instance label keeps the short name. bootc VMs
+            # (tofu/lab) have static addresses, so no DHCP lease gives them a
+            # UniFi name: theirs live in the Tofu-managed zone l.<domain> on
+            # dns01, which UniFi forwards to.
+            bootc = "bootc" in vm.get("tags", "").split(";")
+            fqdn = f"{name}.l.{DOMAIN}" if bootc else f"{name}.{DOMAIN}"
             targets.append({
-                "targets": [f"{name}.{DOMAIN}:{EXPORTER_PORT}"],
+                "targets": [f"{fqdn}:{EXPORTER_PORT}"],
                 "labels": {"instance": name, "proxmox_node": node_name},
             })
 
