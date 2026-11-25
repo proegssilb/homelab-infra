@@ -1,0 +1,68 @@
+# promtool unit tests for the fire-bootc rules (1m samples: sparser ones go stale
+# between samples and reset `for:`) (not deployed: the role copies an
+# explicit list of rule files). Run:
+#   podman run --rm -v "$PWD:/rules:ro,z" --entrypoint promtool quay.io/prometheus/prometheus \
+#     test rules /rules/tests/bootc.test.yml        (from roles/prometheus/files/rules)
+rule_files:
+  - ../fire.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Stuck for 47h: quiet. Past 48h: fires.
+  - interval: 1m
+    input_series:
+      - series: 'bootc_update_available{instance="canary01:9100"}'
+        values: '1x3000'
+      - series: 'bootc_update_available{instance="dns01:9100"}'
+        values: '0x3000'
+    alert_rule_test:
+      - eval_time: 47h
+        alertname: BootcUpdateStuck
+        exp_alerts: []
+      - eval_time: 49h
+        alertname: BootcUpdateStuck
+        exp_alerts:
+          - exp_labels: {severity: critical, instance: "canary01:9100"}
+            exp_annotations:
+              summary: "canary01:9100 has had a bootc update pending for 2 days (failed update or rollback)"
+
+  # Canary runs X, stable runs Y for 5 days: fires after 4 days.
+  - interval: 1m
+    input_series:
+      - series: 'bootc_booted_image_info{instance="canary01:9100",channel="canary",digest="sha256:x"}'
+        values: '1x7300'
+      - series: 'bootc_booted_image_info{instance="dns01:9100",channel="stable",digest="sha256:y"}'
+        values: '1x7300'
+    alert_rule_test:
+      - eval_time: 95h
+        alertname: BootcPromotionStalled
+        exp_alerts: []
+      - eval_time: 97h
+        alertname: BootcPromotionStalled
+        exp_alerts:
+          - exp_labels: {severity: critical, digest: "sha256:x"}
+            exp_annotations:
+              summary: "canary image sha256:x hasn't reached any stable VM in 4 days"
+
+  # Stable caught up with the canary: quiet.
+  - interval: 1m
+    input_series:
+      - series: 'bootc_booted_image_info{instance="canary01:9100",channel="canary",digest="sha256:x"}'
+        values: '1x7300'
+      - series: 'bootc_booted_image_info{instance="dns01:9100",channel="stable",digest="sha256:x"}'
+        values: '1x7300'
+    alert_rule_test:
+      - eval_time: 120h
+        alertname: BootcPromotionStalled
+        exp_alerts: []
+
+  # No VM tracks stable yet: nothing to be stalled against, quiet.
+  - interval: 1m
+    input_series:
+      - series: 'bootc_booted_image_info{instance="canary01:9100",channel="canary",digest="sha256:x"}'
+        values: '1x7300'
+    alert_rule_test:
+      - eval_time: 120h
+        alertname: BootcPromotionStalled
+        exp_alerts: []

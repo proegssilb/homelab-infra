@@ -1,0 +1,22 @@
+# Quadlet: PowerDNS Authoritative for the Tofu-managed lab zone (dns01).
+[Unit]
+Description=PowerDNS Authoritative (lab zone)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=pdns
+Image=docker.io/powerdns/pdns-auth-50:5.0.8
+# Host networking: pdns binds the VM's own address (local-address in homelab.conf),
+# which leaves systemd-resolved's 127.0.0.53 stub alone.
+Network=host
+AddCapability=CAP_NET_BIND_SERVICE
+# The SQLite database. No backup: every record comes from Tofu.
+Volume=pdns-data:/var/lib/powerdns
+Volume=/etc/powerdns/homelab.conf:/etc/powerdns/pdns.d/homelab.conf:ro,Z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

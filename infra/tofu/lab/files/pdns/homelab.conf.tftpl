@@ -1,0 +1,8 @@
+# Managed by Tofu (tofu/lab/dns01.tf) — pushed to dns01, read by pdns from pdns.d/.
+local-address=${listen}, 127.0.0.1
+# RFC 2136 updates from Tofu: only from these networks, and only signed with the
+# TSIG key the zone's TSIG-ALLOW-DNSUPDATE metadata names (pdns-zone-init.service).
+dnsupdate=yes
+allow-dnsupdate-from=${update_from}
+default-ttl=300
+default-soa-content=ns1.@ hostmaster.@ 0 10800 3600 604800 300

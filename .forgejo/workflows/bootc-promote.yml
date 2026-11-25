@@ -1,0 +1,30 @@
+# Daily: promote bootc-base:canary to :stable once the canary VMs have run it for a
+# day, healthy (.forgejo/scripts/bootc_promote.py). bootc-base.yml runs the same check
+# before each release-branch build. Scheduled workflows run only from the default
+# branch, so this one starts working once the bootc migration branch merges.
+name: bootc-promote
+
+on:
+  schedule:
+    - cron: "41 12 * * *"
+  workflow_dispatch:
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_BRANCH: worktree-bootc-migration-spec
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Registry login
+        run: |
+          host="${GITHUB_SERVER_URL#https://}"
+          echo "${{ secrets.PACKAGE_TOKEN }}" | docker login "$host" -u "${GITHUB_REPOSITORY_OWNER,,}" --password-stdin
+
+      - name: Promote canary to stable
+        run: |
+          host="${GITHUB_SERVER_URL#https://}"
+          python3 .forgejo/scripts/bootc_promote.py \
+            "$host/${GITHUB_REPOSITORY_OWNER,,}/bootc-base" "${{ vars.PROMETHEUS_URL }}"

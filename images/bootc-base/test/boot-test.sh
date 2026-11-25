@@ -122,42 +122,50 @@ if ! wait_ssh 420; then
 fi
 pass "boot: SSH reachable"
 
-# ── Checks ────────────────────────────────────────────────────────────────────
-[ "$("${SSH[@]}" hostname 2>/dev/null)" = "$HOSTNAME_WANT" ] && pass "cloud-init: hostname" || fail "cloud-init: hostname"
-check "cloud-init: static address $ADDR/24" "ip -4 -o addr show | grep -q ' $ADDR/24 '"
-check "cloud-init: no DHCP on the static NIC" "! nmcli -g ipv4.method connection show --active | grep -qx auto"
-check "cloud-init: finished without errors" "sudo cloud-init status --wait | grep -q 'status: done'"
-check "no failed systemd units" "test -z \"\$(systemctl --failed --no-legend --plain)\""
-check "greenboot health check passed" "test \"\$(systemctl show -p Result --value greenboot-healthcheck)\" = success" \
-  "systemctl status greenboot-healthcheck --no-pager -l | tail -n 15"
-check "updates only in the nightly window" "systemctl show -p TimersCalendar bootc-fetch-apply-updates.timer | grep -q '04:00:00'" \
-  "systemctl cat bootc-fetch-apply-updates.timer"
-check "sshd: password login off" "sudo sshd -T | grep -qix 'passwordauthentication no'" \
-  "sudo sshd -T | grep -iE '^(passwordauthentication|kbdinteractiveauthentication|permitrootlogin)'; ls /etc/ssh/sshd_config.d/; sudo grep -H -iE 'PasswordAuthentication|Include' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*"
-check "qemu-guest-agent active" "systemctl is-active -q qemu-guest-agent"
-if python3 - "$W/qga.sock" <<'PY'
+# ── Checks on the image under test ────────────────────────────────────────────
+# In upgrade mode these run *after* the upgrade: the old disk predates whatever
+# this image adds (that's the point), so before the switch only the basics count.
+image_checks() {
+  local p=$1  # label prefix
+  [ "$("${SSH[@]}" hostname 2>/dev/null)" = "$HOSTNAME_WANT" ] && pass "${p}cloud-init: hostname" || fail "${p}cloud-init: hostname"
+  check "${p}cloud-init: static address $ADDR/24" "ip -4 -o addr show | grep -q ' $ADDR/24 '"
+  check "${p}cloud-init: no DHCP on the static NIC" "! nmcli -g ipv4.method connection show --active | grep -qx auto"
+  check "${p}cloud-init: finished without errors" "sudo cloud-init status --wait | grep -q 'status: done'"
+  check "${p}no failed systemd units" "test -z \"\$(systemctl --failed --no-legend --plain)\"" \
+    "systemctl --failed --no-legend --plain"
+  check "${p}greenboot health check passed" "test \"\$(systemctl show -p Result --value greenboot-healthcheck)\" = success" \
+    "systemctl status greenboot-healthcheck --no-pager -l | tail -n 15"
+  check "${p}updates only in the nightly window" "systemctl show -p TimersCalendar bootc-fetch-apply-updates.timer | grep -q '04:00:00'" \
+    "systemctl cat bootc-fetch-apply-updates.timer"
+  check "${p}sshd: password login off" "sudo sshd -T | grep -qix 'passwordauthentication no'" \
+    "sudo sshd -T | grep -iE '^(passwordauthentication|kbdinteractiveauthentication|permitrootlogin)'"
+  check "${p}qemu-guest-agent active" "systemctl is-active -q qemu-guest-agent"
+  if python3 - "$W/qga.sock" <<'PY'
 import json, socket, sys
 s = socket.socket(socket.AF_UNIX); s.settimeout(10); s.connect(sys.argv[1])
 s.sendall(b'{"execute":"guest-ping"}\n')
 sys.exit(0 if b'"return"' in s.recv(4096) else 1)
 PY
-then pass "qemu-guest-agent answers the host"; else fail "qemu-guest-agent answers the host"; fi
-check "node_exporter answers on :9100" "curl -sf localhost:9100/metrics | grep -q '^node_boot_time_seconds'"
-check "node_exporter: bootc image metric" "curl -sf localhost:9100/metrics | grep -q '^bootc_booted_image_info{'"
-check "node_exporter: bootc update status metric" "curl -sf localhost:9100/metrics | grep -q '^bootc_update_available '" \
-  "sudo /usr/libexec/bootc-image-metric; cat /var/lib/prometheus/node-exporter/bootc_image.prom; sudo bootc upgrade --check 2>&1 | tail -n 5"
-check "alloy active with endpoints from cloud-init" "systemctl is-active -q alloy" \
-  "systemctl status alloy --no-pager -l | head -n 12; ls -l /etc/alloy/; sudo journalctl -u alloy -b --no-pager -n 15"
-check "podman runs a container" "podman run --rm quay.io/fedora/fedora-minimal:45 true"
+  then pass "${p}qemu-guest-agent answers the host"; else fail "${p}qemu-guest-agent answers the host"; fi
+  check "${p}node_exporter answers on :9100" "curl -sf localhost:9100/metrics | grep -q '^node_boot_time_seconds'"
+  check "${p}node_exporter: bootc image metric" "curl -sf localhost:9100/metrics | grep -q '^bootc_booted_image_info{'"
+  check "${p}node_exporter: bootc update status metric" "curl -sf localhost:9100/metrics | grep -q '^bootc_update_available '" \
+    "sudo /usr/libexec/bootc-image-metric; cat /var/lib/prometheus/node-exporter/bootc_image.prom; sudo bootc upgrade --check 2>&1 | tail -n 5"
+  check "${p}alloy active with endpoints from cloud-init" "systemctl is-active -q alloy" \
+    "systemctl status alloy --no-pager -l | head -n 12; sudo journalctl -u alloy -b --no-pager -n 15"
+  check "${p}podman runs a container" "podman run --rm quay.io/fedora/fedora-minimal:45 true"
+}
 
 DIGEST=$(booted_digest)
 if [ -n "$DIGEST" ]; then pass "bootc status readable"; else fail "bootc status readable"; fi
-if [ -n "$EXPECT_DIGEST" ]; then
-  [ "$DIGEST" = "$EXPECT_DIGEST" ] && pass "booted the expected image" || fail "booted the expected image" "got $DIGEST"
-fi
 
-# ── Upgrade ───────────────────────────────────────────────────────────────────
-if [ -n "$UPGRADE_TO" ]; then
+if [ -z "$UPGRADE_TO" ]; then
+  image_checks ""
+  if [ -n "$EXPECT_DIGEST" ]; then
+    [ "$DIGEST" = "$EXPECT_DIGEST" ] && pass "booted the expected image" || fail "booted the expected image" "got $DIGEST"
+  fi
+else
+  # ── Upgrade: old disk -> image under test ──────────────────────────────────
   if "${SSH[@]}" "sudo bootc switch --quiet '$UPGRADE_TO'" >/dev/null 2>&1; then
     pass "upgrade: bootc switch staged"
     "${SSH[@]}" "sudo systemctl reboot" >/dev/null 2>&1 || true
@@ -170,8 +178,7 @@ if [ -n "$UPGRADE_TO" ]; then
       else
         [ -n "$NEW" ] && [ "$NEW" != "$DIGEST" ] && pass "upgrade: booted a different image" || fail "upgrade: booted a different image"
       fi
-      check "upgrade: no failed systemd units" "test -z \"\$(systemctl --failed --no-legend --plain)\""
-      check "upgrade: node_exporter answers" "curl -sf localhost:9100/metrics | grep -q '^bootc_booted_image_info{'"
+      image_checks "upgraded: "
     else
       fail "upgrade: back after reboot"
     fi

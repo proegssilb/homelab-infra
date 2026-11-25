@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars (gitignored) and fill in. No secrets here: the DNS
+# update key comes from Bitwarden (secrets.env.map: DNS_UPDATE_KEYSECRET).
+
+proxmox_node  = "pve01"
+datastore     = "ceph-ssd-pool"
+admin_ssh_key = "ssh-ed25519 AAAA... you@workstation"
+domain        = "home.example.com"
+
+network = {
+  subnet      = "10.0.20.0/24"
+  gateway     = "10.0.20.1"
+  dns_servers = ["10.0.20.1"]
+  dhcp_first  = 20
+  dhcp_last   = 200
+}
+
+# Networks Tofu runs from (workstation, DR node). TSIG is required on top.
+dns_update_from = ["10.0.7.0/24", "10.0.19.0/24"]
+
+loki_url = "http://obs02.home.example.com:3100"

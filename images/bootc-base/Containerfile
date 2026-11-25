@@ -22,6 +22,7 @@ RUN dnf -y install \
         alloy \
         greenboot \
         greenboot-default-health-checks \
+        bind-utils \
     && dnf clean all \
     && rm -rf /var/cache/* /var/lib/dnf /var/log/dnf* /var/log/hawkey.log \
               /var/lib/alloy /run/dnf /run/cloud-init

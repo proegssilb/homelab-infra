@@ -1,0 +1,9 @@
+#!/bin/bash
+# greenboot required check on dns01: after an update, the lab zone must answer.
+# Failing makes greenboot boot back into the previous deployment.
+for _ in $(seq 1 45); do
+  dig +short +time=2 +tries=1 @127.0.0.1 ${zone} SOA | grep -q . && exit 0
+  sleep 2
+done
+echo "${zone} SOA did not answer on 127.0.0.1 within 90s" >&2
+exit 1

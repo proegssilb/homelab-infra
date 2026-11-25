@@ -27,6 +27,9 @@ _tofu-init state:
 # safe to rerun against a partially-up lab.
 bootstrap:
     just garage
+    # bootc VMs, dns01 first among them; needs only Garage (state) and Forgejo's
+    # published install disk.
+    just cluster-up lab
     just cluster-up platform
     just cluster-up pets
     # proxy01 was configured before pets existed; its Forgejo deploy-key proxy
@@ -37,7 +40,8 @@ bootstrap:
 cluster-up cluster:
     just _tofu-init {{cluster}}
     cd tofu/{{cluster}} && {{bw}} tofu apply -auto-approve -parallelism=2
-    just tune-all {{cluster}}
+    # bootc VMs (lab) are configured by their image and Tofu's push, not Ansible.
+    if [ "{{cluster}}" != lab ]; then just tune-all {{cluster}}; fi
 
 # ── Day 2 ──────────────────────────────────────────────────────────────────────
 

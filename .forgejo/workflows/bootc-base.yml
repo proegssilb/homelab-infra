@@ -4,11 +4,16 @@
 # (bootc-image-builder, the KVM boot test) run as sibling containers and share
 # data through named Docker volumes, never host paths.
 #
-# main  -> bootc-base:<sha12> + :candidate; disk image; boot test; upgrade test from
+# release branch (RELEASE_BRANCH below) ->
+#          first promotes a soaked :canary to :stable (.forgejo/scripts/bootc_promote.py);
+#          then bootc-base:<sha12> + :candidate; disk image; boot test; upgrade test from
 #          :canary; only if both pass: disk published as a generic package and the image
-#          retagged :canary. (:stable is promoted by hand until the promotion job exists.)
+#          retagged :canary. bootc-promote.yml repeats the promotion daily.
 # other -> bootc-base:branch-<sha12>; same tests (upgrading from the newest earlier disk
 #          when there's no canary); disk published if they pass; never candidate/canary.
+#
+# RELEASE_BRANCH is the bootc migration branch until it merges; then it becomes main
+# (one line, below and in bootc-promote.yml).
 #          Any branch push touching the image runs it: Forgejo only lists (and offers
 #          "Run workflow" for) workflows on the default branch, so dispatch can't reach
 #          a workflow that exists only on a branch.
@@ -25,6 +30,7 @@ on:
       - images/bootc-base/**
       - images/bootc-test/**
       - .forgejo/workflows/bootc-base.yml
+      - .forgejo/scripts/bootc_promote.py
   schedule:
     - cron: "17 4 * * 1"   # weekly: pick up Fedora updates without a repo change
   workflow_dispatch:
@@ -34,6 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
+      RELEASE_BRANCH: worktree-bootc-migration-spec
       BIB: quay.io/centos-bootc/bootc-image-builder:latest
       PODMAN: quay.io/podman/stable:latest
     steps:
@@ -45,7 +52,7 @@ jobs:
           host="${GITHUB_SERVER_URL#https://}"
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           short="${GITHUB_SHA::12}"
-          if [ "$GITHUB_REF" = refs/heads/main ]; then tag="$short"; main=1; else tag="branch-$short"; main=0; fi
+          if [ "$GITHUB_REF" = "refs/heads/$RELEASE_BRANCH" ]; then tag="$short"; main=1; else tag="branch-$short"; main=0; fi
           {
             echo "host=$host"; echo "owner=$owner"; echo "tag=$tag"; echo "main=$main"
             echo "image=$host/$owner/bootc-base"
@@ -63,6 +70,14 @@ jobs:
       # connection ("server closed idle connection"), and it doesn't retry. Retries
       # here are cheap: the rebuild comes from cache. --provenance=false keeps a plain
       # image manifest (no attestation index) for bootc and bootc-image-builder.
+      # Before the build, so a canary that has soaked gets promoted before this run
+      # replaces it.
+      - name: Promote canary to stable
+        if: steps.n.outputs.main == '1'
+        run: |
+          python3 .forgejo/scripts/bootc_promote.py \
+            "${{ steps.n.outputs.image }}" "${{ vars.PROMETHEUS_URL }}"
+
       - name: Build and push the image
         id: build
         run: |
@@ -172,6 +187,15 @@ jobs:
           docker buildx imagetools create \
             -t "${{ steps.n.outputs.image }}:canary" \
             "${{ steps.n.outputs.image }}@${{ steps.build.outputs.digest }}"
+
+      # Seeds :stable from this canary when none exists yet (first release run), so
+      # stable VMs have something to track. Otherwise a no-op: the canary VMs aren't
+      # on the image just built, so the soak check refuses.
+      - name: Seed stable if missing
+        if: steps.n.outputs.main == '1'
+        run: |
+          python3 .forgejo/scripts/bootc_promote.py \
+            "${{ steps.n.outputs.image }}" "${{ vars.PROMETHEUS_URL }}"
 
       - name: Clean up volumes
         if: always()

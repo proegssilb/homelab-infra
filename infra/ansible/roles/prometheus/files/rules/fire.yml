@@ -163,3 +163,32 @@ groups:
         labels: {severity: critical}
         annotations:
           summary: "{{ $labels.instance }} battery low or under 10 minutes of runtime"
+
+  # bootc VMs update themselves from canary/stable channels
+  # (docs/specs/2026-11-22-bootc-migration.md, .forgejo/scripts/bootc_promote.py).
+  # Unit tests: tests/bootc.test.yml.
+  - name: fire-bootc
+    rules:
+      # A VM has known about a newer image for 2 days and still isn't on it: the
+      # update failed, or greenboot rolled it back. Updates land within a day of
+      # being available (nightly window), so 48h means stuck, not slow.
+      - alert: BootcUpdateStuck
+        expr: bootc_update_available == 1
+        for: 48h
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.instance }} has had a bootc update pending for 2 days (failed update or rollback)"
+
+      # A canary image that no stable VM runs, for 4 days: promotion is blocked (a
+      # canary VM unhealthy or never updating) or stable VMs aren't taking it. A
+      # weekly build normally reaches stable within ~2 days. Only meaningful once
+      # some VM tracks stable.
+      - alert: BootcPromotionStalled
+        expr: |
+          (count by (digest) (bootc_booted_image_info{channel="canary"})
+             unless on (digest) bootc_booted_image_info{channel="stable"})
+          and on () (count(bootc_booted_image_info{channel="stable"}) > 0)
+        for: 4d
+        labels: {severity: critical}
+        annotations:
+          summary: "canary image {{ $labels.digest }} hasn't reached any stable VM in 4 days"

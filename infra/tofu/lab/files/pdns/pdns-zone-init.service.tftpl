@@ -1,0 +1,17 @@
+# Managed by Tofu (tofu/lab/dns01.tf). Creates the lab zone if missing and lets
+# the `tofu` TSIG key update it. Idempotent; runs at every boot.
+[Unit]
+Description=Create the lab DNS zone and allow Tofu's signed updates
+Requires=pdns.service
+After=pdns.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c '\
+  for i in $$(seq 1 60); do podman exec pdns pdnsutil zone list-all >/dev/null 2>&1 && break; sleep 2; done; \
+  podman exec pdns pdnsutil zone list ${zone} >/dev/null 2>&1 || podman exec pdns pdnsutil zone create ${zone} ns1.${zone}; \
+  podman exec pdns pdnsutil metadata set ${zone} TSIG-ALLOW-DNSUPDATE tofu'
+
+[Install]
+WantedBy=multi-user.target
