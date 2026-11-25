@@ -140,6 +140,8 @@ image_checks() {
   check "${p}sshd: password login off" "sudo sshd -T | grep -qix 'passwordauthentication no'" \
     "sudo sshd -T | grep -iE '^(passwordauthentication|kbdinteractiveauthentication|permitrootlogin)'"
   check "${p}qemu-guest-agent active" "systemctl is-active -q qemu-guest-agent"
+  check "${p}host key published for the guest agent" "sudo cmp -s /etc/ssh/ssh_host_ed25519_key.pub /var/log/qemu-ga/ssh-host-key.pub" \
+    "systemctl status ssh-host-key-publish.service --no-pager -l | tail -n 8; ls -lZ /var/log/qemu-ga/"
   if python3 - "$W/qga.sock" <<'PY'
 import json, socket, sys
 s = socket.socket(socket.AF_UNIX); s.settimeout(10); s.connect(sys.argv[1])

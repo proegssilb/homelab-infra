@@ -43,6 +43,7 @@ locals {
 
   push_spec = jsonencode({
     host         = local.ip
+    vmid         = var.vmid
     user         = "admin"
     wait_seconds = 900
     files = [for f in concat(local.base_files, var.files) : {
@@ -103,6 +104,10 @@ resource "proxmox_virtual_environment_vm" "vm" {
 
   initialization {
     datastore_id = var.datastore
+    # Proxmox's cloud-init defaults to "upgrade packages" (package_upgrade: true in
+    # the user-data it generates), which fails on an immutable bootc root (dnf).
+    # Updates come from the image channel instead.
+    upgrade = false
 
     user_account {
       username = "admin"

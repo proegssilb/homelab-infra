@@ -1,0 +1,9 @@
+[Unit]
+Description=Republish the SSH host public key when it changes
+# cloud-init regenerates host keys whenever it starts a new instance.
+
+[Path]
+PathChanged=/etc/ssh/ssh_host_ed25519_key.pub
+
+[Install]
+WantedBy=multi-user.target

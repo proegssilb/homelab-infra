@@ -5,4 +5,8 @@ local-address=${listen}, 127.0.0.1
 dnsupdate=yes
 allow-dnsupdate-from=${update_from}
 default-ttl=300
+# No zone cache: it refreshes every 5 min, so a zone created after startup (the
+# first boot's pdns-zone-init) answers REFUSED until then. One tiny zone doesn't
+# need it.
+zone-cache-refresh-interval=0
 default-soa-content=ns1.@ hostmaster.@ 0 10800 3600 604800 300

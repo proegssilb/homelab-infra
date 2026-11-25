@@ -3,7 +3,7 @@
 
 Called by Tofu (modules/bootc_vm, local-exec) with the spec as JSON in $PUSH_SPEC:
 
-  {"host": "...", "user": "admin", "wait_seconds": 900,
+  {"host": "...", "vmid": 123, "user": "admin", "wait_seconds": 900,
    "files":   [{"path": "/etc/...", "mode": "0644", "content_b64": "..."}],
    "run":     ["shell command run as root", ...],          # after the files
    "secrets": [{"item": "dns/tsig-tofu", "command": "..."}], # value on the command's stdin
@@ -12,6 +12,9 @@ Called by Tofu (modules/bootc_vm, local-exec) with the spec as JSON in $PUSH_SPE
 Proxmox's cloud-init only sets the admin user, key, hostname and network (no
 snippets: uploading those needs SSH into the hypervisors). Everything else a VM
 needs arrives here, after first boot, the same way for config and for secrets.
+
+The VM's SSH host key is read through the Proxmox API (guest agent) and checked
+strictly, so it needs PROXMOX_VE_ENDPOINT / PROXMOX_VE_API_TOKEN, which Tofu has.
 
 Secrets come from Bitwarden through the BW_SESSION Tofu inherits from
 scripts/bw-run, travel only over SSH stdin, and are never printed: output names
@@ -29,18 +32,63 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bwlib  # noqa: E402
 
-KNOWN_HOSTS = Path.home() / ".cache" / "homelab-push" / "known_hosts"
+import ssl
+import tempfile
+import urllib.parse
+import urllib.request
+
+# Host key verification without trust-on-first-use: the VM's own host key is read
+# through the Proxmox API (QEMU guest agent file-read, authenticated with the
+# token Tofu uses), and SSH then checks strictly against it. Host keys change
+# whenever cloud-init starts a new instance (VM rebuilt, cloud-init data changed),
+# so they're fetched for every push, never cached.
+KNOWN_HOSTS = Path(tempfile.mkdtemp(prefix="push-vm-")) / "known_hosts"
+# The image republishes it there (ssh-host-key-publish.path): the SELinux-confined
+# guest agent can read its own log directory but not /etc/ssh.
+HOST_KEY_FILE = "/var/log/qemu-ga/ssh-host-key.pub"
 
 
 def log(msg: str) -> None:
     print(f"push-vm: {msg}", flush=True)
 
 
+def pve(path: str) -> dict:
+    endpoint = os.environ["PROXMOX_VE_ENDPOINT"].rstrip("/")
+    req = urllib.request.Request(f"{endpoint}/api2/json{path}", headers={
+        "Authorization": f"PVEAPIToken={os.environ['PROXMOX_VE_API_TOKEN']}"})
+    ctx = ssl.create_default_context()
+    if os.environ.get("PROXMOX_VE_INSECURE", "").lower() in ("1", "true", "yes"):
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    with urllib.request.urlopen(req, timeout=15, context=ctx) as r:
+        return json.load(r)["data"]
+
+
+def host_key(spec: dict) -> str | None:
+    """The VM's ed25519 host key via the guest agent, or None if not readable yet."""
+    try:
+        vms = pve("/cluster/resources?type=vm")
+        node = next(v["node"] for v in vms if v.get("vmid") == spec["vmid"])
+        q = urllib.parse.urlencode({"file": HOST_KEY_FILE})
+        key = pve(f"/nodes/{node}/qemu/{spec['vmid']}/agent/file-read?{q}")["content"].strip()
+        return key if key.startswith("ssh-ed25519 ") else None
+    except Exception:
+        return None  # agent not up yet, VM booting, key not generated yet
+
+
+def pin_host_key(spec: dict) -> bool:
+    key = host_key(spec)
+    if not key:
+        return False
+    KNOWN_HOSTS.write_text(f"{spec['host']} {' '.join(key.split()[:2])}\n")
+    return True
+
+
 def ssh_base(spec: dict) -> list[str]:
-    KNOWN_HOSTS.parent.mkdir(parents=True, exist_ok=True)
     return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
-            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "StrictHostKeyChecking=yes",
             "-o", f"UserKnownHostsFile={KNOWN_HOSTS}",
+            "-o", "HostKeyAlgorithms=ssh-ed25519",
             f"{spec.get('user', 'admin')}@{spec['host']}"]
 
 
@@ -57,7 +105,9 @@ def remote(spec: dict, command: str, stdin: bytes | None = None, what: str = "")
 def wait_for_ssh(spec: dict) -> None:
     deadline = time.monotonic() + int(spec.get("wait_seconds", 900))
     while time.monotonic() < deadline:
-        if subprocess.run(ssh_base(spec) + ["true"], capture_output=True).returncode == 0:
+        # Re-read the key each try: cloud-init may regenerate it early in a boot.
+        if pin_host_key(spec) and subprocess.run(ssh_base(spec) + ["true"],
+                                                 capture_output=True).returncode == 0:
             # cloud-init creates the user early; wait until it's done (network, keys).
             subprocess.run(ssh_base(spec) + ["sudo cloud-init status --wait >/dev/null 2>&1 || true"],
                            capture_output=True)

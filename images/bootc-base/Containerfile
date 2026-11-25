@@ -37,6 +37,7 @@ RUN systemctl enable \
         alloy.service \
         bootc-image-metric.service bootc-image-metric.timer \
         greenboot-healthcheck.service greenboot-set-rollback-trigger.service \
+        ssh-host-key-publish.service ssh-host-key-publish.path \
     && chmod 0755 /usr/lib/greenboot/check/required.d/*.sh \
     && rm -rf /var/cache/* \
     && bootc container lint --fatal-warnings

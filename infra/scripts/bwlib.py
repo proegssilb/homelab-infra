@@ -114,6 +114,14 @@ class Vault:
         created = json.loads(_run(["create", "item"], stdin=_encode(item)))
         self.items[name] = created
 
+    def delete(self, name: str) -> None:
+        """Move an item to Bitwarden's trash (recoverable there for 30 days)."""
+        it = self.items.get(name)
+        if it is None:
+            raise BitwardenError(f"no item named {name!r} in folder {FOLDER}")
+        _run(["delete", "item", it["id"]])
+        del self.items[name]
+
     def update(self, name: str, value: str) -> None:
         it = dict(self.items[name])
         password, notes = self._shape(value)

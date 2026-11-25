@@ -1,0 +1,16 @@
+[Unit]
+Description=Publish the SSH host public key where the QEMU guest agent can read it
+# Tofu's push (scripts/push-vm.py) reads it through the Proxmox API (guest agent
+# file-read) to verify the VM's SSH identity without trust-on-first-use. The confined
+# guest agent (SELinux) can't read /etc/ssh, but can read its own log directory.
+After=sshd-keygen.target cloud-init-network.service
+ConditionPathExists=/etc/ssh/ssh_host_ed25519_key.pub
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/install -d -m 0755 /var/log/qemu-ga
+ExecStart=/usr/bin/install -m 0644 /etc/ssh/ssh_host_ed25519_key.pub /var/log/qemu-ga/ssh-host-key.pub
+ExecStart=/usr/sbin/restorecon /var/log/qemu-ga/ssh-host-key.pub
+
+[Install]
+WantedBy=multi-user.target
