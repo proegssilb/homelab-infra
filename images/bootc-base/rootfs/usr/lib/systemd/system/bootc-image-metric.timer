@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh bootc image and update status metrics hourly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

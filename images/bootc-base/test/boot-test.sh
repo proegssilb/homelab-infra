@@ -128,6 +128,10 @@ check "cloud-init: static address $ADDR/24" "ip -4 -o addr show | grep -q ' $ADD
 check "cloud-init: no DHCP on the static NIC" "! nmcli -g ipv4.method connection show --active | grep -qx auto"
 check "cloud-init: finished without errors" "sudo cloud-init status --wait | grep -q 'status: done'"
 check "no failed systemd units" "test -z \"\$(systemctl --failed --no-legend --plain)\""
+check "greenboot health check passed" "test \"\$(systemctl show -p Result --value greenboot-healthcheck)\" = success" \
+  "systemctl status greenboot-healthcheck --no-pager -l | tail -n 15"
+check "updates only in the nightly window" "systemctl show -p TimersCalendar bootc-fetch-apply-updates.timer | grep -q '04:00:00'" \
+  "systemctl cat bootc-fetch-apply-updates.timer"
 check "sshd: password login off" "sudo sshd -T | grep -qix 'passwordauthentication no'" \
   "sudo sshd -T | grep -iE '^(passwordauthentication|kbdinteractiveauthentication|permitrootlogin)'; ls /etc/ssh/sshd_config.d/; sudo grep -H -iE 'PasswordAuthentication|Include' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*"
 check "qemu-guest-agent active" "systemctl is-active -q qemu-guest-agent"
@@ -140,6 +144,8 @@ PY
 then pass "qemu-guest-agent answers the host"; else fail "qemu-guest-agent answers the host"; fi
 check "node_exporter answers on :9100" "curl -sf localhost:9100/metrics | grep -q '^node_boot_time_seconds'"
 check "node_exporter: bootc image metric" "curl -sf localhost:9100/metrics | grep -q '^bootc_booted_image_info{'"
+check "node_exporter: bootc update status metric" "curl -sf localhost:9100/metrics | grep -q '^bootc_update_available '" \
+  "sudo /usr/libexec/bootc-image-metric; cat /var/lib/prometheus/node-exporter/bootc_image.prom; sudo bootc upgrade --check 2>&1 | tail -n 5"
 check "alloy active with endpoints from cloud-init" "systemctl is-active -q alloy" \
   "systemctl status alloy --no-pager -l | head -n 12; ls -l /etc/alloy/; sudo journalctl -u alloy -b --no-pager -n 15"
 check "podman runs a container" "podman run --rm quay.io/fedora/fedora-minimal:45 true"

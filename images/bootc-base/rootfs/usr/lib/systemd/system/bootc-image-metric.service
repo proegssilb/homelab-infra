@@ -1,7 +1,8 @@
 [Unit]
-Description=Publish the booted bootc image as a node_exporter textfile metric
-# Feeds canary promotion and the per-VM image panel: which image each VM booted.
-After=local-fs.target systemd-tmpfiles-setup.service
+Description=Publish bootc image and update status as node_exporter textfile metrics
+# Feeds canary promotion, the per-VM image panel and BootcUpdateStuck.
+Wants=network-online.target
+After=network-online.target systemd-tmpfiles-setup.service
 
 [Service]
 Type=oneshot

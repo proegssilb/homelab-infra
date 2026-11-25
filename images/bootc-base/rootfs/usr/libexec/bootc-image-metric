@@ -1,8 +1,16 @@
 #!/usr/bin/python3
-"""Write bootc_booted_image_info{image,digest,version} 1 for node_exporter.
+"""node_exporter textfile metrics for bootc:
 
-The booted digest changes only at boot, so this runs once per boot. Atomic
-write (temp file + rename) so node_exporter never reads half a file.
+  bootc_booted_image_info{image,channel,digest,version} 1
+      The image this VM booted; channel is the tag of the image it *tracks*
+      (canary/stable after cloud-init's first-boot switch).
+  bootc_update_available 0|1
+      1 when the tracked tag points at something newer than what's booted, or an
+      update is staged and waiting for the window. Stuck at 1 for long means a
+      failed update or a rollback (alert BootcUpdateStuck).
+
+Runs at boot and hourly. The registry check needs the network; if it fails,
+only the booted-image metric is written. Atomic write (temp + rename).
 """
 import json
 import os
@@ -16,21 +24,52 @@ def esc(v: str) -> str:
     return v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
-status = json.loads(subprocess.run(["bootc", "status", "--json"], check=True,
-                                   capture_output=True, text=True).stdout)
-booted = ((status.get("status") or {}).get("booted") or {}).get("image") or {}
+def status() -> dict:
+    return json.loads(subprocess.run(["bootc", "status", "--json"], check=True,
+                                     capture_output=True, text=True).stdout)
+
+
+def get(d, *path):
+    for p in path:
+        d = (d or {}).get(p)
+    return d
+
+
+# Refresh the cached "is there an update" answer; tolerate no network / no registry.
+checked = subprocess.run(["bootc", "upgrade", "--check", "--quiet"],
+                         capture_output=True, text=True).returncode == 0
+
+st = status()
+booted = get(st, "status", "booted", "image") or {}
+booted_digest = booted.get("imageDigest") or "unknown"
+tracked = get(st, "spec", "image", "image") or get(booted, "image", "image") or "unknown"
+channel = tracked.rsplit(":", 1)[1] if ":" in tracked.rsplit("/", 1)[-1] and "@" not in tracked else "none"
+
 labels = {
-    "image": ((booted.get("image") or {}).get("image")) or "unknown",
-    "digest": booted.get("imageDigest") or "unknown",
+    "image": get(booted, "image", "image") or "unknown",
+    "channel": channel,
+    "digest": booted_digest,
     "version": booted.get("version") or "unknown",
 }
-line = "bootc_booted_image_info{%s} 1\n" % ",".join(f'{k}="{esc(v)}"' for k, v in labels.items())
+lines = [
+    "# HELP bootc_booted_image_info The bootc image this VM booted, and the channel it tracks.",
+    "# TYPE bootc_booted_image_info gauge",
+    "bootc_booted_image_info{%s} 1" % ",".join(f'{k}="{esc(v)}"' for k, v in labels.items()),
+]
+
+staged = get(st, "status", "staged", "image", "imageDigest")
+cached = get(st, "status", "booted", "cachedUpdate", "imageDigest")
+if checked or staged:
+    pending = bool(staged and staged != booted_digest) or bool(cached and cached != booted_digest)
+    lines += [
+        "# HELP bootc_update_available 1 if the tracked tag is newer than the booted image or an update is staged.",
+        "# TYPE bootc_update_available gauge",
+        f"bootc_update_available {int(pending)}",
+    ]
 
 os.makedirs(OUT_DIR, exist_ok=True)
 tmp = OUT + ".tmp"
 with open(tmp, "w") as fh:
-    fh.write("# HELP bootc_booted_image_info The bootc image this VM booted.\n")
-    fh.write("# TYPE bootc_booted_image_info gauge\n")
-    fh.write(line)
+    fh.write("\n".join(lines) + "\n")
 os.chmod(tmp, 0o644)
 os.replace(tmp, OUT)
