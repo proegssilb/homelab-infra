@@ -136,7 +136,10 @@ resource "proxmox_virtual_environment_vm" "vm" {
   }
 
   lifecycle {
-    ignore_changes = [node_name]
+    # The install disk only matters when a VM is created: afterwards it updates from
+    # its channel. Bumping tofu/lab's install disk must not rebuild existing VMs.
+    # (To rebuild one from the new disk: -replace=module.<vm>.proxmox_virtual_environment_vm.vm.)
+    ignore_changes = [node_name, disk[0].import_from]
 
     precondition {
       condition     = var.vmid % 256 < var.network.dhcp_first || var.vmid % 256 > var.network.dhcp_last

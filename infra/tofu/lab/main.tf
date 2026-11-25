@@ -4,7 +4,7 @@
 locals {
   # The disk new VMs are installed from. Bumped deliberately: after install a VM
   # updates itself from its channel, so an older install disk costs one update.
-  install_disk_version = "86bcc1f40307"
+  install_disk_version = "02a6f14d1691"
 
   registry = "code.${var.domain}"
   image    = "${local.registry}/minifig/bootc-base"
@@ -31,4 +31,22 @@ resource "proxmox_download_file" "bootc_base" {
   node_name    = var.proxmox_node
   url          = "https://${local.registry}/api/packages/minifig/generic/bootc-base-disk/${local.install_disk_version}/bootc-base.qcow2"
   file_name    = "bootc-base-${local.install_disk_version}.qcow2"
+}
+
+# Proxmox HA for the lab VMs that need it. resource_id comes from the module output
+# plus depends_on, never a literal VMID (CLAUDE.md: proxmox_haresource dependency trap).
+# canary01 isn't here: it's the VM the rollback test breaks.
+locals {
+  ha_vms = {
+    dns01   = module.dns01.vmid
+    ittools = module.ittools.vmid
+  }
+}
+
+resource "proxmox_haresource" "vm" {
+  for_each    = local.ha_vms
+  resource_id = "vm:${each.value}"
+  state       = "started"
+
+  depends_on = [module.dns01, module.ittools]
 }

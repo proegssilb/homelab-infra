@@ -97,7 +97,7 @@ While these two tools are in use, do not mix up their purposes — Tofu does not
 |------------|------------|---------|
 | `platform/` | 2xx | Infrastructure VMs: proxy pair, observability stack, auth |
 | `pets/`     | 1xx | Named standalone VMs: Nextcloud, Forgejo (code) |
-| `lab/`      | any, outside the DHCP pool | bootc VMs (`modules/bootc_vm`): dns01 (240), canary01 (241). Every VM lands here as it migrates; platform/ and pets/ empty out. Not configured by Ansible (tag `bootc`, excluded from the inventory). |
+| `lab/`      | `.<VMID>`, outside the DHCP pool (`.20–.99`) | bootc VMs (`modules/bootc_vm`): ittools (112), dns01 (240), canary01 (241). Every VM lands here as it migrates; platform/ and pets/ empty out. Not configured by Ansible (tag `bootc`, excluded from the inventory). |
 | (none)      | 1000–1999 | Coder workspace VMs, created by Coder (template in `ansible/roles/coder/files/coder-templates/`), fenced to the `coder` Proxmox pool, tagged `coder_workspace` and excluded from the Ansible inventory. Never allocate these IDs to lab VMs. |
 
 There is no `cluster-dev/` directory yet (referenced in justfile, not yet created).
@@ -272,6 +272,8 @@ every directory a package leaves in `/var` gets a tmpfiles.d entry.
   has run the canary 24 h healthy (`.forgejo/scripts/bootc_promote.py`, before each release build and
   daily once merged). greenboot rolls an update back if a required check fails (verified on canary01);
   alerts `BootcUpdateStuck` (48 h) and `BootcPromotionStalled` (4 days).
+- Migrating a VM: `docs/migrating-a-vm-to-bootc.md`. Lab DHCP is `.20–.99`; not-yet-migrated DHCP
+  VMs above that keep temporary UniFi reservations (list in the spec), removed as each migrates.
 - Never run `pdnsutil tsigkey list` (it prints the secret). Rotate with
   `scripts/bw-run -- scripts/bw-generate.py dns/tsig-tofu --rotate`, then targeted-apply dns01's push
   before a full apply (a full plan refreshes records with the new key first and fails NOTAUTH).

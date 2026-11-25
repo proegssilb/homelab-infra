@@ -200,7 +200,17 @@ Phase 1 steps 4–6 (2026-11-24/25), done:
 - Still to observe over time: canary01 taking the new canary in its window, promotion after 24 h
   (before the merge it runs at the start of a release-branch build), dns01 updating at 04:00.
 
-**2. Pilot**: ittools (112), stateless. Proves cloud-init last mile, static IP, DNS record,
+**2. Pilot** — done 2026-11-25. ittools (112) runs as a bootc VM in `tofu/lab` on the canary
+channel (HA, `.112`, behind proxy01 via `ittools.<lab zone>`). The recipe is
+`docs/migrating-a-vm-to-bootc.md`. Lab DHCP pool is now `.20–.99`; **temporary UniFi fixed-IP
+reservations** keep the not-yet-migrated DHCP VMs at their old addresses, each removed when its VM
+migrates (MAC `02:00:00:00:00:xx`): nextcloud .148, forgejo .151, actual .158, mealie .153,
+freshrss .154, immich .155, searxng .156, anamnesis .159, homeassistant .160, homepage .161,
+coder .162, runner01 .163, mcpgw .164, coderdb .165 (ittools' .157 already removed). Found on the
+way: an install disk older than the host-key publisher can't be pushed to, so the install disk is
+bumped deliberately and `ignore_changes` keeps that from rebuilding existing VMs.
+
+Pilot plan (original):: ittools (112), stateless. Proves cloud-init last mile, static IP, DNS record,
 secret push and automatic updates end to end.
 
 **3. Platform**: aptcache01 (230), obs01–03 (210–212), proxy01 (200, LXC → VM),

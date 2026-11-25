@@ -122,8 +122,9 @@ _nginx_vhosts_apps:
     ssl_cert: "/etc/letsencrypt/live/{{ homelab_domain }}/fullchain.pem"
     ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
     upstream_protocol: http
+    # bootc VM (tofu/lab): static address, named in the Tofu-managed zone.
     upstream_servers:
-      - "ittools.{{ homelab_domain }}:8080"
+      - "ittools.{{ lab_dns_zone }}:8080"
 
   - name: anamnesis
     server_name: "tasks.{{ homelab_domain }}"
