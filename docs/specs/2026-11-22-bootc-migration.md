@@ -187,6 +187,19 @@ Phase 1 progress and decisions (2026-11-24):
 - greenboot is installed but its bootc rollback behaviour is still unverified (empirical test in
   phases 1–2, as planned).
 
+Phase 1 steps 4–6 (2026-11-24/25), done:
+- `tofu/lab` (one state for every bootc VM; platform/pets empty out) + `modules/bootc_vm`. dns01
+  (PowerDNS 5.0, zone `l.<apex>`, records written by Tofu with TSIG) and canary01 run on it.
+- Per-VM config arrives by Tofu-run SSH push (cloud-init snippets would need SSH into the
+  hypervisors); cloud-init only sets user, hostname and network. The push verifies host keys through
+  the Proxmox API (guest agent) instead of trust-on-first-use.
+- Channels and promotion work; the workflow's `RELEASE_BRANCH` is this branch until the merge.
+- **greenboot rollback verified** on canary01: a failing required check after an upgrade made the
+  bootloader fall back to the previous image, `bootc_update_available` stayed 1, and
+  `BootcUpdateStuck` went pending. No custom fallback needed.
+- Still to observe over time: canary01 taking the new canary in its window, promotion after 24 h
+  (before the merge it runs at the start of a release-branch build), dns01 updating at 04:00.
+
 **2. Pilot**: ittools (112), stateless. Proves cloud-init last mile, static IP, DNS record,
 secret push and automatic updates end to end.
 

@@ -97,6 +97,7 @@ While these two tools are in use, do not mix up their purposes — Tofu does not
 |------------|------------|---------|
 | `platform/` | 2xx | Infrastructure VMs: proxy pair, observability stack, auth |
 | `pets/`     | 1xx | Named standalone VMs: Nextcloud, Forgejo (code) |
+| `lab/`      | any, outside the DHCP pool | bootc VMs (`modules/bootc_vm`): dns01 (240), canary01 (241). Every VM lands here as it migrates; platform/ and pets/ empty out. Not configured by Ansible (tag `bootc`, excluded from the inventory). |
 | (none)      | 1000–1999 | Coder workspace VMs, created by Coder (template in `ansible/roles/coder/files/coder-templates/`), fenced to the `coder` Proxmox pool, tagged `coder_workspace` and excluded from the Ansible inventory. Never allocate these IDs to lab VMs. |
 
 There is no `cluster-dev/` directory yet (referenced in justfile, not yet created).
@@ -244,13 +245,36 @@ every directory a package leaves in `/var` gets a tmpfiles.d entry.
 - CI (`.forgejo/workflows/bootc-base.yml`, any branch push touching the image): build + push,
   qcow2 via bootc-image-builder, KVM boot test, upgrade test (from `:canary`; on branches from the
   newest earlier disk), and only then publishes the qcow2 as generic package `bootc-base-disk`
-  and (main only) tags `:canary`. Branches get `branch-<sha>` only. A broken disk must never be
+  and (release branch only) tags `:canary`. Branches get `branch-<sha>` only. The release branch is
+  `RELEASE_BRANCH` in the workflows: the migration branch until it merges, then `main`. A broken disk must never be
   published: if one is, delete that `bootc-base-disk` version, or the next branch run upgrades
   from it and fails.
 - CI gotchas (each cost a run): pushes use `secrets.PACKAGE_TOKEN` (owner token, package scope;
   the automatic token gets 401 on push); build and push are one `buildx --push` (a separate
   `docker push` of the big layers hits proxy01's idle keep-alive); bootc-image-builder under
   Docker needs `--cgroupns=host`; job logs aren't public, so read the run in the Forgejo UI.
+
+### bootc VMs (`tofu/lab`, `modules/bootc_vm`)
+
+- Installed from the `bootc-base-disk` package (version pinned in `tofu/lab/main.tf`), static address
+  = VMID as last octet (the module refuses one inside the DHCP pool), names in the Tofu-managed zone
+  `var.zone` on dns01 (PowerDNS; UniFi forwards that zone to it; `lab_dns_zone` for Ansible).
+- Proxmox cloud-init sets only the `admin` user + key, hostname and network, with `upgrade = false`
+  (Proxmox's default "upgrade packages" runs dnf and breaks cloud-init on bootc). No snippets.
+- Everything else is **pushed over SSH by Tofu** (`scripts/push-vm.py`, local-exec): files, commands,
+  then Bitwarden secrets on stdin. Values never in state or cloud-init. The push verifies the VM's
+  SSH host key by reading it through the Proxmox API (guest agent) from `/var/log/qemu-ga/`, where the
+  image republishes it (the confined agent can't read `/etc/ssh`); host keys change with every new
+  cloud-init instance, so nothing is cached. A rotated secret alone doesn't trigger a push:
+  `tofu apply -replace=module.<vm>.terraform_data.push`.
+- Updates: each VM tracks `bootc-base:canary` or `:stable` (switched on first push) and reboots into
+  updates in a nightly window (canary 03:00, stable 04:00). `:stable` moves only when every canary VM
+  has run the canary 24 h healthy (`.forgejo/scripts/bootc_promote.py`, before each release build and
+  daily once merged). greenboot rolls an update back if a required check fails (verified on canary01);
+  alerts `BootcUpdateStuck` (48 h) and `BootcPromotionStalled` (4 days).
+- Never run `pdnsutil tsigkey list` (it prints the secret). Rotate with
+  `scripts/bw-run -- scripts/bw-generate.py dns/tsig-tofu --rotate`, then targeted-apply dns01's push
+  before a full apply (a full plan refreshes records with the new key first and fails NOTAUTH).
 
 ### Secrets
 
