@@ -14,7 +14,12 @@ variable "admin_ssh_key" {
 }
 
 variable "domain" {
-  description = "The lab's base domain. The registry is code.<domain>; the Tofu-managed zone is l.<domain>."
+  description = "The lab's base domain (VMs' search domain; the registry is code.<domain>)."
+  type        = string
+}
+
+variable "zone" {
+  description = "The Tofu-managed DNS zone dns01 serves (e.g. l.example.com); UniFi forwards it to dns01."
   type        = string
 }
 

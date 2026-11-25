@@ -1,5 +1,5 @@
-# dns01: PowerDNS Authoritative for l.<domain>. Every record in it comes from this
-# state, so it needs no backup. UniFi forwards l.<domain> here (manual UniFi setting).
+# dns01: PowerDNS Authoritative for var.zone (l.<apex>). Every record in it comes from this
+# state, so it needs no backup. UniFi forwards the zone here (manual UniFi setting).
 #
 # One apply goes VM -> push (files, pdns started, zone created, TSIG key imported)
 # -> records: the records depend on the whole module, push included.
@@ -45,7 +45,10 @@ module "dns01" {
   run = [
     "systemctl daemon-reload",
     "systemctl restart pdns.service",
-    "systemctl enable --now pdns-zone-init.service",
+    # restart, not enable --now: it's a RemainAfterExit oneshot that must re-run when
+    # its unit (the zone) changes.
+    "systemctl enable pdns-zone-init.service",
+    "systemctl restart pdns-zone-init.service",
   ]
 
   # pdnsutil takes the key as an argument, so on dns01 it's briefly visible in the

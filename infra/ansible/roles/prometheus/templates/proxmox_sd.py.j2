@@ -8,6 +8,8 @@ TOKEN_SECRET  = "{{ prometheus_proxmox_token_secret }}"
 OUTPUT_FILE   = "{{ prometheus_config_dir }}/targets/proxmox.json"
 EXPORTER_PORT = 9100
 DOMAIN        = "{{ homelab_domain }}"
+# Zone of bootc VMs' names (dns01, tofu/lab var.zone); unset = no bootc VMs scraped by name.
+LAB_ZONE      = "{{ lab_dns_zone | default('') }}"
 
 _ctx = ssl.create_default_context()
 _ctx.check_hostname = False
@@ -39,10 +41,10 @@ for node in api_get("/nodes"):
             # Full name: not every short name resolves from obs01 (proxy01's
             # never did). The instance label keeps the short name. bootc VMs
             # (tofu/lab) have static addresses, so no DHCP lease gives them a
-            # UniFi name: theirs live in the Tofu-managed zone l.<domain> on
+            # UniFi name: theirs live in the Tofu-managed zone (lab_dns_zone) on
             # dns01, which UniFi forwards to.
             bootc = "bootc" in vm.get("tags", "").split(";")
-            fqdn = f"{name}.l.{DOMAIN}" if bootc else f"{name}.{DOMAIN}"
+            fqdn = f"{name}.{LAB_ZONE}" if bootc and LAB_ZONE else f"{name}.{DOMAIN}"
             targets.append({
                 "targets": [f"{fqdn}:{EXPORTER_PORT}"],
                 "labels": {"instance": name, "proxmox_node": node_name},

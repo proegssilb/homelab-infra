@@ -5,6 +5,7 @@ proxmox_node  = "pve01"
 datastore     = "ceph-ssd-pool"
 admin_ssh_key = "ssh-ed25519 AAAA... you@workstation"
 domain        = "home.example.com"
+zone          = "l.example.com"   # the zone dns01 serves; UniFi forwards it
 
 network = {
   subnet      = "10.0.20.0/24"

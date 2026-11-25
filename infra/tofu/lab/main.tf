@@ -8,7 +8,7 @@ locals {
 
   registry = "code.${var.domain}"
   image    = "${local.registry}/minifig/bootc-base"
-  zone     = "l.${var.domain}"
+  zone     = var.zone
 
   network  = merge(var.network, { domain = var.domain })
   dns01_ip = cidrhost(var.network.subnet, 240)
