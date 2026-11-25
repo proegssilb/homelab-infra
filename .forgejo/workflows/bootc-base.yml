@@ -97,7 +97,7 @@ jobs:
           digest=$(python3 -c 'import json; print(json.load(open("meta.json"))["containerimage.digest"])')
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           if [ "${{ steps.n.outputs.main }}" = 1 ]; then
-            docker buildx imagetools create -t "${{ steps.n.outputs.image }}:candidate" \
+            docker buildx imagetools create --prefer-index=false -t "${{ steps.n.outputs.image }}:candidate" \
               "${{ steps.n.outputs.image }}@$digest"
           fi
 
@@ -184,7 +184,10 @@ jobs:
       - name: Tag canary
         if: steps.n.outputs.main == '1'
         run: |
-          docker buildx imagetools create \
+          # --prefer-index=false: tag the build's own manifest. The default wraps it in a
+          # new index with a different digest, so VMs, :canary and :stable would never
+          # compare equal for the same image.
+          docker buildx imagetools create --prefer-index=false \
             -t "${{ steps.n.outputs.image }}:canary" \
             "${{ steps.n.outputs.image }}@${{ steps.build.outputs.digest }}"
 

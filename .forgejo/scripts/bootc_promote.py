@@ -109,7 +109,9 @@ def main() -> int:
     if a.dry_run:
         print(f"promote: would move :stable to {canary[:19]} (dry run)")
         return 0
-    subprocess.run(["docker", "buildx", "imagetools", "create", "-t", f"{a.image}:stable",
+    # --prefer-index=false keeps the manifest's own digest (see bootc-base.yml).
+    subprocess.run(["docker", "buildx", "imagetools", "create", "--prefer-index=false",
+                    "-t", f"{a.image}:stable",
                     f"{a.image}@{canary}"], check=True)
     print(f"promote: :stable -> {canary[:19]}")
     return 0
