@@ -629,8 +629,16 @@ resource "proxmox_virtual_environment_vm" "workspace" {
     }
   }
 
+  # The template's vendor snippet tries to install qemu-guest-agent from the
+  # internet, which workspaces can't reach; agent_install installs it through
+  # the apt cache instead. Until then there's no agent, and the IP is static
+  # anyway: waiting for the agent to report it would stall creation for the
+  # whole agent timeout (15m).
   agent {
     enabled = true
+    wait_for_ip {
+      disabled = true
+    }
   }
 
   operating_system {
@@ -748,8 +756,11 @@ resource "terraform_data" "agent_install" {
     timeout     = "5m"
   }
 
+  # Two provisioners on purpose: Coder hides a provisioner's whole output when
+  # its config holds a sensitive value. This first one holds none, so apt's
+  # errors show in the build log; the token and deploy key go in the second.
   provisioner "remote-exec" {
-    inline = concat([
+    inline = [
       "cloud-init status --wait >/dev/null || true",
       # Packages through the lab apt cache and time from egress01, before
       # anything is installed: neither needs the open internet.
@@ -757,18 +768,24 @@ resource "terraform_data" "agent_install" {
       "sudo install -d -m 0755 /etc/systemd/timesyncd.conf.d",
       "echo '${base64encode(local.timesyncd_conf)}' | base64 -d | sudo tee /etc/systemd/timesyncd.conf.d/agents.conf >/dev/null",
       "sudo systemctl try-restart systemd-timesyncd || true",
+      # git for the git-clone module, qemu-guest-agent for Proxmox (the cloud
+      # image ships neither). remote-exec only fails on the script's last
+      # command, so exit explicitly: a workspace without them should fail its
+      # build, not start. --error-on=any: apt-get update otherwise exits 0 when
+      # every index fetch fails. Retried, since one bad fetch fails it.
+      "if ! command -v git >/dev/null || ! dpkg -s qemu-guest-agent >/dev/null 2>&1; then ok=; for i in 1 2 3; do sudo apt-get -o DPkg::Lock::Timeout=300 update -qq --error-on=any && { ok=1; break; }; echo \"apt-get update failed (attempt $i/3)\" >&2; sleep 10; done; [ -n \"$ok\" ] && sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y -qq git qemu-guest-agent >/dev/null || { echo 'installing git and qemu-guest-agent failed' >&2; exit 1; }; fi",
+      "sudo systemctl start qemu-guest-agent",
+    ]
+  }
+
+  provisioner "remote-exec" {
+    inline = concat([
       # Deploy key (runs as user coder); removed if the repo isn't on Forgejo.
       "install -d -m 0700 /home/coder/.ssh",
       ], local.is_forgejo ? [
       "echo '${base64encode(tls_private_key.deploy[0].private_key_openssh)}' | base64 -d | install -m 0600 /dev/stdin ${local.deploy_key_path}",
       ] : [
       "rm -f ${local.deploy_key_path}",
-      ], [
-      # git-clone module needs git; the cloud image doesn't ship it. remote-exec
-      # only fails on the script's last command, so exit explicitly: a workspace
-      # without git should fail its build, not start. --error-on=any: apt-get
-      # update otherwise exits 0 when every index fetch fails.
-      "command -v git >/dev/null || { sudo apt-get -o DPkg::Lock::Timeout=300 update -qq --error-on=any && sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y -qq git >/dev/null; } || { echo 'git install failed' >&2; exit 1; }",
       ], var.llm_base_url != "" ? [
       # Kilo Code's lab config (holds this build's agent token: 0600).
       "install -d -m 0700 /home/coder/.config/kilo",
