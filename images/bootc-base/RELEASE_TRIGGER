@@ -1,0 +1,4 @@
+# Touched to start a release build of bootc-base.yml (its first step promotes a
+# soaked :canary to :stable). Not copied into the image. Temporary: remove after
+# the merge, when bootc-promote.yml's daily schedule takes over.
+soaked-canary: sha256:eb20a442056010149f267935059419a789497c73d0022abeb7ca24d010143653
