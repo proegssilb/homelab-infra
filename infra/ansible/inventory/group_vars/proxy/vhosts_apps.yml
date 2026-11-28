@@ -187,7 +187,7 @@ _nginx_vhosts_apps:
     ssl_key:  "/etc/letsencrypt/live/{{ homelab_domain }}/privkey.pem"
     upstream_protocol: http
     upstream_servers:
-      - "garage-apps.{{ homelab_domain }}:3900"
+      - "garage-apps.{{ lab_dns_zone }}:3900"  # bootc VM (tofu/lab)
     # Object PUTs traverse this vhost, so nginx's 1m default would cap every
     # upload well below what the apps behind it allow (anamnesis alone permits
     # 40MiB). Generous but still bounded, since this endpoint is shared.

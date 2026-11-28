@@ -97,7 +97,7 @@ While these two tools are in use, do not mix up their purposes — Tofu does not
 |------------|------------|---------|
 | `platform/` | 2xx | Infrastructure VMs: proxy pair, observability stack, auth |
 | `pets/`     | 1xx | Named standalone VMs: Nextcloud, Forgejo (code) |
-| `lab/`      | `.<VMID>`, outside the DHCP pool (`.20–.99`) | bootc VMs (`modules/bootc_vm`): ittools (112), upsmon01 (213), aptcache01 (230), dns01 (240), canary01 (241). Every VM lands here as it migrates; platform/ and pets/ empty out. Not configured by Ansible (tag `bootc`, excluded from the inventory). |
+| `lab/`      | `.<VMID>`, outside the DHCP pool (`.20–.99`) | bootc VMs (`modules/bootc_vm`): ittools (112), upsmon01 (213), garage-apps (222), aptcache01 (230), dns01 (240), canary01 (241). Every VM lands here as it migrates; platform/ and pets/ empty out. Not configured by Ansible (tag `bootc`, excluded from the inventory). |
 | (none)      | 1000–1999 | Coder workspace VMs, created by Coder (template in `ansible/roles/coder/files/coder-templates/`), fenced to the `coder` Proxmox pool, tagged `coder_workspace` and excluded from the Ansible inventory. Never allocate these IDs to lab VMs. |
 | (lab)       | 2000–2999 | Holder VMs owning bootc VMs' data disks (`2000 + vmid`, `<name>-data`, tag `bootc-data`, never started). Created by `modules/bootc_vm` or `scripts/adopt-data-disk.py`. |
 
@@ -277,7 +277,9 @@ every directory a package leaves in `/var` gets a tmpfiles.d entry.
   tag `bootc-data`, `prevent_destroy`); the VM attaches them by `path_in_datastore`, so `-replace` or
   destroying the VM keeps the data (several apps are single-instance). Mounts use
   `homelab-prepare-disk@` (formats only an all-zero disk) and the container SELinux context, so Quadlets
-  mount them without `:Z`. Existing disks are adopted with `scripts/adopt-data-disk.py` (dry run by
+  mount them without `:Z`. A VM with data joins a backup pool (`pool_id`; `ha-prod`/`la-prod` live in
+  `tofu/lab`, which bootstrap applies first): the nightly vzdump jobs target pools. Existing disks are
+  adopted with `scripts/adopt-data-disk.py` (dry run by
   default). Never remove `prevent_destroy` or delete a holder casually.
 - The image waits up to 10 min for the network (`homelab-wait-network`, before
   `network-online.target`); Quadlets use `RestartSec=10s` + `StartLimitIntervalSec=0`, and pushed

@@ -261,6 +261,16 @@ with no capabilities. The generic-kernel swap is gone (Fedora's kernel has USB).
 `upsmon01.<lab zone>:9199`; `up{job="ups_nut"}` 1, battery metrics back. Also: bpg/proxmox 0.124
 in every state (no plan changes).
 
+Step 2 (garage-apps), cut over 2026-11-28 05:13–05:19 UTC: the first adopted data disk. Bootc VM `.222`,
+HA, `:stable`, Garage from its upstream image (`dxflrs/garage:v2.5.0`, same version) as UID 3900 with
+no capabilities, RPC and admin API on loopback only. The old VM's 50 GiB disk was reassigned to holder
+2222 after a stop-mode vzdump; the existing node, layout, `anamnesis` bucket and key (from 2026-09-05)
+came back unchanged, ownership handed to UID 3900 by an idempotent `find … -exec chown`. RPC secret
+and default key are Podman secrets from Bitwarden. proxy01's `s3` vhost points at the lab-zone name.
+Found on the way: lab VMs weren't in a backup pool, so the nightly pool-based vzdump would have dropped
+them. `ha-prod`/`la-prod` moved from `tofu/platform` to `tofu/lab` (lab is applied first by bootstrap;
+`removed` without destroy there, imported here) and `modules/bootc_vm` takes `pool_id`.
+
 **4. Apps with data**: searxng (111), homepage (115), actual (107), freshrss (109),
 mealie (108), anamnesis (113), homeassistant (114), immich (110, own Postgres),
 nextcloud (103), then pg01 (221). Nextcloud migrates: bulk storage stays in the lab as a data

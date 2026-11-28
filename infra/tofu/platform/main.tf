@@ -12,7 +12,7 @@
 locals {
   lxcs = {
     # Reverse proxy — single nginx LXC, Proxmox HA for auto-restart
-    proxy01    = { vmid = 200, cores = 1, memory = 512, tags = ["platform", "proxy", "observe"],        node = "pxmx03", privileged = false, ha = true }
+    proxy01 = { vmid = 200, cores = 1, memory = 512, tags = ["platform", "proxy", "observe"], node = "pxmx03", privileged = false, ha = true }
     # Tailscale subnet routers — HA pair on separate nodes, anti-affinity enforced by proxmox_harule below
     tsrouter01 = { vmid = 201, cores = 1, memory = 512, tags = ["platform", "tailscale_router"], node = "pxmx04", privileged = false, ha = true }
     tsrouter02 = { vmid = 202, cores = 1, memory = 512, tags = ["platform", "tailscale_router"], node = "pxmx02", privileged = false, ha = true }
@@ -21,8 +21,8 @@ locals {
   vms = {
     # Observability stack — Prometheus + Alertmanager + Loki + Grafana
     obs01 = { vmid = 210, cores = 4, memory = 4096, tags = ["platform", "observability", "obs_prometheus", "observe"], node = "pxmx01", data_disks = [{ size = 60, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
-    obs02 = { vmid = 211, cores = 4, memory = 4096, tags = ["platform", "observability", "obs_loki", "observe"],       node = "pxmx02", data_disks = [{ size = 80, datastore = "ceph-hdd-pool" }], ha = true, backup = true }
-    obs03 = { vmid = 212, cores = 2, memory = 2048, tags = ["platform", "observability", "obs_grafana", "observe"],    node = "pxmx03", data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
+    obs02 = { vmid = 211, cores = 4, memory = 4096, tags = ["platform", "observability", "obs_loki", "observe"], node = "pxmx02", data_disks = [{ size = 80, datastore = "ceph-hdd-pool" }], ha = true, backup = true }
+    obs03 = { vmid = 212, cores = 2, memory = 2048, tags = ["platform", "observability", "obs_grafana", "observe"], node = "pxmx03", data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
 
     # Identity provider — Authentik
     authentik = { vmid = 220, cores = 2, memory = 4096, tags = ["platform", "auth_app", "observe"], node = "pxmx02", data_disks = [{ size = 20, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
@@ -30,11 +30,7 @@ locals {
     # Shared PostgreSQL — all pet apps connect here
     pg01 = { vmid = 221, cores = 4, memory = 8192, tags = ["platform", "postgres_primary", "observe"], node = "pxmx03", data_disks = [{ size = 40, datastore = "ceph-ssd-pool" }], ha = true, backup = true }
 
-    # General-purpose S3-compatible app blob storage — distinct from the tiny
-    # bootstrap-only Garage on blade02, which exists only to hold Tofu state.
-    "garage-apps" = { vmid = 222, cores = 2, memory = 4096, tags = ["platform", "garage_app", "observe"], node = "pxmx02", data_disks = [{ size = 50, datastore = "ceph-hdd-pool" }], ha = true, backup = true }
-
-    # aptcache01 (230) and upsmon01 (213) moved to tofu/lab as bootc VMs (Phase 3).
+    # aptcache01 (230), upsmon01 (213) and garage-apps (222) moved to tofu/lab as bootc VMs (Phase 3).
     # upsmon01's USB mapping stays here (ups_usb.tf); tofu/lab refers to it by name.
   }
 }
@@ -42,15 +38,20 @@ locals {
 # Backup pools. VMs/LXCs holding real user data (see the "backup" key on each
 # entry above) are assigned to one of these so they're covered by whatever
 # backup job targets the pool. "ha-prod" for anything with an HA rule,
-# "la-prod" for everything else that still needs backups.
-resource "proxmox_virtual_environment_pool" "ha_prod" {
-  pool_id = "ha-prod"
-  comment = "VMs/LXCs with HA rules that need backups"
+# "la-prod" for everything else that still needs backups. The pools themselves
+# live in tofu/lab (applied first by `just bootstrap`); this state only forgets them.
+removed {
+  from = proxmox_virtual_environment_pool.ha_prod
+  lifecycle {
+    destroy = false
+  }
 }
 
-resource "proxmox_virtual_environment_pool" "la_prod" {
-  pool_id = "la-prod"
-  comment = "VMs/LXCs without HA rules that still need backups"
+removed {
+  from = proxmox_virtual_environment_pool.la_prod
+  lifecycle {
+    destroy = false
+  }
 }
 
 moved {
@@ -74,7 +75,6 @@ module "lxc" {
   ansible_ssh_key  = var.ansible_ssh_key
   pool_id          = try(each.value.backup, false) ? (try(each.value.ha, false) ? "ha-prod" : "la-prod") : null
 
-  depends_on = [proxmox_virtual_environment_pool.ha_prod, proxmox_virtual_environment_pool.la_prod]
 }
 
 moved {
@@ -97,9 +97,9 @@ resource "proxmox_haresource" "vm" {
 }
 
 resource "proxmox_harule" "tsrouter_anti_affinity" {
-  rule      = "tsrouter-separate"
-  type      = "resource-affinity"
-  affinity  = "negative"
+  rule     = "tsrouter-separate"
+  type     = "resource-affinity"
+  affinity = "negative"
   resources = toset([
     "ct:${module.lxc["tsrouter01"].vmid}",
     "ct:${module.lxc["tsrouter02"].vmid}",
@@ -111,12 +111,12 @@ module "vm" {
   for_each = local.vms
   source   = "../modules/vm"
 
-  name        = each.key
-  vmid        = each.value.vmid
-  node_name   = lookup(each.value, "node", var.proxmox_node)
+  name          = each.key
+  vmid          = each.value.vmid
+  node_name     = lookup(each.value, "node", var.proxmox_node)
   template_id   = var.template_id
   template_node = var.template_node
-  datastore   = var.datastore
+  datastore     = var.datastore
 
   cores  = lookup(each.value, "cores", 2)
   memory = lookup(each.value, "memory", 4096)
@@ -129,6 +129,4 @@ module "vm" {
 
   tags    = lookup(each.value, "tags", ["platform"])
   pool_id = try(each.value.backup, false) ? (try(each.value.ha, false) ? "ha-prod" : "la-prod") : null
-
-  depends_on = [proxmox_virtual_environment_pool.ha_prod, proxmox_virtual_environment_pool.la_prod]
 }

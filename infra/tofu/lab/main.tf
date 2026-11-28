@@ -44,14 +44,28 @@ resource "proxmox_download_file" "bootc_base" {
   }
 }
 
+# Backup pools: the Proxmox vzdump jobs target these, so a VM holding data joins one
+# ("ha-prod" with an HA rule, "la-prod" without). Here, not in platform, because lab
+# is the first state `just bootstrap` applies; platform and pets name them by string.
+resource "proxmox_virtual_environment_pool" "ha_prod" {
+  pool_id = "ha-prod"
+  comment = "VMs/LXCs with HA rules that need backups"
+}
+
+resource "proxmox_virtual_environment_pool" "la_prod" {
+  pool_id = "la-prod"
+  comment = "VMs/LXCs without HA rules that still need backups"
+}
+
 # Proxmox HA for the lab VMs that need it. resource_id comes from the module output
 # plus depends_on, never a literal VMID (CLAUDE.md: proxmox_haresource dependency trap).
 # canary01 isn't here: it's the VM the rollback test breaks.
 locals {
   ha_vms = {
-    dns01      = module.dns01.vmid
-    ittools    = module.ittools.vmid
-    aptcache01 = module.aptcache01.vmid
+    dns01       = module.dns01.vmid
+    ittools     = module.ittools.vmid
+    aptcache01  = module.aptcache01.vmid
+    garage-apps = module.garage_apps.vmid
   }
 }
 
@@ -60,5 +74,5 @@ resource "proxmox_haresource" "vm" {
   resource_id = "vm:${each.value}"
   state       = "started"
 
-  depends_on = [module.dns01, module.ittools, module.aptcache01]
+  depends_on = [module.dns01, module.ittools, module.aptcache01, module.garage_apps]
 }

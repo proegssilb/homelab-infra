@@ -69,7 +69,9 @@ An existing VM's disk is **adopted**, not copied (a rename on the storage):
    `import { to = module.<vm>.proxmox_virtual_environment_vm.data[0], id = "${var.proxmox_node}/<2000+vmid>" }`
    file (delete it after the apply). Map the old paths to the container layout: ownership may need
    changing to the container's UID (e.g. `chown -R` once, as a `run` command or by hand, noted in
-   the VM's `.tf`).
+   the VM's `.tf`). Keep its backups: `pool_id = proxmox_virtual_environment_pool.ha_prod.pool_id`
+   (or `la_prod` without HA), since the nightly vzdump jobs target pools. Secrets go in as Podman
+   secrets (`secrets`, then start the app in `run_after_secrets`).
 2. Stop the old VM (its app stops; downtime starts). Then
    `scripts/bw-run --env-map secrets.env.map -- scripts/adopt-data-disk.py --from <vmid> --drive scsi2
    --holder <2000+vmid> --holder-name <name>-data --backup`: a dry run that shows what it will do.

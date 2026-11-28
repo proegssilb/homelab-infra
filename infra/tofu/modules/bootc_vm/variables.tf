@@ -172,6 +172,12 @@ variable "files" {
   }
 }
 
+variable "pool_id" {
+  description = "Proxmox pool for backups (ha-prod / la-prod, tofu/lab main.tf), or null. VMs with data disks need one: vzdump jobs target pools."
+  type        = string
+  default     = null
+}
+
 variable "run" {
   description = "Commands run as root after the files are pushed (e.g. daemon-reload, start a Quadlet)."
   type        = list(string)

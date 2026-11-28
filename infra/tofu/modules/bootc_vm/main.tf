@@ -171,6 +171,9 @@ resource "proxmox_virtual_environment_vm" "vm" {
   node_name = var.node_name
   vm_id     = var.vmid
   tags      = sort(distinct(concat(var.tags, ["bootc", "observe"])))
+  # Backup pool (vzdump jobs target pools). The VM, not the holder: a vzdump of the VM
+  # includes its attached data disks.
+  pool_id = var.pool_id
 
   cpu {
     cores = var.cores

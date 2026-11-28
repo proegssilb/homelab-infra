@@ -1,0 +1,22 @@
+# Garage on garage-apps (single node). Pushed by Tofu (tofu/lab/garage-apps.tf).
+# Secrets aren't here: GARAGE_RPC_SECRET and the default bucket's key come from
+# Podman secrets (Bitwarden, pushed after boot).
+
+metadata_dir = "/var/lib/garage/meta"
+data_dir     = "/var/lib/garage/data"
+db_engine    = "sqlite"
+
+replication_factor = 1
+
+# Single node: RPC only on loopback (nothing else ever talks to it).
+rpc_bind_addr   = "127.0.0.1:3901"
+rpc_public_addr = "127.0.0.1:3901"
+
+[s3_api]
+s3_region     = "garage"
+api_bind_addr = "0.0.0.0:3900"
+
+# Health endpoint for the greenboot check. No admin token, so only the
+# unauthenticated endpoints answer.
+[admin]
+api_bind_addr = "127.0.0.1:3903"

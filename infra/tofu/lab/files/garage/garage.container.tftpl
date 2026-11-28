@@ -1,0 +1,41 @@
+# Quadlet: Garage (S3 object storage for the pet apps, starting with anamnesis), on
+# garage-apps. Reached only through proxy01 (s3.<domain>).
+[Unit]
+Description=Garage (S3 object storage)
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=${data_dir}
+# Keep retrying (every 10 s) instead of hitting systemd's start limit and giving up.
+StartLimitIntervalSec=0
+
+[Container]
+ContainerName=garage
+Image=${image}
+# --single-node --default-bucket: on an empty disk Garage creates its layout, the
+# default bucket and its key (from the env below) by itself; on existing data it
+# finds them already there.
+# (The image has no entrypoint, only CMD ["/garage", "server"].)
+Exec=/garage server --single-node --default-bucket
+Network=host
+# The upstream image declares no user (it would run as root). Pinned unprivileged
+# UID/GID (the S3 port number), which owns the data on the disk.
+User=3900
+Group=3900
+DropCapability=ALL
+NoNewPrivileges=true
+Environment=RUST_LOG=garage=info
+Environment=GARAGE_DEFAULT_BUCKET=${default_bucket}
+Secret=garage-rpc-secret,type=env,target=GARAGE_RPC_SECRET
+Secret=garage-default-access-key,type=env,target=GARAGE_DEFAULT_ACCESS_KEY
+Secret=garage-default-secret-key,type=env,target=GARAGE_DEFAULT_SECRET_KEY
+# The data disk is mounted with the container SELinux context: no :Z.
+Volume=${data_dir}:/var/lib/garage
+Volume=/etc/garage.toml:/etc/garage.toml:ro,Z
+Ulimit=nofile=42000:42000
+
+[Service]
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
