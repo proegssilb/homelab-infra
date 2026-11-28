@@ -34,11 +34,7 @@ locals {
     # bootstrap-only Garage on blade02, which exists only to hold Tofu state.
     "garage-apps" = { vmid = 222, cores = 2, memory = 4096, tags = ["platform", "garage_app", "observe"], node = "pxmx02", data_disks = [{ size = 50, datastore = "ceph-hdd-pool" }], ha = true, backup = true }
 
-    # APT caching proxy — every Ansible-managed host fetches packages through it,
-    # so servers that only need the internet for packages can lose internet
-    # access entirely. A VM rather than an LXC so the cache gets its own data
-    # disk; the cache is disposable, so no backup.
-    aptcache01 = { vmid = 230, cores = 1, memory = 1024, tags = ["platform", "apt_cache", "observe"], node = "pxmx05", data_disks = [{ size = 100, datastore = "ceph-hdd-pool" }], ha = true }
+    # aptcache01 (230) moved to tofu/lab as a bootc VM (Phase 3).
 
     # Reads the UPS that's plugged into pxmx01 by USB (ups_usb.tf). Pinned to
     # pxmx01 with no HA: a passed-through USB device can't migrate.

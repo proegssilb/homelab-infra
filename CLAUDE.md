@@ -97,7 +97,7 @@ While these two tools are in use, do not mix up their purposes — Tofu does not
 |------------|------------|---------|
 | `platform/` | 2xx | Infrastructure VMs: proxy pair, observability stack, auth |
 | `pets/`     | 1xx | Named standalone VMs: Nextcloud, Forgejo (code) |
-| `lab/`      | `.<VMID>`, outside the DHCP pool (`.20–.99`) | bootc VMs (`modules/bootc_vm`): ittools (112), dns01 (240), canary01 (241). Every VM lands here as it migrates; platform/ and pets/ empty out. Not configured by Ansible (tag `bootc`, excluded from the inventory). |
+| `lab/`      | `.<VMID>`, outside the DHCP pool (`.20–.99`) | bootc VMs (`modules/bootc_vm`): ittools (112), aptcache01 (230), dns01 (240), canary01 (241). Every VM lands here as it migrates; platform/ and pets/ empty out. Not configured by Ansible (tag `bootc`, excluded from the inventory). |
 | (none)      | 1000–1999 | Coder workspace VMs, created by Coder (template in `ansible/roles/coder/files/coder-templates/`), fenced to the `coder` Proxmox pool, tagged `coder_workspace` and excluded from the Ansible inventory. Never allocate these IDs to lab VMs. |
 | (lab)       | 2000–2999 | Holder VMs owning bootc VMs' data disks (`2000 + vmid`, `<name>-data`, tag `bootc-data`, never started). Created by `modules/bootc_vm` or `scripts/adopt-data-disk.py`. |
 
@@ -176,7 +176,7 @@ method+path allowlist in front of a Forgejo bot token that never leaves proxy01.
 
 ### APT proxy
 
-Every Ansible-managed host fetches packages through `aptcache01` (apt-cacher-ng, port 3142), so a server that only needs the internet for packages can lose internet access. The proxy is an allowlist: plain-HTTP repos only via its Remap rules, HTTPS repos only by tunnel to the hosts in `apt_cache_https_passthrough_hosts`. When a role adds a new HTTPS repo, add its host there, and give its `deb822_repository` task `environment: "{{ apt_proxy_env | default({}) }}"` so the signing-key download goes through the proxy too. The proxy itself and the `bootstrap` group are exempt (`apt_proxy_host: ""`).
+Every Ansible-managed host (and every Coder workspace) fetches packages through `aptcache01` (apt-cacher-ng, port 3142), so a server that only needs the internet for packages can lose internet access. Since Phase 3 it's a bootc VM in `tofu/lab` (`aptcache01.<lab zone>`, `.230`; apt-cacher-ng from `images/apps/apt-cacher-ng`), and `roles/apt_cache` is unused. The proxy is an allowlist: plain-HTTP repos only via its Remap rules, HTTPS repos only by tunnel to the hosts in `acng_passthrough_hosts` (`tofu/lab/aptcache01.tf`). When a role adds a new HTTPS repo, add its host there, and give its `deb822_repository` task `environment: "{{ apt_proxy_env | default({}) }}"` so the signing-key download goes through the proxy too. The `bootstrap` group is exempt (`apt_proxy_host: ""`).
 
 ### Platform topology
 

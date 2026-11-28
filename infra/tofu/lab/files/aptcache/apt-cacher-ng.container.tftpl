@@ -1,0 +1,27 @@
+# Quadlet: apt-cacher-ng on aptcache01 (image built from images/apps/apt-cacher-ng).
+[Unit]
+Description=apt-cacher-ng (APT caching proxy)
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=${cache_dir}
+# Keep retrying (every 10 s) instead of hitting systemd's start limit and giving up.
+StartLimitIntervalSec=0
+
+[Container]
+ContainerName=apt-cacher-ng
+Image=${image}
+# Host networking: listens on the VM's :3142, and resolves upstreams through the
+# VM's systemd-resolved stub (/etc/resolv.conf -> 127.0.0.53). That matters: the
+# gateway resolver sends DNS cookies inconsistently, which apt-cacher-ng's c-ares
+# rejects ("502 CONNECT error: Cannot allocate memory"); resolved never does.
+Network=host
+# The data disk is mounted with the container SELinux context: no :Z.
+Volume=${cache_dir}:/var/cache/apt-cacher-ng
+Volume=/etc/apt-cacher-ng/homelab.conf:/etc/apt-cacher-ng/homelab.conf:ro,Z
+
+[Service]
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

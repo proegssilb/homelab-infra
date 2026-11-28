@@ -63,10 +63,11 @@ module "dns01" {
 # One record per lab VM (add each new VM here).
 resource "dns_a_record_set" "bootc" {
   for_each = {
-    dns01    = module.dns01.ip
-    ns1      = module.dns01.ip
-    canary01 = module.canary01.ip
-    ittools  = module.ittools.ip
+    dns01      = module.dns01.ip
+    ns1        = module.dns01.ip
+    canary01   = module.canary01.ip
+    ittools    = module.ittools.ip
+    aptcache01 = module.aptcache01.ip
   }
 
   zone      = "${local.zone}."

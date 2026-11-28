@@ -46,8 +46,9 @@ resource "proxmox_download_file" "bootc_base" {
 # canary01 isn't here: it's the VM the rollback test breaks.
 locals {
   ha_vms = {
-    dns01   = module.dns01.vmid
-    ittools = module.ittools.vmid
+    dns01      = module.dns01.vmid
+    ittools    = module.ittools.vmid
+    aptcache01 = module.aptcache01.vmid
   }
 }
 
@@ -56,5 +57,5 @@ resource "proxmox_haresource" "vm" {
   resource_id = "vm:${each.value}"
   state       = "started"
 
-  depends_on = [module.dns01, module.ittools]
+  depends_on = [module.dns01, module.ittools, module.aptcache01]
 }

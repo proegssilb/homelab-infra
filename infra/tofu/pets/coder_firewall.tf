@@ -31,13 +31,16 @@ data "dns_a_record_set" "coder_peer" {
     "code",       # Forgejo and the deploy-key proxy, via proxy01
     "dev",        # Coder's own access URL, via proxy01
     "auth",       # Authentik (OIDC login), via proxy01
-    "aptcache01", # apt_proxy_host
+    "aptcache01", # apt_proxy_host (a bootc VM: named in the lab zone)
     "obs02",      # loki_url
   ])
-  host = "${each.key}.${var.domain}"
+  host = contains(local.coder_peer_in_lab, each.key) ? "${each.key}.${var.lab_zone}" : "${each.key}.${var.domain}"
 }
 
 locals {
+  # Peers that have moved to bootc VMs (tofu/lab): static, named in the lab zone.
+  coder_peer_in_lab = ["aptcache01"]
+
   coder_fw_vmid = module.vm["coder"].vmid
   coder_fw_node = local.vms.coder.node
 
