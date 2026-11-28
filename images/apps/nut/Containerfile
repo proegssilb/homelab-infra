@@ -1,0 +1,19 @@
+# NUT (driver + upsd) for upsmon01 (bootc VM, tofu/lab/upsmon01.tf): reads the UPS
+# that's passed through by USB. Debian's package, same as the old Debian VM, so the
+# same usbhid-ups driver. Config (ups.conf, upsd.conf, nut.conf, upsd.users) comes
+# from Tofu's push as bind mounts. upsd listens on localhost only; nut_exporter
+# (its own container) reads it there. No upsmon: nothing shuts down on low battery.
+FROM docker.io/library/debian:trixie-slim
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nut-server usbutils \
+    && rm -rf /var/lib/apt/lists/* \
+    && install -d -o nut -g nut -m 0770 /run/nut
+
+COPY entrypoint.sh /usr/local/bin/nut-entrypoint
+RUN chmod 0755 /usr/local/bin/nut-entrypoint
+
+ENTRYPOINT ["/usr/local/bin/nut-entrypoint"]
+
+LABEL org.opencontainers.image.title="nut" \
+      org.opencontainers.image.description="NUT driver and upsd for the lab's USB UPS (upsmon01)"
