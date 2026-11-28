@@ -36,12 +36,45 @@ variable "datastore" {
 }
 
 variable "data_disks" {
-  description = "Data disks after the OS disk (scsi2, scsi3, ...): {size (GiB), datastore}."
+  description = <<-EOT
+    Data disks after the OS disk (scsi2, scsi3, ...). They belong to a separate, never-started
+    holder VM (VMID data_holder_vmid) and are attached here, so replacing or destroying this VM
+    leaves them alone (docs/specs/2026-11-22-bootc-migration.md, Data). Each:
+      size, datastore  as for any Proxmox disk;
+      mount            optional mount point (letters, digits, _ and /; no dashes, so the systemd
+                       unit name is just the path with / -> -). Mounted with the container SELinux
+                       context, so Quadlets bind-mount it without :Z relabelling;
+      owner            optional "uid:gid" for the mount point itself (not recursive).
+    A blank disk gets ext4 on first mount (homelab-prepare-disk refuses anything not blank).
+  EOT
   type = list(object({
     size      = number
     datastore = string
+    mount     = optional(string)
+    owner     = optional(string)
   }))
   default = []
+
+  validation {
+    condition     = alltrue([for d in var.data_disks : d.mount == null || can(regex("^/var/[a-z0-9_]+(/[a-z0-9_]+)*$", d.mount))])
+    error_message = "data_disks[*].mount must be under /var and use only [a-z0-9_] path components (no dashes)."
+  }
+  validation {
+    condition     = alltrue([for d in var.data_disks : d.owner == null || can(regex("^[0-9]+:[0-9]+$", d.owner))])
+    error_message = "data_disks[*].owner must be numeric uid:gid."
+  }
+}
+
+variable "data_holder_vmid" {
+  description = "VMID of the holder VM that owns the data disks. Default 2000 + vmid (2000-2999 is reserved for holders; Coder uses 1000-1999)."
+  type        = number
+  default     = null
+}
+
+variable "usb_mappings" {
+  description = "Proxmox cluster USB mapping names to pass through (the VM then can't migrate: pin it, no HA)."
+  type        = list(string)
+  default     = []
 }
 
 variable "install_disk_id" {
@@ -100,13 +133,23 @@ variable "tags" {
 }
 
 variable "files" {
-  description = "Extra files pushed to the VM after first boot: {path, content, mode}. Non-secret only (they sit in Tofu state)."
+  description = <<-EOT
+    Extra files pushed to the VM after first boot: {path, mode, and either content or source}.
+    source = a local file read by the push at apply time (big static files such as dashboards and
+    rule files; only its hash goes into the push spec). Non-secret only.
+  EOT
   type = list(object({
     path    = string
-    content = string
+    content = optional(string)
+    source  = optional(string)
     mode    = optional(string, "0644")
   }))
   default = []
+
+  validation {
+    condition     = alltrue([for f in var.files : (f.content == null) != (f.source == null)])
+    error_message = "Each file needs exactly one of content or source."
+  }
 }
 
 variable "run" {

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Push config files, commands and secrets to a bootc VM over SSH.
 
-Called by Tofu (modules/bootc_vm, local-exec) with the spec as JSON in $PUSH_SPEC:
+Called by Tofu (modules/bootc_vm, local-exec) with the spec as JSON, gzipped and
+base64-encoded in $PUSH_SPEC_GZ (plain JSON in $PUSH_SPEC also works):
 
   {"host": "...", "vmid": 123, "user": "admin", "wait_seconds": 900,
-   "files":   [{"path": "/etc/...", "mode": "0644", "content_b64": "..."}],
+   "files":   [{"path": "/etc/...", "mode": "0644", "content_b64": "..."},
+               {"path": "/etc/...", "mode": "0644", "source": "/local/file", "sha256": "..."}],
    "run":     ["shell command run as root", ...],          # after the files
    "secrets": [{"item": "dns/tsig-tofu", "command": "..."}], # value on the command's stdin
    "run_after_secrets": ["...", ...]}
@@ -21,6 +23,8 @@ scripts/bw-run, travel only over SSH stdin, and are never printed: output names
 files, commands' first words and item names only.
 """
 import base64
+import gzip
+import hashlib
 import json
 import os
 import shlex
@@ -117,13 +121,31 @@ def wait_for_ssh(spec: dict) -> None:
                        f"within {spec.get('wait_seconds', 900)}s")
 
 
+def load_spec() -> dict:
+    # modules/bootc_vm passes it gzipped + base64 (an env var holds at most 128 KiB).
+    if "PUSH_SPEC_GZ" in os.environ:
+        return json.loads(gzip.decompress(base64.b64decode(os.environ["PUSH_SPEC_GZ"])))
+    return json.loads(os.environ["PUSH_SPEC"])
+
+
+def file_content(f: dict) -> bytes:
+    if f.get("source"):
+        data = Path(f["source"]).read_bytes()
+        # The spec carries the hash Tofu saw at plan time; a file changed since then
+        # would push content the plan never showed.
+        if f.get("sha256") and hashlib.sha256(data).hexdigest() != f["sha256"]:
+            raise RuntimeError(f"{f['source']} changed since the plan; re-plan")
+        return data
+    return base64.b64decode(f["content_b64"])
+
+
 def main() -> int:
-    spec = json.loads(os.environ["PUSH_SPEC"])
+    spec = load_spec()
     log(f"waiting for SSH on {spec['host']}")
     wait_for_ssh(spec)
 
     for f in spec.get("files", []):
-        content = base64.b64decode(f["content_b64"])
+        content = file_content(f)
         remote(spec, f"install -D -m {shlex.quote(f.get('mode', '0644'))} /dev/stdin "
                      f"{shlex.quote(f['path'])}", stdin=content)
         log(f"file {f['path']}")
@@ -150,7 +172,7 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (RuntimeError, bwlib.BitwardenError, KeyError) as e:
+    except (RuntimeError, bwlib.BitwardenError, KeyError, OSError) as e:
         sys.exit(f"push-vm: error: {e}")
     except Exception as e:  # never let a traceback print local variables
         sys.exit(f"push-vm: error: unexpected {type(e).__name__}")

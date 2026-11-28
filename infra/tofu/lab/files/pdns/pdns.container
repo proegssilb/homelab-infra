@@ -3,6 +3,8 @@
 Description=PowerDNS Authoritative (lab zone)
 Wants=network-online.target
 After=network-online.target
+# Keep retrying (every 10 s) instead of hitting systemd's start limit and giving up.
+StartLimitIntervalSec=0
 
 [Container]
 ContainerName=pdns
@@ -17,6 +19,7 @@ Volume=/etc/powerdns/homelab.conf:/etc/powerdns/pdns.d/homelab.conf:ro,Z
 
 [Service]
 Restart=always
+RestartSec=10s
 
 [Install]
 WantedBy=multi-user.target

@@ -3,6 +3,8 @@
 Description=IT Tools
 Wants=network-online.target
 After=network-online.target
+# Keep retrying (every 10 s) instead of hitting systemd's start limit and giving up.
+StartLimitIntervalSec=0
 
 [Container]
 ContainerName=ittools
@@ -11,6 +13,7 @@ PublishPort=8080:80
 
 [Service]
 Restart=always
+RestartSec=10s
 
 [Install]
 WantedBy=multi-user.target

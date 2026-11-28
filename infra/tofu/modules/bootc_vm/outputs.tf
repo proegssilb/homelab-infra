@@ -6,6 +6,11 @@ output "vmid" {
   value = proxmox_virtual_environment_vm.vm.vm_id
 }
 
+output "data_holder_vmid" {
+  description = "VMID of the holder VM owning the data disks (null without data disks)."
+  value       = length(var.data_disks) > 0 ? proxmox_virtual_environment_vm.data[0].vm_id : null
+}
+
 output "ip" {
   description = "Static IPv4 address (VMID = last octet). Known at plan time."
   value       = local.ip
