@@ -29,6 +29,7 @@ on:
     paths:
       - images/bootc-base/**
       - images/bootc-test/**
+      - infra/tofu/modules/bootc_vm/files/**
       - .forgejo/workflows/bootc-base.yml
       - .forgejo/scripts/bootc_promote.py
   schedule:
@@ -107,6 +108,7 @@ jobs:
           ref="${{ steps.n.outputs.tester }}:${{ steps.n.outputs.tag }}"
           for attempt in 1 2 3; do
             docker buildx build --pull --push --provenance=false \
+              --build-context push=infra/tofu/modules/bootc_vm/files \
               -t "$ref" -f images/bootc-test/Containerfile images/bootc-base && break
             [ "$attempt" = 3 ] && exit 1
             echo "::warning::build/push attempt $attempt failed; retrying"; sleep 15

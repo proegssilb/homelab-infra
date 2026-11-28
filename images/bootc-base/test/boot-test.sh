@@ -190,13 +190,23 @@ PY
     "systemctl status alloy --no-pager -l | head -n 12; sudo journalctl -u alloy -b --no-pager -n 15"
   check "${p}podman runs a container" "podman run --rm quay.io/fedora/fedora-minimal:45 true"
 
-  # Data disks: format only a blank disk, never one with data.
+  # Data disks: format only a blank disk, never one with data. Disk prep isn't in the
+  # image: modules/bootc_vm pushes it to VMs with data disks, so push it the same way.
   local d2=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2 d3=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi3
+  local push=${PUSH_DIR:-/usr/local/share/homelab-push}
+  if "${SSH[@]}" "sudo install -D -m 0644 /dev/stdin /etc/homelab/prepare-disk" <"$push/prepare-disk" \
+     && "${SSH[@]}" "sudo install -D -m 0644 /dev/stdin /etc/systemd/system/homelab-prepare-disk@.service" \
+          <"$push/homelab-prepare-disk@.service" \
+     && "${SSH[@]}" "sudo systemctl daemon-reload"; then
+    pass "${p}data disk: disk prep pushed (as modules/bootc_vm does)"
+  else
+    fail "${p}data disk: disk prep pushed (as modules/bootc_vm does)"
+  fi
   check "${p}data disk: blank scsi2 gets a filesystem" \
     "sudo systemctl start homelab-prepare-disk@scsi2 && sudo blkid -p -o value -s TYPE $d2 | grep -qx ext4" \
     "sudo journalctl -u homelab-prepare-disk@scsi2 -b --no-pager | tail -n 8; ls -l /dev/disk/by-id/"
   check "${p}data disk: a formatted disk is left alone" \
-    "u=\$(sudo blkid -p -o value -s UUID $d2) && sudo /usr/libexec/homelab-prepare-disk scsi2 | grep -q 'not touching' && test \"\$u\" = \"\$(sudo blkid -p -o value -s UUID $d2)\""
+    "u=\$(sudo blkid -p -o value -s UUID $d2) && sudo bash /etc/homelab/prepare-disk scsi2 | grep -q 'not touching' && test \"\$u\" = \"\$(sudo blkid -p -o value -s UUID $d2)\""
   check "${p}data disk: unknown data is refused" \
     "! sudo systemctl start homelab-prepare-disk@scsi3 && ! sudo blkid -p $d3"
   check "${p}data disk: refused disk unchanged" \

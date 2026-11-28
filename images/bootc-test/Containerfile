@@ -9,5 +9,8 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     && dnf clean all
 
 COPY test/boot-test.sh /usr/local/bin/boot-test.sh
+# What modules/bootc_vm pushes to VMs with data disks (disk prep): the test pushes it
+# the same way. Build with --build-context push=infra/tofu/modules/bootc_vm/files.
+COPY --from=push . /usr/local/share/homelab-push/
 
 ENTRYPOINT ["/usr/local/bin/boot-test.sh"]

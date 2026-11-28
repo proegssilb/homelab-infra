@@ -66,7 +66,7 @@ while one is offline. In `modules/bootc_vm` a VM's `data_disks` are **its own di
   (`pool_id`, `ha-prod` with HA, `la-prod` without), since the nightly jobs target pools.
 
 Each disk can have a `mount` (and an `owner` for the mount point). The module writes a mount unit
-that requires `homelab-prepare-disk@scsiN` (image): it formats a disk only if its first and last MiB
+that requires `homelab-prepare-disk@scsiN` (pushed with it from `modules/bootc_vm/files/`): it formats a disk only if its first and last MiB
 are zeros, leaves any filesystem alone, and refuses unknown data. The whole filesystem gets the
 container SELinux context at mount, so Quadlets bind-mount it **without `:Z`**. Adding a disk is one
 apply.

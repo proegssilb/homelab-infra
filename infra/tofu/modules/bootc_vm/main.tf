@@ -50,23 +50,17 @@ locals {
     EOT
   }]
 
-  # The disk-prep script and unit the mounts require, pushed rather than taken from the
-  # image: a VM on a channel whose image predates them (e.g. :stable lagging :canary)
-  # would otherwise boot without its data mounted. Same source as the image's copy;
-  # the /etc unit overrides the image's, so every VM runs this one. /usr is read-only
-  # (including /usr/local), so the script lives in /etc and the image's bash runs it.
-  prepare_disk_src = "${path.module}/../../../../images/bootc-base/rootfs"
+  # The disk-prep script and unit the mounts require. Per-VM config like the mounts
+  # themselves, so pushed, never baked into the image (a VM on a channel whose image
+  # lacked them would boot without its data). The image's CI boot test pushes the
+  # same files. /usr is read-only (including /usr/local), so the script lives in /etc
+  # and the image's bash runs it.
   prepare_disk_files = length(local.mounts) == 0 ? [] : [
+    { path = "/etc/homelab/prepare-disk", source = "${path.module}/files/prepare-disk", mode = "0644" },
     {
-      path   = "/etc/homelab/prepare-disk"
-      source = "${local.prepare_disk_src}/usr/libexec/homelab-prepare-disk"
-      mode   = "0644"
-    },
-    {
-      path = "/etc/systemd/system/homelab-prepare-disk@.service"
-      mode = "0644"
-      content = replace(file("${local.prepare_disk_src}/usr/lib/systemd/system/homelab-prepare-disk@.service"),
-      "ExecStart=/usr/libexec/homelab-prepare-disk", "ExecStart=/usr/bin/bash /etc/homelab/prepare-disk")
+      path    = "/etc/systemd/system/homelab-prepare-disk@.service"
+      content = file("${path.module}/files/homelab-prepare-disk@.service")
+      mode    = "0644"
     },
   ]
 

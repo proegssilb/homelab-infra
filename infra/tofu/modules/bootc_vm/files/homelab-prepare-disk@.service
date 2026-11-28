@@ -12,4 +12,4 @@ Conflicts=shutdown.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/libexec/homelab-prepare-disk %i
+ExecStart=/usr/bin/bash /etc/homelab/prepare-disk %i

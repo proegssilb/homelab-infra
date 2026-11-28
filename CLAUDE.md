@@ -240,7 +240,7 @@ every directory a package leaves in `/var` gets a tmpfiles.d entry.
 
 - Local loop: `podman build -t localhost/bootc-base:dev images/bootc-base`, then
   `sudo images/bootc-base/build-disk.sh` (bootc-image-builder needs root; output in the gitignored
-  `out/`), then the boot test: `podman build -t localhost/bootc-test:dev -f images/bootc-test/Containerfile
+  `out/`), then the boot test: `podman build -t localhost/bootc-test:dev --build-context push=infra/tofu/modules/bootc_vm/files -f images/bootc-test/Containerfile
   images/bootc-base && podman run --rm --device /dev/kvm -v "$PWD/images/bootc-base/out:/work:ro,z"
   localhost/bootc-test:dev /work/qcow2/disk.qcow2`.
 - CI (`.forgejo/workflows/bootc-base.yml`, any branch push touching the image): build + push,
@@ -278,8 +278,9 @@ every directory a package leaves in `/var` gets a tmpfiles.d entry.
   removing the VM or its drives). A fresh OS is `scripts/reinstall-os.py` (swaps only `scsi1` in
   place); migrating a VM with data is in place too (`--migrate`, then import into `tofu/lab`).
   Retiring data: lift protection first (docs/migrating-a-vm-to-bootc.md). Mounts use
-  `homelab-prepare-disk@` (formats only an all-zero disk; pushed by the module, not taken from the image,
-  because `:stable` can lag the units a mount needs) and the container SELinux context, so Quadlets
+  `homelab-prepare-disk@` (formats only an all-zero disk; per-VM config like the mounts, so it lives in
+  `modules/bootc_vm/files/` and is pushed, never baked into the image; the CI boot test pushes it the
+  same way) and the container SELinux context, so Quadlets
   mount them without `:Z`. A VM with data joins a backup pool (`pool_id`; `ha-prod`/`la-prod` live in
   `tofu/lab`, which bootstrap applies first): the nightly vzdump jobs target pools. Never remove
   `prevent_destroy` or lift protection casually.
