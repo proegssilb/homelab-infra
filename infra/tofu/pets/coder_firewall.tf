@@ -34,7 +34,7 @@ data "dns_a_record_set" "coder_peer" {
     "aptcache01", # apt_proxy_host (a bootc VM: named in the lab zone)
     "obs02",      # loki_url
   ])
-  host = contains(local.coder_peer_in_lab, each.key) ? "${each.key}.${var.lab_zone}" : "${each.key}.${var.domain}"
+  host = contains(local.coder_peer_in_lab, each.key) ? "${each.key}.${var.zone}" : "${each.key}.${var.domain}"
 }
 
 locals {

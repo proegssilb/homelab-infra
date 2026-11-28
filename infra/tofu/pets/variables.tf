@@ -76,7 +76,7 @@ variable "coder_proxmox_password" {
 # Lab peers are resolved from DNS there. Admin SSH and the node_exporter scrape
 # reuse agentsvc_admin_sources / agentsvc_scrape_sources.
 
-variable "lab_zone" {
+variable "zone" {
   description = "The lab DNS zone bootc VMs are named in (tofu/lab var.zone, e.g. l.example.com). Set in terraform.tfvars."
   type        = string
 }
