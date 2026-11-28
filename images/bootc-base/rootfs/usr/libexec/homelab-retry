@@ -1,0 +1,14 @@
+#!/bin/bash
+# homelab-retry SECONDS COMMAND...: run COMMAND every 5 s until it succeeds or
+# SECONDS pass. For greenboot checks, so a service that comes up slowly (network
+# back late after a power cut) doesn't count as a failed update.
+limit=${1:?usage: homelab-retry SECONDS COMMAND...}
+shift
+deadline=$((SECONDS + limit))
+while :; do
+  "$@" && exit 0
+  [ $SECONDS -ge $deadline ] && break
+  sleep 5
+done
+echo "still failing after ${limit}s: $*" >&2
+exit 1

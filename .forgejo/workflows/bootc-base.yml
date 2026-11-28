@@ -133,7 +133,8 @@ jobs:
         run: |
           docker run --rm --device /dev/kvm -v "${{ steps.n.outputs.vol }}-out:/work:ro" \
             "${{ steps.n.outputs.tester }}:${{ steps.n.outputs.tag }}" \
-            /work/qcow2/disk.qcow2 --expect-digest "${{ steps.build.outputs.digest }}"
+            /work/qcow2/disk.qcow2 --expect-digest "${{ steps.build.outputs.digest }}" \
+            --link-down 180
 
       # Upgrade from what VMs run now (:canary). Branches have no canary of their own,
       # so when none exists they upgrade from the newest earlier disk package instead.

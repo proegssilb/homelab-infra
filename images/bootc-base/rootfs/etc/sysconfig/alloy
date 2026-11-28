@@ -1,0 +1,9 @@
+# Alloy settings (replaces the package's /etc/sysconfig/alloy). CONFIG_FILE is a
+# directory: Alloy loads every *.alloy file in it, so a VM adds its own pipelines
+# (e.g. obs02's syslog listeners) next to the base config.alloy.
+CONFIG_FILE="/etc/alloy"
+OTEL_CONFIG_FILE="/etc/alloy/config.yaml"
+CUSTOM_ARGS=""
+OTEL_CUSTOM_ARGS=""
+ALLOY_OTEL_MODE=""
+RESTART_ON_UPGRADE=true

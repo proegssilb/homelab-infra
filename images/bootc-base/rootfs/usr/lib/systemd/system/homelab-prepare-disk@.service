@@ -1,0 +1,15 @@
+# Instance = Proxmox drive name (scsi2, ...). The data-disk mounts that
+# modules/bootc_vm writes require it, so a new blank disk gets a filesystem first.
+# The script refuses anything that isn't blank (see it for why).
+[Unit]
+Description=Prepare data disk %i (format only if blank)
+DefaultDependencies=no
+BindsTo=dev-disk-by\x2did-scsi\x2d0QEMU_QEMU_HARDDISK_drive\x2d%i.device
+After=dev-disk-by\x2did-scsi\x2d0QEMU_QEMU_HARDDISK_drive\x2d%i.device
+Before=local-fs.target shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/homelab-prepare-disk %i

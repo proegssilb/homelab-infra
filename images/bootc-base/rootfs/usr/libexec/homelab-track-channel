@@ -1,0 +1,18 @@
+#!/bin/bash
+# Point bootc at the channel tag in /etc/homelab/channel (one image ref, e.g.
+# <registry>/<owner>/bootc-base:stable). Run by homelab-track-channel.service,
+# which retries while the registry is unreachable (Forgejo down, or a rebuild
+# from scratch where Forgejo comes up after this VM), so a push never depends on
+# it. Staged only: the switch takes effect at the next update reboot.
+set -euo pipefail
+ref=$(tr -d '[:space:]' </etc/homelab/channel)
+[ -n "$ref" ] || { echo "/etc/homelab/channel is empty" >&2; exit 1; }
+current=$(bootc status --json | python3 -c 'import json, sys
+s = json.load(sys.stdin)
+print((((s.get("spec") or {}).get("image")) or {}).get("image") or "")')
+if [ "$current" = "$ref" ]; then
+  echo "already tracking $ref"
+  exit 0
+fi
+echo "switching from ${current:-<none>} to $ref"
+bootc switch --quiet "$ref"

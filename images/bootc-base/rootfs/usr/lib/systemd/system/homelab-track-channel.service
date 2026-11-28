@@ -1,0 +1,16 @@
+[Unit]
+Description=Track the bootc channel tag in /etc/homelab/channel
+ConditionPathExists=/etc/homelab/channel
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/homelab-track-channel
+Restart=on-failure
+RestartSec=2min
+
+[Install]
+WantedBy=multi-user.target

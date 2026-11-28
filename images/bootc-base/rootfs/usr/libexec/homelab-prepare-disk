@@ -1,0 +1,36 @@
+#!/bin/bash
+# homelab-prepare-disk DRIVE [FSTYPE]: put a filesystem on a *blank* data disk.
+#   DRIVE is the Proxmox drive name (scsi2, ...), so the device is the stable
+#   /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-<DRIVE> (CLAUDE.md: never sdX).
+# Data disks outlive VM rebuilds and hold single-instance app data, so this is
+# deliberately timid:
+#   - any filesystem/partition/RAID signature (blkid -p, wipefs) -> leave it alone, exit 0;
+#   - no signature but non-zero bytes in the first or last MiB -> refuse, exit 1
+#     (unknown data: a human decides);
+#   - only a disk that's all zeros there gets mkfs.
+set -euo pipefail
+drive=${1:?usage: homelab-prepare-disk DRIVE [FSTYPE]}
+fstype=${2:-ext4}
+[[ "$drive" =~ ^scsi([2-9]|[12][0-9]|30)$ ]] || { echo "bad data drive name: $drive" >&2; exit 2; }
+case "$fstype" in ext4|xfs) ;; *) echo "unsupported filesystem: $fstype" >&2; exit 2 ;; esac
+dev=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-$drive
+[ -b "$dev" ] || { echo "$dev: no such block device" >&2; exit 1; }
+[ "$(lsblk -dno TYPE "$dev")" = disk ] || { echo "$dev is not a whole disk" >&2; exit 1; }
+
+if blkid -p "$dev" >/dev/null 2>&1 || [ -n "$(wipefs -n -O TYPE --noheadings "$dev" 2>/dev/null)" ]; then
+  echo "$dev already has data ($(blkid -p -o value -s TYPE "$dev" 2>/dev/null || echo a signature)); not touching it"
+  exit 0
+fi
+mib=$((1024 * 1024))
+size=$(blockdev --getsize64 "$dev")
+nonzero() { [ -n "$(tr -d '\0' | head -c 1)" ]; }
+if head -c "$mib" "$dev" | nonzero || tail -c "$mib" "$dev" | nonzero; then
+  echo "$dev has no filesystem signature but isn't blank; refusing to format it" >&2
+  exit 1
+fi
+echo "$dev is blank ($((size / mib)) MiB); creating $fstype"
+case "$fstype" in
+  ext4) mkfs.ext4 -q -L "data-$drive" "$dev" ;;
+  xfs)  mkfs.xfs -q -L "data-$drive" "$dev" ;;
+esac
+udevadm settle

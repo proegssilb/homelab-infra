@@ -1,0 +1,30 @@
+#!/bin/bash
+# Holds network-online.target until the network actually works: the first DNS
+# server answers a query (any answer, even SERVFAIL: it's reachability that
+# counts). Static addresses need no DHCP server, but after a power cut the switch,
+# gateway or DNS may come back minutes after the VMs do, and units ordered after
+# network-online.target (every Quadlet, greenboot's checks) should start then,
+# not fail now. Never fails the boot: after the deadline it logs and lets it go on.
+# sshd doesn't wait for it, so a VM stays reachable while it waits.
+deadline=$((SECONDS + ${HOMELAB_NETWORK_WAIT:-600}))
+
+servers() {
+  # Upstream servers (systemd-resolved's copy), not the 127.0.0.53 stub.
+  local f
+  for f in /run/systemd/resolve/resolv.conf /etc/resolv.conf; do
+    [ -r "$f" ] || continue
+    awk '$1 == "nameserver" && $2 !~ /^127\./ {print $2}' "$f"
+  done | awk '!seen[$0]++'
+}
+
+while [ $SECONDS -lt $deadline ]; do
+  for s in $(servers); do
+    if dig +time=2 +tries=1 @"$s" . SOA 2>/dev/null | grep -q 'status: '; then
+      echo "network ready after ${SECONDS}s (DNS server $s answers)"
+      exit 0
+    fi
+  done
+  sleep 5
+done
+echo "network still not ready after ${SECONDS}s; continuing the boot anyway" >&2
+exit 0

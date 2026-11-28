@@ -1,0 +1,15 @@
+[Unit]
+Description=Wait (up to 10 min) until the network answers
+Documentation=file:///usr/libexec/homelab-wait-network
+After=NetworkManager-wait-online.service
+Wants=NetworkManager-wait-online.service
+Before=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/homelab-wait-network
+TimeoutStartSec=660
+
+[Install]
+WantedBy=network-online.target

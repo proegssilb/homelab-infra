@@ -1,7 +1,11 @@
 #!/bin/bash
 # Boot a bootc-base disk image under KVM and check it over SSH.
 #
-#   boot-test.sh DISK.qcow2 [--expect-digest sha256:...] [--upgrade-to REF --upgrade-digest sha256:...]
+#   boot-test.sh DISK.qcow2 [--expect-digest sha256:...] [--link-down SECONDS]
+#                [--upgrade-to REF --upgrade-digest sha256:...]
+#
+# --link-down N: the NIC's link is down for the first N seconds (switch/gateway back
+# late after a power cut); everything must still come up healthy once it's back.
 #
 # Runs inside the images/bootc-test container (CI and local alike):
 #   podman build -t bootc-test -f images/bootc-test/Containerfile images/bootc-base
@@ -12,12 +16,13 @@
 # dummy Alloy endpoints. Prints one PASS/FAIL line per check; exit 0 only if all pass.
 set -uo pipefail
 
-DISK=""; EXPECT_DIGEST=""; UPGRADE_TO=""; UPGRADE_DIGEST=""
+DISK=""; EXPECT_DIGEST=""; UPGRADE_TO=""; UPGRADE_DIGEST=""; LINK_DOWN=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --expect-digest)  EXPECT_DIGEST=$2; shift 2 ;;
     --upgrade-to)     UPGRADE_TO=$2; shift 2 ;;
     --upgrade-digest) UPGRADE_DIGEST=$2; shift 2 ;;
+    --link-down)      LINK_DOWN=$2; shift 2 ;;
     -*) echo "unknown option $1" >&2; exit 2 ;;
     *)  DISK=$1; shift ;;
   esac
@@ -71,18 +76,39 @@ xorriso -as mkisofs -quiet -V cidata -J -r -o "$W/seed.iso" "$W/seed" 2>/dev/nul
 
 # ── Boot ──────────────────────────────────────────────────────────────────────
 qemu-img create -q -f qcow2 -F qcow2 -b "$(realpath "$DISK")" "$W/overlay.qcow2"
+# Two data disks named like Proxmox's (drive id drive-scsiN, so the guest sees
+# /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsiN): scsi2 blank, scsi3 with
+# unknown data and no filesystem signature (random bytes), which must never be formatted.
+truncate -s 1G "$W/scsi2.raw"
+truncate -s 1G "$W/scsi3.raw"
+head -c 1048576 /dev/urandom | dd of="$W/scsi3.raw" conv=notrunc status=none
+SCSI3_SUM=$(head -c 1048576 "$W/scsi3.raw" | sha256sum)
 
 boot() {
   qemu-system-x86_64 -enable-kvm -cpu host -m 2048 -smp 2 \
     -display none -serial "file:$W/console.log" \
     -drive "file=$W/overlay.qcow2,if=virtio" \
     -drive "file=$W/seed.iso,media=cdrom,readonly=on" \
-    -nic "user,model=virtio-net-pci,mac=$MAC,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" \
+    -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" \
+    -device "virtio-net-pci,netdev=net0,mac=$MAC" \
+    -device virtio-scsi-pci,id=scsi0 \
+    -drive "file=$W/scsi2.raw,if=none,id=drive-scsi2,format=raw" -device scsi-hd,bus=scsi0.0,drive=drive-scsi2 \
+    -drive "file=$W/scsi3.raw,if=none,id=drive-scsi3,format=raw" -device scsi-hd,bus=scsi0.0,drive=drive-scsi3 \
+    -monitor "unix:$W/monitor.sock,server=on,wait=off" \
     -device virtio-serial-pci \
     -chardev "socket,path=$W/qga.sock,server=on,wait=off,id=qga0" \
     -device virtserialport,chardev=qga0,name=org.qemu.guest_agent.0 \
     -pidfile "$W/qemu.pid" -daemonize
   QEMU_PID=$(cat "$W/qemu.pid")
+}
+
+monitor() {  # one HMP command
+  python3 - "$W/monitor.sock" "$1" <<'PY'
+import socket, sys, time
+s = socket.socket(socket.AF_UNIX); s.settimeout(5); s.connect(sys.argv[1])
+time.sleep(0.3); s.recv(65536)
+s.sendall(sys.argv[2].encode() + b"\n"); time.sleep(0.3)
+PY
 }
 
 SSH=(ssh -q -i "$W/key" -p "$SSH_PORT" -o StrictHostKeyChecking=no
@@ -115,6 +141,13 @@ check() {  # name, remote command (pass = exit 0), optional diagnostic command r
 }
 
 boot
+if [ "$LINK_DOWN" -gt 0 ]; then
+  monitor "set_link net0 off"
+  echo "link down for ${LINK_DOWN}s"
+  sleep "$LINK_DOWN"
+  monitor "set_link net0 on"
+  echo "link up"
+fi
 if ! wait_ssh 420; then
   fail "boot: SSH reachable within 7 min"
   echo "--- last console lines ---"; tail -n 30 "$W/console.log"
@@ -156,12 +189,37 @@ PY
   check "${p}alloy active with endpoints from cloud-init" "systemctl is-active -q alloy" \
     "systemctl status alloy --no-pager -l | head -n 12; sudo journalctl -u alloy -b --no-pager -n 15"
   check "${p}podman runs a container" "podman run --rm quay.io/fedora/fedora-minimal:45 true"
+
+  # Data disks: format only a blank disk, never one with data.
+  local d2=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2 d3=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi3
+  check "${p}data disk: blank scsi2 gets a filesystem" \
+    "sudo systemctl start homelab-prepare-disk@scsi2 && sudo blkid -p -o value -s TYPE $d2 | grep -qx ext4" \
+    "sudo journalctl -u homelab-prepare-disk@scsi2 -b --no-pager | tail -n 8; ls -l /dev/disk/by-id/"
+  check "${p}data disk: a formatted disk is left alone" \
+    "u=\$(sudo blkid -p -o value -s UUID $d2) && sudo /usr/libexec/homelab-prepare-disk scsi2 | grep -q 'not touching' && test \"\$u\" = \"\$(sudo blkid -p -o value -s UUID $d2)\""
+  check "${p}data disk: unknown data is refused" \
+    "! sudo systemctl start homelab-prepare-disk@scsi3 && ! sudo blkid -p $d3"
+  check "${p}data disk: refused disk unchanged" \
+    "test \"\$(sudo head -c 1048576 $d3 | sha256sum)\" = '$SCSI3_SUM'"
+
+  # Channel switch: an unreachable registry means retrying, not a failed unit.
+  check "${p}channel switch retries while the registry is unreachable" \
+    "sudo mkdir -p /etc/homelab && echo registry.invalid/none/bootc-base:stable | sudo tee /etc/homelab/channel >/dev/null && sudo systemctl start --no-block homelab-track-channel && sleep 20 && test \"\$(systemctl show -p SubState --value homelab-track-channel)\" = auto-restart" \
+    "systemctl status homelab-track-channel --no-pager -l | tail -n 10"
+  "${SSH[@]}" "sudo systemctl stop homelab-track-channel; sudo rm -f /etc/homelab/channel; sudo systemctl reset-failed" >/dev/null 2>&1 || true
 }
 
 DIGEST=$(booted_digest)
 if [ -n "$DIGEST" ]; then pass "bootc status readable"; else fail "bootc status readable"; fi
 
 if [ -z "$UPGRADE_TO" ]; then
+  if [ "$LINK_DOWN" -gt 0 ]; then
+    # It waited for the network instead of giving up; that the boot then completed
+    # (greenboot, units after network-online.target) is checked below.
+    check "network patience: waited for the link instead of giving up" \
+      "sudo journalctl -u homelab-wait-network -b --no-pager | grep -qE 'network ready after ([6-9][0-9]|[1-9][0-9]{2,})s'" \
+      "sudo journalctl -u homelab-wait-network -b --no-pager | tail -n 5"
+  fi
   image_checks ""
   if [ -n "$EXPECT_DIGEST" ]; then
     [ "$DIGEST" = "$EXPECT_DIGEST" ] && pass "booted the expected image" || fail "booted the expected image" "got $DIGEST"
