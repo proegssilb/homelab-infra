@@ -1,0 +1,26 @@
+# Quadlet: nut_exporter on upsmon01, scraped by obs01 as job ups_nut (/ups_metrics).
+[Unit]
+Description=NUT Prometheus exporter
+Wants=network-online.target nut.service
+After=network-online.target nut.service
+StartLimitIntervalSec=0
+
+[Container]
+ContainerName=nut-exporter
+Image=${image}
+Network=host
+# The image declares no user (it would be root); a static binary needs nothing.
+User=9199
+Group=9199
+DropCapability=ALL
+NoNewPrivileges=true
+# Empty vars_enable = every numeric NUT variable. upsd is local and allows reads
+# without a login.
+Exec=--nut.server=127.0.0.1 --nut.vars_enable= --web.listen-address=:9199
+
+[Service]
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

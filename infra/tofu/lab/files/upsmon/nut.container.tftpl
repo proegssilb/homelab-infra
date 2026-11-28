@@ -1,0 +1,31 @@
+# Quadlet: NUT driver + upsd on upsmon01 (image built from images/apps/nut). upsd
+# listens on localhost only; nut_exporter reads it there. No upsmon.
+[Unit]
+Description=NUT (usbhid-ups driver and upsd)
+Wants=network-online.target
+After=network-online.target
+# Keep retrying (every 10 s) instead of hitting systemd's start limit and giving up.
+StartLimitIntervalSec=0
+
+[Container]
+ContainerName=nut
+Image=${image}
+Network=host
+# The passed-through USB bus. The UPS node gets group nut (GID 101, the image's)
+# from the pushed udev rule, so the driver runs unprivileged. A replug gives the
+# node a new number; the driver then exits and a restart picks the node up.
+AddDevice=/dev/bus/usb
+# Only what's needed to start as root and drop to the nut user.
+DropCapability=ALL
+AddCapability=CAP_SETUID CAP_SETGID CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE
+Volume=/etc/nut/ups.conf:/etc/nut/ups.conf:ro,Z
+Volume=/etc/nut/upsd.conf:/etc/nut/upsd.conf:ro,Z
+Volume=/etc/nut/nut.conf:/etc/nut/nut.conf:ro,Z
+Volume=/etc/nut/upsd.users:/etc/nut/upsd.users:ro,Z
+
+[Service]
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

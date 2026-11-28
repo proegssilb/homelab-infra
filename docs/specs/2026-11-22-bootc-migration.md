@@ -254,6 +254,13 @@ as a mirror with the upstream as fallback: verified a pull from canary01 lands i
 (locally) that a pull still succeeds from the upstream when the cache is down. Plain HTTP inside
 the lab; podman checks every blob against the manifest's digests.
 
+Step 1c (upsmon01), cut over 2026-11-28 03:34–03:37 UTC: bootc VM `.213`, pinned, no HA, the cluster
+USB mapping attached by name. NUT from `images/apps/nut` (Debian's, same `usbhid-ups`) as the nut
+user (pushed udev rule gives the UPS node GID 101), nut_exporter from its upstream image as UID 9199
+with no capabilities. The generic-kernel swap is gone (Fedora's kernel has USB). obs01 scrapes
+`upsmon01.<lab zone>:9199`; `up{job="ups_nut"}` 1, battery metrics back. Also: bpg/proxmox 0.124
+in every state (no plan changes).
+
 **4. Apps with data**: searxng (111), homepage (115), actual (107), freshrss (109),
 mealie (108), anamnesis (113), homeassistant (114), immich (110, own Postgres),
 nextcloud (103), then pg01 (221). Nextcloud migrates: bulk storage stays in the lab as a data

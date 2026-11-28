@@ -34,11 +34,8 @@ locals {
     # bootstrap-only Garage on blade02, which exists only to hold Tofu state.
     "garage-apps" = { vmid = 222, cores = 2, memory = 4096, tags = ["platform", "garage_app", "observe"], node = "pxmx02", data_disks = [{ size = 50, datastore = "ceph-hdd-pool" }], ha = true, backup = true }
 
-    # aptcache01 (230) moved to tofu/lab as a bootc VM (Phase 3).
-
-    # Reads the UPS that's plugged into pxmx01 by USB (ups_usb.tf). Pinned to
-    # pxmx01 with no HA: a passed-through USB device can't migrate.
-    upsmon01 = { vmid = 213, cores = 1, memory = 1024, tags = ["platform", "ups_usb", "observe"], node = "pxmx01", usb_mappings = [proxmox_hardware_mapping_usb.ups_pxmx01.name] }
+    # aptcache01 (230) and upsmon01 (213) moved to tofu/lab as bootc VMs (Phase 3).
+    # upsmon01's USB mapping stays here (ups_usb.tf); tofu/lab refers to it by name.
   }
 }
 

@@ -69,6 +69,7 @@ resource "dns_a_record_set" "bootc" {
     canary01   = module.canary01.ip
     ittools    = module.ittools.ip
     aptcache01 = module.aptcache01.ip
+    upsmon01   = module.upsmon01.ip
   }
 
   zone      = "${local.zone}."

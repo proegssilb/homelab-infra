@@ -89,7 +89,7 @@ snmp_exporter_ups_priv_password: !vault |
 # The UPS plugged into pxmx01 by USB, read by NUT on upsmon01 (roles/ups_usb).
 prometheus_nut_targets:
   - name: ups-pxmx01
-    address: "upsmon01.{{ homelab_domain }}:9199"
+    address: "upsmon01.{{ lab_dns_zone }}:9199"  # bootc VM (tofu/lab), named in the lab zone
     ups: ups
 
 # name = the instance label (the UniFi client name, or the card's MAC suffix).
