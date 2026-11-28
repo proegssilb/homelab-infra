@@ -48,7 +48,8 @@ variable "data_disks" {
     A blank disk gets ext4 on first mount (homelab-prepare-disk refuses anything not blank).
     Adding a disk to an existing VM takes two applies: the first adds it to the holder and stops
     with "Provider produced inconsistent final plan" (the new disk's path isn't known at plan
-    time); the second attaches it. Nothing is lost in between.
+    time); the second attaches it. Nothing is lost in between. A provider limitation, not fixed as
+    of bpg 0.124.0 (changelog checked 2026-11-28). Creating a VM with its disks is one apply.
   EOT
   type = list(object({
     size      = number
