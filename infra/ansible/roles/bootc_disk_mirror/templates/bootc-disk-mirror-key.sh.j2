@@ -1,0 +1,68 @@
+#!/bin/bash
+# Managed by Ansible — do not edit manually.
+#
+# Ensure the DR disk bucket exists, is served by Garage's web endpoint under
+# {{ bootc_disk_mirror_host }}, and that rclone can write to it with its own key.
+# The secret goes straight from `garage` into a root-only file and is never printed.
+# Prints "ok" or "changed".
+set -euo pipefail
+
+CONF=/etc/bootc-disk-mirror/rclone.conf
+KEY="{{ bootc_disk_mirror_key_name }}"
+BUCKET="{{ bootc_disk_mirror_bucket }}"
+HOST="{{ bootc_disk_mirror_host }}"
+
+node_id=$(garage node id -q | cut -d@ -f1)
+g() { garage --rpc-host "${node_id}@{{ bootc_disk_mirror_garage_rpc }}" "$@"; }
+
+changed=0
+if ! g bucket info "$BUCKET" >/dev/null 2>&1; then
+  g bucket create "$BUCKET" >/dev/null
+  changed=1
+fi
+if ! g bucket info "$HOST" >/dev/null 2>&1; then
+  g bucket alias "$BUCKET" "$HOST" >/dev/null
+  changed=1
+fi
+if ! g bucket info "$BUCKET" | grep -qi 'website access: *true'; then
+  g bucket website --allow "$BUCKET" >/dev/null
+  changed=1
+fi
+
+if [ -s "$CONF" ] && rclone --config "$CONF" lsf "garage:${BUCKET}" --max-depth 1 >/dev/null 2>&1; then
+  [ "$changed" = 1 ] && echo changed || echo ok
+  exit 0
+fi
+
+if ! g key info "$KEY" >/dev/null 2>&1; then
+  g key create "$KEY" >/dev/null
+fi
+g bucket allow --read --write --key "$KEY" "$BUCKET" >/dev/null
+
+info=$(g key info --show-secret "$KEY")
+key_id=$(awk -F': *' '/^Key ID/ {print $2; exit}' <<<"$info")
+secret=$(awk -F': *' '/^Secret key/ {print $2; exit}' <<<"$info")
+unset info
+if [ -z "$key_id" ] || [ -z "$secret" ]; then
+  echo "could not read key $KEY from garage key info" >&2
+  exit 1
+fi
+
+umask 077
+install -d -m 0700 /etc/bootc-disk-mirror
+tmp=$(mktemp /etc/bootc-disk-mirror/rclone.conf.XXXXXX)
+cat >"$tmp" <<EOF
+[garage]
+type = s3
+provider = Other
+endpoint = {{ bootc_disk_mirror_s3_endpoint }}
+region = {{ bootc_disk_mirror_s3_region }}
+force_path_style = true
+access_key_id = ${key_id}
+secret_access_key = ${secret}
+EOF
+unset secret
+mv "$tmp" "$CONF"
+
+rclone --config "$CONF" lsf "garage:${BUCKET}" --max-depth 1 >/dev/null
+echo changed

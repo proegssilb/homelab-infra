@@ -1,0 +1,68 @@
+---
+# DR copy of the bootc install disks in blade02's Garage (see defaults/main.yml).
+# Like tofu_state_backup, it only adds a bucket, an alias, website access and a key
+# to the hand-made Garage; garage.toml already has the web endpoint.
+
+- name: Skip when disabled
+  ansible.builtin.meta: end_role
+  when: not bootc_disk_mirror_enabled
+
+- name: Install rclone
+  ansible.builtin.apt:
+    name: rclone
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install the bucket/key helper
+  ansible.builtin.template:
+    src: bootc-disk-mirror-key.sh.j2
+    dest: /usr/local/sbin/bootc-disk-mirror-key
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Ensure the bucket, its web alias and the rclone key
+  ansible.builtin.command: /usr/local/sbin/bootc-disk-mirror-key
+  register: bootc_disk_mirror_key
+  changed_when: bootc_disk_mirror_key.stdout == "changed"
+  no_log: true
+
+- name: Install the mirror script
+  ansible.builtin.template:
+    src: bootc-disk-mirror.py.j2
+    dest: /usr/local/bin/bootc-disk-mirror
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install the mirror service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - bootc-disk-mirror.service
+    - bootc-disk-mirror.timer
+  notify: Reload systemd
+
+- name: Flush handlers so systemd sees the new units
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the mirror timer
+  ansible.builtin.systemd:
+    name: bootc-disk-mirror.timer
+    enabled: true
+    state: started
+
+# Start at 0 so BootcDiskMirrorStale fires if the first run never succeeds.
+- name: Seed the mirror metric on a new host
+  ansible.builtin.copy:
+    content: "bootc_disk_mirror_last_success_timestamp_seconds 0\n"
+    dest: "{{ node_exporter_textfile_dir }}/bootc_disk_mirror.prom"
+    owner: root
+    group: root
+    mode: "0644"
+    force: false

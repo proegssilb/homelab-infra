@@ -29,8 +29,16 @@ resource "proxmox_download_file" "bootc_base" {
   content_type = "import"
   datastore_id = "cephfs"
   node_name    = var.proxmox_node
-  url          = "https://${local.registry}/api/packages/minifig/generic/bootc-base-disk/${local.install_disk_version}/bootc-base.qcow2"
-  file_name    = "bootc-base-${local.install_disk_version}.qcow2"
+  # Forgejo normally; in a rebuild from scratch (Forgejo not up yet) blade02's DR copy
+  # (roles/bootc_disk_mirror): install_disk_url = "http://<blade02>:3902/bootc-base-<version>.qcow2".
+  url       = coalesce(var.install_disk_url, "https://${local.registry}/api/packages/minifig/generic/bootc-base-disk/${local.install_disk_version}/bootc-base.qcow2")
+  file_name = "bootc-base-${local.install_disk_version}.qcow2"
+
+  lifecycle {
+    # Where the file came from doesn't matter once it's on cephfs; switching to the
+    # DR URL (or back) mustn't re-download it.
+    ignore_changes = [url]
+  }
 }
 
 # Proxmox HA for the lab VMs that need it. resource_id comes from the module output

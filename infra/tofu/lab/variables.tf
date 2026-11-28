@@ -49,3 +49,9 @@ variable "loki_url" {
   description = "Loki base URL for Alloy on bootc VMs (e.g. http://obs02.<domain>:3100)."
   type        = string
 }
+
+variable "install_disk_url" {
+  description = "Override for the install disk's download URL. Null = Forgejo's package. In a rebuild from scratch, blade02's DR copy: http://<blade02>:3902/bootc-base-<install_disk_version>.qcow2 (roles/bootc_disk_mirror)."
+  type        = string
+  default     = null
+}

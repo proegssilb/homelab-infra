@@ -1,0 +1,11 @@
+# Managed by Ansible — do not edit manually.
+[Unit]
+Description=Nightly DR mirror of the bootc install disks
+
+[Timer]
+OnCalendar={{ bootc_disk_mirror_on_calendar }}
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

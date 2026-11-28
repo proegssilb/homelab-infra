@@ -1,0 +1,9 @@
+# Managed by Ansible — do not edit manually.
+[Unit]
+Description=Mirror the bootc install disks from Forgejo into Garage (DR copy)
+Wants=network-online.target
+After=network-online.target garage.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/bootc-disk-mirror

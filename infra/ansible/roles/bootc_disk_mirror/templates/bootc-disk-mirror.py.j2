@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+# Managed by Ansible — do not edit manually.
+#
+# Mirror the newest {{ bootc_disk_mirror_keep }} release bootc install disks from Forgejo
+# into Garage bucket {{ bootc_disk_mirror_bucket }} (served at
+# http://{{ bootc_disk_mirror_host }}:3902/bootc-base-<version>.qcow2), checking each
+# download against the sha256 Forgejo lists, and drop older ones. Writes a
+# node_exporter textfile metric on success.
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+
+FORGEJO = "{{ bootc_disk_mirror_forgejo }}"
+OWNER = "{{ bootc_disk_mirror_owner }}"
+PKG = "{{ bootc_disk_mirror_package }}"
+KEEP = {{ bootc_disk_mirror_keep }}
+BUCKET = "{{ bootc_disk_mirror_bucket }}"
+RCLONE = ["rclone", "--config", "/etc/bootc-disk-mirror/rclone.conf"]
+PROM = "{{ node_exporter_textfile_dir }}/bootc_disk_mirror.prom"
+
+
+def get(path):
+    with urllib.request.urlopen(f"{FORGEJO}/api/v1{path}", timeout=60) as r:
+        return json.load(r)
+
+
+def name(version):
+    return f"bootc-base-{version}.qcow2"
+
+
+def main():
+    pkgs = [p for p in get(f"/packages/{OWNER}?type=generic&q={PKG}&limit=50")
+            if p["name"] == PKG and not p["version"].startswith("branch-")]
+    pkgs.sort(key=lambda p: p["created_at"], reverse=True)
+    want = [p["version"] for p in pkgs[:KEEP]]
+    if not want:
+        sys.exit("no release disks on Forgejo")
+    have = set(subprocess.run(RCLONE + ["lsf", f"garage:{BUCKET}"], capture_output=True, text=True,
+                              check=True).stdout.split())
+    for v in want:
+        if name(v) in have:
+            continue
+        files = get(f"/packages/{OWNER}/generic/{PKG}/{v}/files")
+        sha = next(f["sha256"] for f in files if f["name"] == "bootc-base.qcow2")
+        with tempfile.TemporaryDirectory(dir="/var/tmp") as d:
+            path = os.path.join(d, name(v))
+            urllib.request.urlretrieve(f"{FORGEJO}/api/packages/{OWNER}/generic/{PKG}/{v}/bootc-base.qcow2", path)
+            got = subprocess.run(["sha256sum", path], capture_output=True, text=True, check=True).stdout.split()[0]
+            if got != sha:
+                sys.exit(f"{v}: sha256 mismatch, not mirrored")
+            subprocess.run(RCLONE + ["copyto", path, f"garage:{BUCKET}/{name(v)}"], check=True)
+        print(f"mirrored {v}")
+    for f in sorted(have - {name(v) for v in want}):
+        if f.startswith("bootc-base-") and f.endswith(".qcow2"):
+            subprocess.run(RCLONE + ["deletefile", f"garage:{BUCKET}/{f}"], check=True)
+            print(f"dropped {f}")
+    tmp = PROM + ".tmp"
+    with open(tmp, "w") as fh:
+        fh.write("# HELP bootc_disk_mirror_last_success_timestamp_seconds Last successful DR disk mirror run.\n"
+                 "# TYPE bootc_disk_mirror_last_success_timestamp_seconds gauge\n"
+                 f"bootc_disk_mirror_last_success_timestamp_seconds {int(time.time())}\n"
+                 f'bootc_disk_mirror_newest_info{{version="{want[0]}"}} 1\n')
+    os.replace(tmp, PROM)
+    print(f"ok: newest {want[0]}, keeping {', '.join(want)}")
+
+
+if __name__ == "__main__":
+    main()

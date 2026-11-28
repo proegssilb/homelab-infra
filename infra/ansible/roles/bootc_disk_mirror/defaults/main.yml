@@ -1,0 +1,26 @@
+---
+# DR copy of the bootc install disk (docs/specs/2026-11-22-bootc-migration.md, D3): a
+# rebuild from scratch creates the platform VMs before Forgejo (which hosts the disk)
+# exists, so blade02 keeps the newest release disks in its Garage and serves them
+# anonymously over Garage's web endpoint. tofu/lab's install_disk_url points there in DR.
+bootc_disk_mirror_enabled: true
+
+# Forgejo generic package with the disks (published by .forgejo/workflows/bootc-base.yml).
+bootc_disk_mirror_forgejo: "https://code.{{ homelab_domain }}"
+bootc_disk_mirror_owner: minifig
+bootc_disk_mirror_package: bootc-base-disk
+# Release disks to keep (branch-* builds are skipped). tofu/lab pins one of the
+# recent ones, so a handful covers it.
+bootc_disk_mirror_keep: 3
+
+# Garage web serves a bucket by the request's Host header, so the bucket's global
+# alias is the name clients use: http://<this>:3902/bootc-base-<version>.qcow2
+bootc_disk_mirror_host: "blade02.{{ homelab_domain }}"
+bootc_disk_mirror_bucket: bootc-disks
+bootc_disk_mirror_key_name: bootc-disk-mirror
+bootc_disk_mirror_s3_endpoint: "http://127.0.0.1:3900"
+bootc_disk_mirror_s3_region: garage
+bootc_disk_mirror_garage_rpc: "127.0.0.1:3901"
+
+bootc_disk_mirror_on_calendar: "05:30"
+node_exporter_textfile_dir: /var/lib/prometheus/node-exporter

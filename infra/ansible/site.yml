@@ -33,6 +33,7 @@
   roles:
     - garage
     - tofu_state_backup
+    - bootc_disk_mirror
 
 - name: Garage — general-purpose app object storage
   hosts: garage_app
