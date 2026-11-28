@@ -52,39 +52,56 @@ restore the vzdump.
 ## With a data disk
 
 Data disks must survive every rebuild: the apps are single-instance, so there's no second copy
-while one is offline. In `modules/bootc_vm` a VM's `data_disks` belong to a **holder VM**
-(VMID `2000 + vmid`, tag `bootc-data`, never started, `prevent_destroy`) and the VM only attaches
-them (`path_in_datastore`), so replacing or destroying the VM leaves them alone. Proved on canary01
-(2026-11-28): a rebuild, a live migration and a vzdump (which includes the attached disk) all keep
-the data, and Tofu refuses to destroy the holder.
+while one is offline. In `modules/bootc_vm` a VM's `data_disks` are **its own disks** (`scsi2`,
+`scsi3`, ...), and the VM is the long-lived object:
+
+- Tofu never replaces or destroys a bootc VM (`prevent_destroy`): a change bpg can't make in place
+  (in practice only `vm_id`) or a `-replace` fails the plan.
+- Proxmox `protection` is on for every VM with data: removing the VM or any of its drives is refused,
+  in the API and the UI. (A volume deleted straight through the storage API is not covered.)
+- A fresh OS is `scripts/reinstall-os.py <vmid>`: it swaps only the OS disk (`scsi1`) for a new import
+  of the install disk, in place, and leaves every other drive alone; then re-push with
+  `tofu -chdir=tofu/lab apply -replace=module.<vm>.terraform_data.push`.
+- vzdump of the VM includes its data disks, as for any Proxmox VM; the VM joins a backup pool
+  (`pool_id`, `ha-prod` with HA, `la-prod` without), since the nightly jobs target pools.
 
 Each disk can have a `mount` (and an `owner` for the mount point). The module writes a mount unit
 that requires `homelab-prepare-disk@scsiN` (image): it formats a disk only if its first and last MiB
 are zeros, leaves any filesystem alone, and refuses unknown data. The whole filesystem gets the
-container SELinux context at mount, so Quadlets bind-mount it **without `:Z`**.
+container SELinux context at mount, so Quadlets bind-mount it **without `:Z`**. Adding a disk is one
+apply.
 
-An existing VM's disk is **adopted**, not copied (a rename on the storage):
+### Migrating a VM that has data: in place
 
-1. Write the lab VM with `data_disks` (same size, same datastore, `mount`), and a temporary
-   `import { to = module.<vm>.proxmox_virtual_environment_vm.data[0], id = "${var.proxmox_node}/<2000+vmid>" }`
-   file (delete it after the apply). Map the old paths to the container layout: ownership may need
-   changing to the container's UID (e.g. `chown -R` once, as a `run` command or by hand, noted in
-   the VM's `.tf`). Keep its backups: `pool_id = proxmox_virtual_environment_pool.ha_prod.pool_id`
-   (or `la_prod` without HA), since the nightly vzdump jobs target pools. Secrets go in as Podman
-   secrets (`secrets`, then start the app in `run_after_secrets`).
-2. Stop the old VM (its app stops; downtime starts). Then
-   `scripts/bw-run --env-map secrets.env.map -- scripts/adopt-data-disk.py --from <vmid> --drive scsi2
-   --holder <2000+vmid> --holder-name <name>-data --backup`: a dry run that shows what it will do.
-   Re-run with `--yes`: it takes a vzdump of the stopped VM (mode=stop, the rollback), creates the
-   holder and reassigns the disk to it. It refuses if the VM isn't stopped, the storage isn't
-   shared, or (without `--backup`) there's no vzdump newer than 6 h.
-3. Remove the old VM from its state (its data disk is no longer in its config, so destroying it
-   deletes only the OS disk). `tofu plan` there first: only the VM and its HA resource.
-4. `tofu plan` in `tofu/lab`: the holder is **imported** and updated in place (never replaced: the
-   plan would fail on `prevent_destroy`), the VM and its push are created. Apply that plan.
-5. Verify the app's data, then continue with steps 5–6 above.
+Same VMID, same data disk where it is; only the OS disk changes. Rehearsed 2026-11-28 on a scratch VM
+shaped like the old Debian platform VMs (OS `scsi1`, data `scsi2`, cloud-init snippet, DHCP).
 
-Rollback: restore the vzdump (it has the OS disk and the data disk as they were at the stop).
+1. **Write the lab VM** as in step 1 above, with `data_disks` at the sizes and datastores the VM has
+   now (same order: `scsi2` first), `mount`s mapped to the container layout, and `pool_id`. Ownership
+   may need handing to the container's UID: an idempotent `find <dir> ! -user <uid> -exec chown …`
+   in `run` (see `garage-apps.tf`).
+2. **Stop and reinstall**: `scripts/bw-run --env-map secrets.env.map -- scripts/reinstall-os.py <vmid>
+   --migrate --backup --size <GiB>` is a dry run; re-run with `--yes`. It takes a vzdump (mode=stop,
+   the rollback), puts a fresh bootc OS disk in place, drops the old cloud-init snippet (`cicustom`)
+   and inherited `cipassword`, and leaves the VM **stopped**. Downtime starts.
+3. **Forget it in the old state**: `tofu -chdir=tofu/<pets|platform> state rm 'module.vm["<name>"]'`
+   (a `removed` block can't name one instance of a `for_each` module), then delete its entry in that
+   state's `main.tf`. `tofu plan` there must show only its `proxmox_haresource` being destroyed (the VM
+   is stopped; `tofu/lab` recreates the HA resource, and would fail creating one that still exists);
+   apply it.
+4. **Import it into the lab**: a temporary
+   `import { to = module.<vm>.proxmox_virtual_environment_vm.vm, id = "<node>/<vmid>" }`; `tofu plan`
+   must show the VM **updated in place** (static IP, `admin` user, protection, tags, ...) and nothing
+   replaced (prevent_destroy would fail the plan). Apply: it configures and starts the VM, pushes
+   config and secrets, writes DNS, adds HA. Delete the import block.
+5. **Verify the app's data**, then continue with steps 5–6 above.
 
-Retiring a VM's data for good is deliberate and manual: remove `prevent_destroy`'s protection by
-deleting the holder in Proxmox after a final backup, then `tofu state rm` it.
+Rollback: restore the vzdump (it has the OS disk and the data disks as they were at the stop).
+
+### Retiring data
+
+Deliberate, never a side effect: lift protection in Proxmox **first**, then remove the disk (or the
+whole VM) from the config and apply. With protection still on the apply fails: for a removed disk Tofu
+then forgets it while it stays attached; for a removed VM bpg has already shut it down when the delete
+is refused (an outage, no data loss). A disk removed from the config becomes `unusedN` on the VM, not
+deleted: deleting it for good is a separate step in Proxmox, after a final backup.

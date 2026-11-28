@@ -1,8 +1,8 @@
 # garage-apps: general-purpose S3 object storage (Garage, single node) for the pet apps,
 # starting with anamnesis. Reached only through proxy01 (s3.<domain>). Distinct from
 # blade02's bootstrap-only Garage, which holds Tofu state and stays a pet.
-# Migrated from tofu/platform in Phase 3 (step 2): the data disk was adopted from the
-# old Debian VM (scripts/adopt-data-disk.py), not copied.
+# Migrated from tofu/platform in Phase 3 (step 2): the old Debian VM's data disk was
+# reassigned to it (a rename on the storage, not a copy).
 
 locals {
   garage_image    = "docker.io/dxflrs/garage:v2.5.0"

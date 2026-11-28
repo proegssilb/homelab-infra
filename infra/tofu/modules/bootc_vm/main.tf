@@ -16,8 +16,8 @@ locals {
   tracked_ref = "${var.image}:${var.channel}"
   window      = var.update_window != null ? var.update_window : (var.channel == "canary" ? "*-*-* 03:00" : null)
 
-  # Data disks live on a holder VM (below) and are attached as scsi2, scsi3, ...
-  holder_vmid = coalesce(var.data_holder_vmid, 2000 + var.vmid)
+  # Data disks are the VM's own disks scsi2, scsi3, ... (the VM is never replaced:
+  # see the lifecycle block below).
   mounts = [for i, d in var.data_disks : {
     drive = "scsi${i + 2}"
     mount = d.mount
@@ -29,7 +29,7 @@ locals {
     path    = "/etc/systemd/system/${m.unit}"
     mode    = "0644"
     content = <<-EOT
-      # Data disk ${m.drive}, owned by holder VM ${local.holder_vmid} (modules/bootc_vm).
+      # Data disk ${m.drive} (modules/bootc_vm).
       [Unit]
       Description=Data disk ${m.drive} at ${m.mount}
       # Formats it only if it's blank; refuses unknown data.
@@ -134,46 +134,21 @@ locals {
   })
 }
 
-# Owns the data disks; never started. The VM below attaches them by path, so
-# replacing or destroying the VM (a rebuild) leaves the data where it is: several
-# apps are single-instance, so there's no other copy to fall back on. Destroying
-# this holder is what would delete the data, hence prevent_destroy: retiring a
-# VM's data is a deliberate, manual step (docs/migrating-a-vm-to-bootc.md).
-resource "proxmox_virtual_environment_vm" "data" {
-  count = length(var.data_disks) > 0 ? 1 : 0
-
-  name        = "${var.name}-data"
-  description = "Data disks of ${var.name} (VM ${var.vmid}), attached there. Never started. Destroying this VM destroys the data."
-  node_name   = var.node_name
-  vm_id       = local.holder_vmid
-  tags        = ["bootc", "bootc-data"]
-  started     = false
-  on_boot     = false
-
-  dynamic "disk" {
-    for_each = { for i, d in var.data_disks : i => d }
-    content {
-      datastore_id = disk.value.datastore
-      size         = disk.value.size
-      interface    = "scsi${disk.key}"
-      file_format  = "raw"
-    }
-  }
-
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [node_name]
-  }
-}
-
+# The VM is the long-lived object: its data disks are its own, so it is never
+# replaced (several apps are single-instance; there's no other copy). Rebuilding the
+# OS is scripts/reinstall-os.py, which swaps only the OS disk in place.
 resource "proxmox_virtual_environment_vm" "vm" {
   name      = var.name
   node_name = var.node_name
   vm_id     = var.vmid
   tags      = sort(distinct(concat(var.tags, ["bootc", "observe"])))
-  # Backup pool (vzdump jobs target pools). The VM, not the holder: a vzdump of the VM
-  # includes its attached data disks.
+  # Backup pool (vzdump jobs target pools); a vzdump of the VM includes its data disks.
   pool_id = var.pool_id
+  # Proxmox refuses to remove a protected VM or any of its drives (API and UI alike;
+  # a volume deleted straight through the storage API is not covered). Tofu's
+  # prevent_destroy below stops a replace at plan time, before bpg would shut the VM
+  # down for a delete that protection then refuses.
+  protection = length(var.data_disks) > 0
 
   cpu {
     cores = var.cores
@@ -195,16 +170,15 @@ resource "proxmox_virtual_environment_vm" "vm" {
     discard      = "on"
   }
 
-  # The holder's disks, attached (not owned): scsi2, scsi3, ...
+  # Data disks: scsi2, scsi3, ... (mounted by the units in local.mount_files).
   dynamic "disk" {
-    for_each = length(var.data_disks) > 0 ? { for i, d in proxmox_virtual_environment_vm.data[0].disk : i => d } : {}
+    for_each = { for i, d in var.data_disks : i => d }
     content {
-      datastore_id      = disk.value.datastore_id
-      path_in_datastore = disk.value.path_in_datastore
-      file_format       = disk.value.file_format
-      size              = disk.value.size
-      interface         = "scsi${disk.key + 2}"
-      discard           = "on"
+      datastore_id = disk.value.datastore
+      size         = disk.value.size
+      interface    = "scsi${disk.key + 2}"
+      file_format  = "raw"
+      discard      = "on"
     }
   }
 
@@ -257,9 +231,14 @@ resource "proxmox_virtual_environment_vm" "vm" {
   }
 
   lifecycle {
+    # Never replaced or destroyed by Tofu, data or not (a literal: one way to rebuild
+    # every bootc VM). A change bpg can't make in place (in practice: vm_id) or a
+    # -replace fails the plan; a fresh OS is scripts/reinstall-os.py. Retiring a VM is
+    # deliberate: lift protection in Proxmox, then remove it from the config and apply.
+    prevent_destroy = true
+
     # The install disk only matters when a VM is created: afterwards it updates from
     # its channel. Bumping tofu/lab's install disk must not rebuild existing VMs.
-    # (To rebuild one from the new disk: -replace=module.<vm>.proxmox_virtual_environment_vm.vm.)
     ignore_changes = [node_name, disk[0].import_from]
 
     precondition {

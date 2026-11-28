@@ -44,6 +44,11 @@ resource "proxmox_download_file" "bootc_base" {
   }
 }
 
+# What scripts/reinstall-os.py imports as a VM's fresh OS disk.
+output "install_disk_id" {
+  value = proxmox_download_file.bootc_base.id
+}
+
 # Backup pools: the Proxmox vzdump jobs target these, so a VM holding data joins one
 # ("ha-prod" with an HA rule, "la-prod" without). Here, not in platform, because lab
 # is the first state `just bootstrap` applies; platform and pets name them by string.

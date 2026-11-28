@@ -218,10 +218,11 @@ secret push and automatic updates end to end.
 VM), in that order, one VM at a time with the user's go-ahead before each cutover.
 
 Phase 3 decisions (2026-11-25/27):
-- **Data disks must survive every rebuild** (several apps are single-instance): a never-started
-  holder VM (VMID 2000 + vmid, `prevent_destroy`) owns them, the VM attaches them. Existing disks
-  are adopted (reassigned, no copy) with `scripts/adopt-data-disk.py` after a vzdump of the stopped
-  VM. Platform VMs renumber to `.<VMID>`; UniFi policies that pin them by IP get the new address next
+- **Data disks must survive every rebuild** (several apps are single-instance). Revised 2026-11-28:
+  they are the VM's own disks and the VM is never replaced (`prevent_destroy`, Proxmox `protection`);
+  a fresh OS is an in-place OS-disk swap (`scripts/reinstall-os.py`), and VMs with data migrate in
+  place the same way (import into `tofu/lab`). This replaced never-started "holder" VMs owning the
+  disks, which worked but cluttered the Proxmox VM list. Platform VMs renumber to `.<VMID>`; UniFi policies that pin them by IP get the new address next
   to the old one before each cutover and lose the old one after; consumers move to lab-zone names.
 - DR: blade02 mirrors the newest release install disks (`roles/bootc_disk_mirror`); the channel
   switch retries until Forgejo is back, so a rebuild from scratch doesn't need Forgejo first.
@@ -270,6 +271,18 @@ and default key are Podman secrets from Bitwarden. proxy01's `s3` vhost points a
 Found on the way: lab VMs weren't in a backup pool, so the nightly pool-based vzdump would have dropped
 them. `ha-prod`/`la-prod` moved from `tofu/platform` to `tofu/lab` (lab is applied first by bootstrap;
 `removed` without destroy there, imported here) and `modules/bootc_vm` takes `pool_id`.
+
+Holder VMs retired, 2026-11-28 (decision above). `modules/bootc_vm`: data disks are plain VM disks,
+`protection` with data, `prevent_destroy` on every bootc VM. Verified on canary01: `scripts/dissolve-holder.py`
+moved its disk off holder 2241 (rename, no copy; holder deleted), marker intact; a `-replace` fails the
+plan; Proxmox refuses deleting the VM or its data drive; `reinstall-os.py` swapped the OS disk and the
+marker survived; vzdump includes the data disk; adding a disk is one apply (the two-applies problem was
+the holder's), and retiring one detaches it to `unusedN` instead of deleting it. Found: protection
+doesn't cover a delete through the storage API (holders had the same gap); detaching `scsi1` drops it
+from the boot order (the script restores it). In-place migration rehearsed on a scratch VM shaped like
+obs03: `--migrate` drops the old `cicustom` snippet (bpg would keep it silently) and `cipassword`, the
+import plans in place only, one apply configures, starts and pushes it. garage-apps and aptcache01
+still have holders until dissolved (`tofu/lab/holders.tf` keeps Tofu from destroying them).
 
 **4. Apps with data**: searxng (111), homepage (115), actual (107), freshrss (109),
 mealie (108), anamnesis (113), homeassistant (114), immich (110, own Postgres),

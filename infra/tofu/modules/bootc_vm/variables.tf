@@ -37,19 +37,17 @@ variable "datastore" {
 
 variable "data_disks" {
   description = <<-EOT
-    Data disks after the OS disk (scsi2, scsi3, ...). They belong to a separate, never-started
-    holder VM (VMID data_holder_vmid) and are attached here, so replacing or destroying this VM
-    leaves them alone (docs/specs/2026-11-22-bootc-migration.md, Data). Each:
+    Data disks after the OS disk (scsi2, scsi3, ...): the VM's own disks. The VM is never replaced
+    (prevent_destroy) and is protected in Proxmox when it has any, so they survive OS rebuilds
+    (scripts/reinstall-os.py swaps only the OS disk) and go into the VM's vzdump. Each:
       size, datastore  as for any Proxmox disk;
       mount            optional mount point (letters, digits, _ and /; no dashes, so the systemd
                        unit name is just the path with / -> -). Mounted with the container SELinux
                        context, so Quadlets bind-mount it without :Z relabelling;
       owner            optional "uid:gid" for the mount point itself (not recursive).
     A blank disk gets ext4 on first mount (homelab-prepare-disk refuses anything not blank).
-    Adding a disk to an existing VM takes two applies: the first adds it to the holder and stops
-    with "Provider produced inconsistent final plan" (the new disk's path isn't known at plan
-    time); the second attaches it. Nothing is lost in between. A provider limitation, not fixed as
-    of bpg 0.124.0 (changelog checked 2026-11-28). Creating a VM with its disks is one apply.
+    Removing or shrinking a disk is refused (protection; Proxmox never shrinks): retiring data is
+    deliberate (docs/migrating-a-vm-to-bootc.md).
   EOT
   type = list(object({
     size      = number
@@ -67,12 +65,6 @@ variable "data_disks" {
     condition     = alltrue([for d in var.data_disks : d.owner == null || can(regex("^[0-9]+:[0-9]+$", d.owner))])
     error_message = "data_disks[*].owner must be numeric uid:gid."
   }
-}
-
-variable "data_holder_vmid" {
-  description = "VMID of the holder VM that owns the data disks. Default 2000 + vmid (2000-2999 is reserved for holders; Coder uses 1000-1999)."
-  type        = number
-  default     = null
 }
 
 variable "registry_mirror" {
