@@ -1,0 +1,56 @@
+# Build the app container images that bootc VMs run as Quadlets but nobody
+# publishes upstream (images/apps/<name>/Containerfile), e.g. apt-cacher-ng for
+# aptcache01. Pushed to the Forgejo registry as <host>/<owner>/<name>:
+#   release branch (RELEASE_BRANCH) -> :<sha12>   (what tofu/lab pins)
+#   other branches                  -> :branch-<sha12>
+# Pins are bumped deliberately in tofu/lab; nothing tracks a moving tag.
+# Weekly rebuild picks up Debian security updates (bump the pin to take them).
+name: app-images
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - images/apps/**
+      - .forgejo/workflows/app-images.yml
+  schedule:
+    - cron: "37 4 * * 1"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RELEASE_BRANCH: worktree-bootc-migration-spec
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Registry login
+        run: |
+          echo "${{ secrets.PACKAGE_TOKEN }}" | docker login "${GITHUB_SERVER_URL#https://}" \
+            -u "${GITHUB_REPOSITORY_OWNER,,}" --password-stdin
+
+      - name: Build and push every app image
+        run: |
+          set -euo pipefail
+          host="${GITHUB_SERVER_URL#https://}"; owner="${GITHUB_REPOSITORY_OWNER,,}"
+          short="${GITHUB_SHA::12}"
+          if [ "$GITHUB_REF" = "refs/heads/$RELEASE_BRANCH" ]; then tag="$short"; else tag="branch-$short"; fi
+          for dir in images/apps/*/; do
+            name=$(basename "$dir")
+            ref="$host/$owner/$name:$tag"
+            for attempt in 1 2 3; do
+              # Same as bootc-base: one buildx --push (a separate push of big layers
+              # hits proxy01's idle keep-alive), plain manifest, no attestation index.
+              if docker buildx build --pull --push --provenance=false \
+                   --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+                   --label org.opencontainers.image.revision="$GITHUB_SHA" \
+                   -t "$ref" -f "$dir/Containerfile" "$dir"; then
+                break
+              fi
+              [ "$attempt" = 3 ] && exit 1
+              echo "::warning::$name: attempt $attempt failed; retrying"; sleep 15
+            done
+            echo "pushed $ref"
+          done

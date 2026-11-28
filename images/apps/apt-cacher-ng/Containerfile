@@ -1,0 +1,24 @@
+# apt-cacher-ng for aptcache01 (bootc VM, tofu/lab/aptcache01.tf). Fedora has no
+# package, so the app runs from Debian's. Config arrives from Tofu's push as
+# /etc/apt-cacher-ng/homelab.conf (bind mount); the cache is the VM's data disk.
+FROM docker.io/library/debian:trixie-slim
+
+# Pinned UID/GID (the port number), so the data disk's ownership doesn't depend on
+# the order the package's postinst creates users in.
+RUN groupadd --system --gid 3142 apt-cacher-ng \
+    && useradd --system --uid 3142 --gid 3142 --home-dir /var/cache/apt-cacher-ng \
+         --shell /usr/sbin/nologin apt-cacher-ng \
+    && echo 'apt-cacher-ng apt-cacher-ng/tunnelenable boolean false' | debconf-set-selections \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends apt-cacher-ng ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && install -d -o apt-cacher-ng -g apt-cacher-ng /var/log/apt-cacher-ng /run/apt-cacher-ng
+
+USER apt-cacher-ng
+EXPOSE 3142
+# ForeGround keeps it the container's main process. Logs go to the container's
+# /var/log/apt-cacher-ng (ephemeral); errors also reach stderr.
+ENTRYPOINT ["/usr/sbin/apt-cacher-ng", "-c", "/etc/apt-cacher-ng", "ForeGround=1"]
+
+LABEL org.opencontainers.image.title="apt-cacher-ng" \
+      org.opencontainers.image.description="APT caching proxy for the lab (aptcache01)"
