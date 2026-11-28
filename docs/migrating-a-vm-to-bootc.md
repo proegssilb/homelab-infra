@@ -76,6 +76,11 @@ apply.
 Same VMID, same data disk where it is; only the OS disk changes. Rehearsed 2026-11-28 on a scratch VM
 shaped like the old Debian platform VMs (OS `scsi1`, data `scsi2`, cloud-init snippet, DHCP).
 
+0. **Survey where its state lives** (read-only): `lsblk -f`, `df -h`, `findmnt -t nfs,nfs4,cifs`,
+   and its Docker volumes (`docker volume ls`, bind mounts in the compose file). Everything worth
+   keeping must be on a data disk before the OS swap: the swap replaces the OS disk, and
+   `reinstall-os.py` refuses a VM with no data disk unless `--stateless`. State on the OS disk means
+   adding a data disk and copying it there first. Network mounts (NFS) go in the lab VM's config.
 1. **Write the lab VM** as in step 1 above, with `data_disks` at the sizes and datastores the VM has
    now (same order: `scsi2` first), `mount`s mapped to the container layout, and `pool_id`. Ownership
    may need handing to the container's UID: an idempotent `find <dir> ! -user <uid> -exec chown …`

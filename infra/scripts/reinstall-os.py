@@ -51,6 +51,9 @@ def main() -> int:
                     help="an old (Ansible-era) VM becoming a bootc VM: also drop its cloud-init snippet (cicustom) and "
                          "inherited cipassword, and leave it stopped, so `tofu apply` in tofu/lab sets its cloud-init "
                          "(static IP, admin user) before the fresh OS boots for the first time")
+    ap.add_argument("--stateless", action="store_true",
+                    help="the VM has no data disk and keeps nothing worth keeping on its OS disk "
+                         "(without it, a VM with no data disk is refused: its OS disk is all it has)")
     ap.add_argument("--yes", action="store_true", help="act (default: dry run)")
     a = ap.parse_args()
     act = "" if a.yes else "[dry run] "
@@ -80,6 +83,9 @@ def main() -> int:
     if not install.endswith(".qcow2") and ":import/" not in install:
         raise Refuse(f"install disk {install!r} doesn't look like an import image")
     keep = drives(cfg)
+    if not keep and not a.stateless:
+        raise Refuse(f"VM {a.vmid} has no data disk, so any state it has is on the OS disk this would replace. "
+                     "Move that state to a data disk first, or pass --stateless if it has none")
     protected = cfg.get("protection") in (1, "1")
     # Proxmox drops a detached drive from the boot order, so it goes back with the import.
     boot = cfg.get("boot", "")

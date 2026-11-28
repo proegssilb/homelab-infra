@@ -312,3 +312,19 @@ templates 901/902, rewrite CLAUDE.md's architecture section.
   alerts, and blocks promotion. Exit criterion for phase 2.
 - Canary set and wave assignment per VM.
 - Per-app data layout mapping (Debian paths → container volumes) for each phase 3–5 VM.
+  Disk survey 2026-11-28 (read-only, API + `lsblk`/`df`):
+  - Every old VM with a data disk has exactly one, on `scsi2`, whole-disk ext4 (no partitions, LVM
+    or xfs), as the bootc mount units assume: forgejo `/opt/forgejo` (24G of 100G), actual, mealie,
+    freshrss, searxng, homeassistant (`/opt/<app>`, all under 40M), immich `/opt/immich` (155G of
+    700G), coderdb and pg01 `/var/lib/postgresql`, obs01 `/var/lib/prometheus` (3.6G), obs02
+    `/var/lib/loki`, obs03 `/var/lib/grafana`, authentik `/opt/authentik`. Only aptcache01 has (and
+    is configured for) two.
+  - **State on the OS disk, no data disk**: nextcloud (`/opt/nextcloud` 2.7G + Docker data), coder
+    (`/opt/coder` + Docker data), mcpgw (agentgateway SQLite in `/opt/agentgateway`). An in-place OS
+    swap would erase it: each needs a new data disk and a copy of its state first
+    (`reinstall-os.py` refuses a VM without a data disk unless `--stateless`). nextcloud's plan
+    already adds a bulk-storage disk; whether its app state gets its own is open.
+  - anamnesis (113) is an LXC with its state in its rootfs, like the tsrouters (Tailscale identity)
+    and proxy01 (Let's Encrypt certs): LXC → VM needs its own plan per container.
+  - pg01 also mounts its NFS backup share; its bootc VM needs that mount.
+  - Docker volumes under `/var/lib/docker` may hold app state on any of these; check per VM.
