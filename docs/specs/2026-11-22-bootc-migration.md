@@ -244,8 +244,15 @@ Same allowlist (Debian 200, unmanaged URL 403, CONNECT only to the listed hosts)
 Debian hosts point at `aptcache01.<lab zone>` (os_baseline only); the Coder template was re-pushed;
 UniFi "Agents: -> aptcache01" now names `.230` only. Left: the Coder VM's own firewall peer
 (`tofu/pets`, needs `lab_zone` in its tfvars and the workstation resolving the lab zone; until then
-the Coder VM itself fetches packages directly). Next: 1b, a pull-through container registry cache on
-aptcache01 (registries.conf mirror with upstream fallback).
+the Coder VM itself fetches packages directly). Done 2026-11-28 once `zone` was in pets' tfvars and
+the workstation's Tailscale split DNS answered for the lab zone.
+
+Step 1b (registry cache), 2026-11-28: Zot v2.1.23 on aptcache01 (:5000, own 100 GiB data disk,
+unprivileged UID 5000, no capabilities) syncs docker.io, ghcr.io and quay.io on demand under
+`/<upstream>/`. Every bootc VM gets a registries.conf drop-in (module `registry_mirror`) listing it
+as a mirror with the upstream as fallback: verified a pull from canary01 lands in the cache, and
+(locally) that a pull still succeeds from the upstream when the cache is down. Plain HTTP inside
+the lab; podman checks every blob against the manifest's digests.
 
 **4. Apps with data**: searxng (111), homepage (115), actual (107), freshrss (109),
 mealie (108), anamnesis (113), homeassistant (114), immich (110, own Postgres),

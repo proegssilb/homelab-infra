@@ -15,6 +15,9 @@ Image=${image}
 # gateway resolver sends DNS cookies inconsistently, which apt-cacher-ng's c-ares
 # rejects ("502 CONNECT error: Cannot allocate memory"); resolved never does.
 Network=host
+# Runs as the image's apt-cacher-ng user (UID 3142) and needs no capabilities.
+DropCapability=ALL
+NoNewPrivileges=true
 # The data disk is mounted with the container SELinux context: no :Z.
 Volume=${cache_dir}:/var/cache/apt-cacher-ng
 Volume=/etc/apt-cacher-ng/homelab.conf:/etc/apt-cacher-ng/homelab.conf:ro,Z

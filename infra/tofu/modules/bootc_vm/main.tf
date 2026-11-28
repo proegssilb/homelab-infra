@@ -62,6 +62,26 @@ locals {
       # is unreachable, so the push doesn't depend on Forgejo being up.
       { path = "/etc/homelab/channel", content = "${local.tracked_ref}\n", mode = "0644" },
     ],
+    var.registry_mirror == null ? [] : [{
+      # Pull-through cache first, upstream as fallback (podman tries mirrors in
+      # order, then the location). Plain HTTP inside the lab; podman still checks
+      # every blob against the digest the manifest names.
+      path = "/etc/containers/registries.conf.d/50-homelab-mirror.conf"
+      mode = "0644"
+      content = join("\n", concat(
+        ["# Written by Tofu (modules/bootc_vm): the lab's pull-through registry cache."],
+        [for u in var.registry_mirror_upstreams : join("\n", [
+          "",
+          "[[registry]]",
+          "prefix = \"${u}\"",
+          "location = \"${u}\"",
+          "[[registry.mirror]]",
+          "location = \"${var.registry_mirror}/${u}\"",
+          "insecure = true",
+        ])],
+        [""],
+      ))
+    }],
     local.window == null ? [] : [{
       path    = "/etc/systemd/system/bootc-fetch-apply-updates.timer.d/window.conf"
       content = "[Timer]\nOnCalendar=\nOnCalendar=${local.window}\n"

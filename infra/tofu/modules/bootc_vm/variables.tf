@@ -46,6 +46,9 @@ variable "data_disks" {
                        context, so Quadlets bind-mount it without :Z relabelling;
       owner            optional "uid:gid" for the mount point itself (not recursive).
     A blank disk gets ext4 on first mount (homelab-prepare-disk refuses anything not blank).
+    Adding a disk to an existing VM takes two applies: the first adds it to the holder and stops
+    with "Provider produced inconsistent final plan" (the new disk's path isn't known at plan
+    time); the second attaches it. Nothing is lost in between.
   EOT
   type = list(object({
     size      = number
@@ -69,6 +72,22 @@ variable "data_holder_vmid" {
   description = "VMID of the holder VM that owns the data disks. Default 2000 + vmid (2000-2999 is reserved for holders; Coder uses 1000-1999)."
   type        = number
   default     = null
+}
+
+variable "registry_mirror" {
+  description = <<-EOT
+    host:port of the lab's pull-through registry cache (Zot on aptcache01), or null. Podman then
+    pulls each upstream in registry_mirror_upstreams through <mirror>/<upstream> first and falls
+    back to the upstream itself when the cache doesn't answer, so nothing depends on it being up.
+  EOT
+  type        = string
+  default     = null
+}
+
+variable "registry_mirror_upstreams" {
+  description = "Upstream registries pulled through registry_mirror (each must be a sync source in Zot's config)."
+  type        = list(string)
+  default     = ["docker.io", "ghcr.io", "quay.io"]
 }
 
 variable "usb_mappings" {

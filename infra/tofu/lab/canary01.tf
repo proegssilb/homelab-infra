@@ -23,4 +23,5 @@ module "canary01" {
   network         = local.common.network
   admin_ssh_key   = local.common.admin_ssh_key
   loki_url        = local.common.loki_url
+  registry_mirror = local.common.registry_mirror
 }

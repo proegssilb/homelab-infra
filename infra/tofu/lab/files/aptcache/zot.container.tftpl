@@ -1,0 +1,35 @@
+# Quadlet: Zot, the lab's pull-through registry cache, on aptcache01. Each upstream
+# (docker.io, ghcr.io, quay.io) is synced on demand under /<upstream>/ (zot-config.json);
+# bootc VMs list it as a mirror with the upstream as fallback (modules/bootc_vm,
+# registry_mirror). Plain HTTP inside the lab.
+[Unit]
+Description=Zot (pull-through registry cache)
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=${data_dir}
+# Keep retrying (every 10 s) instead of hitting systemd's start limit and giving up.
+StartLimitIntervalSec=0
+
+[Container]
+ContainerName=zot
+Image=${image}
+# Host networking: listens on the VM's :5000 and resolves upstreams through the
+# VM's systemd-resolved stub, like apt-cacher-ng.
+Network=host
+# The upstream image declares no user, so it would run as root; nothing in Zot needs
+# that (port 5000, writes only its storage). Pinned unprivileged UID/GID (the port
+# number, like apt-cacher-ng's 3142), which owns the data disk.
+User=5000
+Group=5000
+DropCapability=ALL
+NoNewPrivileges=true
+# The data disk is mounted with the container SELinux context: no :Z.
+Volume=${data_dir}:/var/lib/registry
+Volume=/etc/zot/config.json:/etc/zot/config.json:ro,Z
+
+[Service]
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

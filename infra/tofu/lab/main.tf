@@ -21,6 +21,9 @@ locals {
     network         = local.network
     admin_ssh_key   = var.admin_ssh_key
     loki_url        = var.loki_url
+    # Pull-through registry cache (Zot on aptcache01). VMs fall back to the upstream
+    # registries when it doesn't answer, so bootstrap order doesn't matter.
+    registry_mirror = "aptcache01.${var.zone}:5000"
   }
 }
 
