@@ -213,8 +213,30 @@ bumped deliberately and `ignore_changes` keeps that from rebuilding existing VMs
 Pilot plan (original):: ittools (112), stateless. Proves cloud-init last mile, static IP, DNS record,
 secret push and automatic updates end to end.
 
-**3. Platform**: aptcache01 (230), obs01–03 (210–212), proxy01 (200, LXC → VM),
-tsrouter01/02 (201/202, LXC → VM), authentik (220), garage-apps (222).
+**3. Platform**: aptcache01 (230), upsmon01 (213), garage-apps (222), obs03, obs02, obs01
+(212–210), authentik (220), tsrouter02 then tsrouter01 (202/201, LXC → VM), proxy01 (200, LXC →
+VM), in that order, one VM at a time with the user's go-ahead before each cutover.
+
+Phase 3 decisions (2026-11-25/27):
+- **Data disks must survive every rebuild** (several apps are single-instance): a never-started
+  holder VM (VMID 2000 + vmid, `prevent_destroy`) owns them, the VM attaches them. Existing disks
+  are adopted (reassigned, no copy) with `scripts/adopt-data-disk.py` after a vzdump of the stopped
+  VM. Platform VMs renumber to `.<VMID>`; UniFi policies that pin them by IP get the new address next
+  to the old one before each cutover and lose the old one after; consumers move to lab-zone names.
+- DR: blade02 mirrors the newest release install disks (`roles/bootc_disk_mirror`); the channel
+  switch retries until Forgejo is back, so a rebuild from scratch doesn't need Forgejo first.
+- Network patience: VMs wait up to 10 min for the network at boot (switch/gateway/DNS back late
+  after a power cut); Quadlets retry without a start limit; app greenboot checks wait 10 min.
+- Staggered nightly windows for stable platform VMs (HA pairs and the observability stack never
+  reboot together).
+
+Step 0 (foundations), done 2026-11-28: image units (network wait, channel switch retries, timid
+disk prep), module (holder disks, mounts, USB, source files), DR mirror. Verified in CI (NIC link
+down 3 min at boot; a blank disk gets ext4, a disk of random data is refused and unchanged: that
+check caught a pipefail bug that *did* format it) and on canary01: an adopted disk keeps its data and
+ownership through a rebuild, a live migration and a vzdump (which includes it); Tofu refuses to
+destroy the holder; plan is a no-op afterwards. canary01 keeps a 1 GiB data disk to exercise this
+on every update.
 
 **4. Apps with data**: searxng (111), homepage (115), actual (107), freshrss (109),
 mealie (108), anamnesis (113), homeassistant (114), immich (110, own Postgres),

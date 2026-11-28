@@ -63,7 +63,7 @@ def main():
         fh.write("# HELP bootc_disk_mirror_last_success_timestamp_seconds Last successful DR disk mirror run.\n"
                  "# TYPE bootc_disk_mirror_last_success_timestamp_seconds gauge\n"
                  f"bootc_disk_mirror_last_success_timestamp_seconds {int(time.time())}\n"
-                 f'bootc_disk_mirror_newest_info{{version="{want[0]}"}} 1\n')
+                 'bootc_disk_mirror_newest_info{version="' + want[0] + '"} 1\n')
     os.replace(tmp, PROM)
     print(f"ok: newest {want[0]}, keeping {', '.join(want)}")
 

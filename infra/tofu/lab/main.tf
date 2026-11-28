@@ -4,7 +4,7 @@
 locals {
   # The disk new VMs are installed from. Bumped deliberately: after install a VM
   # updates itself from its channel, so an older install disk costs one update.
-  install_disk_version = "02a6f14d1691"
+  install_disk_version = "810f85717a51"
 
   registry = "code.${var.domain}"
   image    = "${local.registry}/minifig/bootc-base"

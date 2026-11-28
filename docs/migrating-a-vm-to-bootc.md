@@ -1,8 +1,8 @@
 # Migrating a VM to bootc
 
 The recipe proved on ittools (Phase 2 pilot, 2026-11-25) for moving a VM from `tofu/pets` or
-`tofu/platform` (Debian + Ansible) to `tofu/lab` (bootc, `modules/bootc_vm`). This is the
-**stateless** version; VMs with data disks or secrets add steps (Phase 3/4 extend this file).
+`tofu/platform` (Debian + Ansible) to `tofu/lab` (bootc, `modules/bootc_vm`). The steps below are
+the **stateless** version; "With a data disk" adds the disk handover (Phase 3).
 Background: `docs/specs/2026-11-22-bootc-migration.md`, CLAUDE.md "bootc VMs".
 
 ## Before
@@ -48,3 +48,41 @@ restore the vzdump.
 - `<name>.<lab_dns_zone>` resolves through the UniFi gateway; Prometheus target up; HA resource present;
   not in `ansible-inventory --list`.
 - `tofu plan` in both `lab` and the old state: no changes.
+
+## With a data disk
+
+Data disks must survive every rebuild: the apps are single-instance, so there's no second copy
+while one is offline. In `modules/bootc_vm` a VM's `data_disks` belong to a **holder VM**
+(VMID `2000 + vmid`, tag `bootc-data`, never started, `prevent_destroy`) and the VM only attaches
+them (`path_in_datastore`), so replacing or destroying the VM leaves them alone. Proved on canary01
+(2026-11-28): a rebuild, a live migration and a vzdump (which includes the attached disk) all keep
+the data, and Tofu refuses to destroy the holder.
+
+Each disk can have a `mount` (and an `owner` for the mount point). The module writes a mount unit
+that requires `homelab-prepare-disk@scsiN` (image): it formats a disk only if its first and last MiB
+are zeros, leaves any filesystem alone, and refuses unknown data. The whole filesystem gets the
+container SELinux context at mount, so Quadlets bind-mount it **without `:Z`**.
+
+An existing VM's disk is **adopted**, not copied (a rename on the storage):
+
+1. Write the lab VM with `data_disks` (same size, same datastore, `mount`), and a temporary
+   `import { to = module.<vm>.proxmox_virtual_environment_vm.data[0], id = "${var.proxmox_node}/<2000+vmid>" }`
+   file (delete it after the apply). Map the old paths to the container layout: ownership may need
+   changing to the container's UID (e.g. `chown -R` once, as a `run` command or by hand, noted in
+   the VM's `.tf`).
+2. Stop the old VM (its app stops; downtime starts). Then
+   `scripts/bw-run --env-map secrets.env.map -- scripts/adopt-data-disk.py --from <vmid> --drive scsi2
+   --holder <2000+vmid> --holder-name <name>-data --backup`: a dry run that shows what it will do.
+   Re-run with `--yes`: it takes a vzdump of the stopped VM (mode=stop, the rollback), creates the
+   holder and reassigns the disk to it. It refuses if the VM isn't stopped, the storage isn't
+   shared, or (without `--backup`) there's no vzdump newer than 6 h.
+3. Remove the old VM from its state (its data disk is no longer in its config, so destroying it
+   deletes only the OS disk). `tofu plan` there first: only the VM and its HA resource.
+4. `tofu plan` in `tofu/lab`: the holder is **imported** and updated in place (never replaced: the
+   plan would fail on `prevent_destroy`), the VM and its push are created. Apply that plan.
+5. Verify the app's data, then continue with steps 5–6 above.
+
+Rollback: restore the vzdump (it has the OS disk and the data disk as they were at the stop).
+
+Retiring a VM's data for good is deliberate and manual: remove `prevent_destroy`'s protection by
+deleting the holder in Proxmox after a final backup, then `tofu state rm` it.

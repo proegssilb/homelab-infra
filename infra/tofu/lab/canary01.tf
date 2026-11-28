@@ -11,6 +11,11 @@ module "canary01" {
   channel   = "canary"
   tags      = ["canary"]
 
+  # A small data disk, so the canary exercises what real VMs with data do across
+  # image updates and rebuilds (holder VM, mount, homelab-prepare-disk). Adopted from
+  # a scratch VM in the Phase 3 test (scripts/adopt-data-disk.py).
+  data_disks = [{ size = 1, datastore = "ceph-ssd-pool", mount = "/var/lib/scratch" }]
+
   node_name       = local.common.node_name
   datastore       = local.common.datastore
   install_disk_id = local.common.install_disk_id

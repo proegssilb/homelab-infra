@@ -99,6 +99,7 @@ While these two tools are in use, do not mix up their purposes — Tofu does not
 | `pets/`     | 1xx | Named standalone VMs: Nextcloud, Forgejo (code) |
 | `lab/`      | `.<VMID>`, outside the DHCP pool (`.20–.99`) | bootc VMs (`modules/bootc_vm`): ittools (112), dns01 (240), canary01 (241). Every VM lands here as it migrates; platform/ and pets/ empty out. Not configured by Ansible (tag `bootc`, excluded from the inventory). |
 | (none)      | 1000–1999 | Coder workspace VMs, created by Coder (template in `ansible/roles/coder/files/coder-templates/`), fenced to the `coder` Proxmox pool, tagged `coder_workspace` and excluded from the Ansible inventory. Never allocate these IDs to lab VMs. |
+| (lab)       | 2000–2999 | Holder VMs owning bootc VMs' data disks (`2000 + vmid`, `<name>-data`, tag `bootc-data`, never started). Created by `modules/bootc_vm` or `scripts/adopt-data-disk.py`. |
 
 There is no `cluster-dev/` directory yet (referenced in justfile, not yet created).
 
@@ -272,6 +273,18 @@ every directory a package leaves in `/var` gets a tmpfiles.d entry.
   has run the canary 24 h healthy (`.forgejo/scripts/bootc_promote.py`, before each release build and
   daily once merged). greenboot rolls an update back if a required check fails (verified on canary01);
   alerts `BootcUpdateStuck` (48 h) and `BootcPromotionStalled` (4 days).
+- **Data disks survive rebuilds**: `data_disks` belong to a never-started holder VM (VMID 2000 + vmid,
+  tag `bootc-data`, `prevent_destroy`); the VM attaches them by `path_in_datastore`, so `-replace` or
+  destroying the VM keeps the data (several apps are single-instance). Mounts use
+  `homelab-prepare-disk@` (formats only an all-zero disk) and the container SELinux context, so Quadlets
+  mount them without `:Z`. Existing disks are adopted with `scripts/adopt-data-disk.py` (dry run by
+  default). Never remove `prevent_destroy` or delete a holder casually.
+- The image waits up to 10 min for the network (`homelab-wait-network`, before
+  `network-online.target`); Quadlets use `RestartSec=10s` + `StartLimitIntervalSec=0`, and pushed
+  greenboot checks wait up to 10 min and stay self-contained (no helper an older deployment lacks).
+  The channel switch retries in `homelab-track-channel.service`, so pushes don't need Forgejo up.
+- DR: blade02 mirrors the newest release install disks (`roles/bootc_disk_mirror`, Garage web on
+  :3902); set `install_disk_url` in `tofu/lab` to it when Forgejo isn't up yet.
 - Migrating a VM: `docs/migrating-a-vm-to-bootc.md`. Lab DHCP is `.20–.99`; not-yet-migrated DHCP
   VMs above that keep temporary UniFi reservations (list in the spec), removed as each migrates.
 - Never run `pdnsutil tsigkey list` (it prints the secret). Rotate with
