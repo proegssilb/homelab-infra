@@ -50,6 +50,26 @@ locals {
     EOT
   }]
 
+  # The disk-prep script and unit the mounts require, pushed rather than taken from the
+  # image: a VM on a channel whose image predates them (e.g. :stable lagging :canary)
+  # would otherwise boot without its data mounted. Same source as the image's copy;
+  # the /etc unit overrides the image's, so every VM runs this one. /usr is read-only
+  # (including /usr/local), so the script lives in /etc and the image's bash runs it.
+  prepare_disk_src = "${path.module}/../../../../images/bootc-base/rootfs"
+  prepare_disk_files = length(local.mounts) == 0 ? [] : [
+    {
+      path   = "/etc/homelab/prepare-disk"
+      source = "${local.prepare_disk_src}/usr/libexec/homelab-prepare-disk"
+      mode   = "0644"
+    },
+    {
+      path = "/etc/systemd/system/homelab-prepare-disk@.service"
+      mode = "0644"
+      content = replace(file("${local.prepare_disk_src}/usr/lib/systemd/system/homelab-prepare-disk@.service"),
+      "ExecStart=/usr/libexec/homelab-prepare-disk", "ExecStart=/usr/bin/bash /etc/homelab/prepare-disk")
+    },
+  ]
+
   mount_run = flatten([for m in local.mounts : concat(
     ["systemctl enable --now ${m.unit}"],
     m.owner == null ? [] : ["chown ${m.owner} ${m.mount}"],
@@ -121,7 +141,7 @@ locals {
     wait_seconds = 900
     # Inline files carry their content; source files carry a path and its hash (so
     # a changed file still changes the spec and re-runs the push).
-    files = [for f in concat(local.base_files, local.mount_files, var.files) : {
+    files = [for f in concat(local.base_files, local.prepare_disk_files, local.mount_files, var.files) : {
       path        = f.path
       mode        = f.mode
       content_b64 = try(f.source, null) == null ? base64encode(f.content) : null

@@ -10,7 +10,7 @@ protection), so "rebuild" means this: replace only the OS disk, scsi1, with a fr
 the install disk. Also how an old Debian VM becomes a bootc VM in place (same VMID, same data
 disk; docs/migrating-a-vm-to-bootc.md). Without --yes it only prints what it would do.
 
-Steps: [vzdump, mode=stop] -> clean shutdown -> lift protection -> detach scsi1 and delete
+Steps: clean shutdown -> [vzdump] -> lift protection -> detach scsi1 and delete
 exactly that volume -> import the install disk as scsi1 (same drive options) -> resize ->
 restore protection -> start -> wait for the guest agent -> check every other drive is unchanged.
 Then push the VM's config again:
@@ -45,7 +45,7 @@ def main() -> int:
     ap.add_argument("vmid", type=int)
     ap.add_argument("--install-disk", help="volume id of the install image (default: tofu/lab output install_disk_id)")
     ap.add_argument("--size", type=int, help="OS disk size in GiB (default: the current scsi1 size)")
-    ap.add_argument("--backup", action="store_true", help="vzdump first (mode=stop)")
+    ap.add_argument("--backup", action="store_true", help="vzdump once it is shut down")
     ap.add_argument("--backup-storage", default="backups")
     ap.add_argument("--migrate", action="store_true",
                     help="an old (Ansible-era) VM becoming a bootc VM: also drop its cloud-init snippet (cicustom) and "
@@ -63,6 +63,10 @@ def main() -> int:
     cfg = pvelib.vm_config(node, a.vmid)
     if OS_DRIVE not in cfg:
         raise Refuse(f"VM {a.vmid} has no {OS_DRIVE} (the OS disk, by this repo's convention)")
+    leftovers = [k for k in ("cicustom", "cipassword") if k in cfg]
+    if leftovers and not a.migrate:
+        raise Refuse(f"VM {a.vmid} still has Ansible-era cloud-init ({', '.join(leftovers)}); "
+                     "an old VM becoming a bootc VM needs --migrate, which drops them")
     if any(k.startswith("unused") for k in cfg):
         raise Refuse(f"VM {a.vmid} has unused disks; sort those out first (this script only deletes its own)")
     store, volname, opts = pvelib.parse_drive(cfg[OS_DRIVE])
@@ -89,7 +93,7 @@ def main() -> int:
     for k, v in keep.items():
         print(f"  keeps {k} = {v.split(',')[0]}")
     if a.backup:
-        print(f"{act}vzdump {a.vmid} to {a.backup_storage} (mode=stop)")
+        print(f"{act}vzdump {a.vmid} to {a.backup_storage} (after the shutdown)")
     drop = [k for k in ("cicustom", "cipassword") if a.migrate and k in cfg]
     if drop:
         print(f"{act}drop {', '.join(drop)} (Ansible-era cloud-init; the bootc module sets its own)")
@@ -100,12 +104,12 @@ def main() -> int:
         return 0
 
     # ── Act ────────────────────────────────────────────────────────────────────
+    pvelib.shutdown(node, a.vmid)
+    print("stopped")
     if a.backup:
         print("backup: running ...", flush=True)
         pvelib.vzdump(node, a.vmid, a.backup_storage)
         print("backup: done")
-    pvelib.shutdown(node, a.vmid)
-    print("stopped")
     if protected:
         pvelib.set_config(node, a.vmid, {"protection": 0}, "lift protection")
     try:

@@ -81,8 +81,8 @@ shaped like the old Debian platform VMs (OS `scsi1`, data `scsi2`, cloud-init sn
    may need handing to the container's UID: an idempotent `find <dir> ! -user <uid> -exec chown …`
    in `run` (see `garage-apps.tf`).
 2. **Stop and reinstall**: `scripts/bw-run --env-map secrets.env.map -- scripts/reinstall-os.py <vmid>
-   --migrate --backup --size <GiB>` is a dry run; re-run with `--yes`. It takes a vzdump (mode=stop,
-   the rollback), puts a fresh bootc OS disk in place, drops the old cloud-init snippet (`cicustom`)
+   --migrate --backup --size <GiB>` is a dry run; re-run with `--yes`. It shuts the VM down, takes a vzdump (the
+   rollback; snapshot mode, as HA VMs refuse stop mode), puts a fresh bootc OS disk in place, drops the old cloud-init snippet (`cicustom`)
    and inherited `cipassword`, and leaves the VM **stopped**. Downtime starts.
 3. **Forget it in the old state**: `tofu -chdir=tofu/<pets|platform> state rm 'module.vm["<name>"]'`
    (a `removed` block can't name one instance of a `for_each` module), then delete its entry in that

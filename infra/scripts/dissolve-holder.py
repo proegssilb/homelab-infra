@@ -31,7 +31,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("vmid", type=int)
     ap.add_argument("--holder", type=int)
-    ap.add_argument("--backup", action="store_true", help="vzdump the VM first (mode=stop)")
+    ap.add_argument("--backup", action="store_true", help="vzdump the VM once it is shut down")
     ap.add_argument("--backup-storage", default="backups")
     ap.add_argument("--yes", action="store_true", help="act (default: dry run)")
     a = ap.parse_args()
@@ -67,7 +67,7 @@ def main() -> int:
 
     print(f"VM {a.vmid} ({vm.get('name')}) on {node}, {vm.get('status')}; holder {holder} ({h.get('name')}) on {hnode}")
     if a.backup:
-        print(f"{act}vzdump {a.vmid} to {a.backup_storage} (mode=stop; includes the attached disks)")
+        print(f"{act}vzdump {a.vmid} to {a.backup_storage} (after the shutdown; includes the attached disks)")
     if hnode != node:
         print(f"{act}migrate the stopped holder {holder} {hnode} -> {node} (reassign needs both on one node; shared storage, no copy)")
     for hd, vd, volid, _ in moves:
@@ -78,12 +78,12 @@ def main() -> int:
         return 0
 
     # ── Act ────────────────────────────────────────────────────────────────────
+    pvelib.shutdown(node, a.vmid)
+    print("VM stopped")
     if a.backup:
         print("backup: running ...", flush=True)
         pvelib.vzdump(node, a.vmid, a.backup_storage)
         print("backup: done")
-    pvelib.shutdown(node, a.vmid)
-    print("VM stopped")
     node = pvelib.vm_info(a.vmid)["node"]
     if hnode != node:
         pvelib.wait_task(hnode, pvelib.api("POST", f"/nodes/{hnode}/qemu/{holder}/migrate", {"target": node}),

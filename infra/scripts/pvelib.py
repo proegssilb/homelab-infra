@@ -93,8 +93,12 @@ def start(node: str, vmid: int) -> None:
 
 
 def vzdump(node: str, vmid: int, storage: str) -> None:
+    """Back up a VM that is already shut down. Snapshot mode, because Proxmox refuses stop mode
+    for HA-managed VMs; with the VM off, the disks don't change, so it is just as consistent."""
+    if status(node, vmid) != "stopped":
+        raise Refuse(f"VM {vmid} is running; shut it down before the backup")
     wait_task(node, api("POST", f"/nodes/{node}/vzdump", {
-        "vmid": vmid, "storage": storage, "mode": "stop", "compress": "zstd"}), f"vzdump {vmid}")
+        "vmid": vmid, "storage": storage, "mode": "snapshot", "compress": "zstd"}), f"vzdump {vmid}")
 
 
 def wait_agent(node: str, vmid: int, timeout: int = 900) -> None:

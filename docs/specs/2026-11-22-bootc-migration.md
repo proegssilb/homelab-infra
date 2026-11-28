@@ -282,7 +282,17 @@ doesn't cover a delete through the storage API (holders had the same gap); detac
 from the boot order (the script restores it). In-place migration rehearsed on a scratch VM shaped like
 obs03: `--migrate` drops the old `cicustom` snippet (bpg would keep it silently) and `cipassword`, the
 import plans in place only, one apply configures, starts and pushes it. garage-apps and aptcache01
-still have holders until dissolved (`tofu/lab/holders.tf` keeps Tofu from destroying them).
+dissolved the same day (06:11 and 06:32 UTC); no holder VM is left.
+Outage on the way (garage-apps, 06:11–06:26 UTC, `s3.<domain>` 502): its reboot finalized the staged
+switch to `:stable`, whose image predates `homelab-prepare-disk@` (`:stable` last moved before step 0),
+so the data mount never started, Garage didn't either, and greenboot rebooted it as designed. Data
+untouched; `bootc rollback` restored it. Fix: `modules/bootc_vm` pushes the disk-prep script
+(`/etc/homelab/prepare-disk`, run by the image's bash; `/usr` incl. `/usr/local` is read-only) and an
+`/etc` override of its unit, so mounts don't depend on the channel's image; verified by booting
+garage-apps and aptcache01 into `:stable` (data mounted, greenboot success). Also found: stopped-mode
+vzdump is refused for HA VMs, so the scripts shut down first and back up in snapshot mode. Still true
+until `:stable` is next promoted: stable VMs lack the image's network wait and the channel-switch
+retry unit (the push falls back to an inline switch).
 
 **4. Apps with data**: searxng (111), homepage (115), actual (107), freshrss (109),
 mealie (108), anamnesis (113), homeassistant (114), immich (110, own Postgres),

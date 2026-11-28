@@ -278,7 +278,8 @@ every directory a package leaves in `/var` gets a tmpfiles.d entry.
   removing the VM or its drives). A fresh OS is `scripts/reinstall-os.py` (swaps only `scsi1` in
   place); migrating a VM with data is in place too (`--migrate`, then import into `tofu/lab`).
   Retiring data: lift protection first (docs/migrating-a-vm-to-bootc.md). Mounts use
-  `homelab-prepare-disk@` (formats only an all-zero disk) and the container SELinux context, so Quadlets
+  `homelab-prepare-disk@` (formats only an all-zero disk; pushed by the module, not taken from the image,
+  because `:stable` can lag the units a mount needs) and the container SELinux context, so Quadlets
   mount them without `:Z`. A VM with data joins a backup pool (`pool_id`; `ha-prod`/`la-prod` live in
   `tofu/lab`, which bootstrap applies first): the nightly vzdump jobs target pools. Never remove
   `prevent_destroy` or lift protection casually.
