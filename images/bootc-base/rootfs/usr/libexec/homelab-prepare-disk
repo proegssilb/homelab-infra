@@ -23,8 +23,12 @@ if blkid -p "$dev" >/dev/null 2>&1 || [ -n "$(wipefs -n -O TYPE --noheadings "$d
 fi
 mib=$((1024 * 1024))
 size=$(blockdev --getsize64 "$dev")
-nonzero() { [ -n "$(tr -d '\0' | head -c 1)" ]; }
-if head -c "$mib" "$dev" | nonzero || tail -c "$mib" "$dev" | nonzero; then
+[ "$size" -ge $((2 * mib)) ] || { echo "$dev is smaller than 2 MiB; refusing" >&2; exit 1; }
+# Blank = the first and last MiB compare equal to /dev/zero. No pipes on purpose: an
+# early-exiting reader plus pipefail once turned "found data" into "blank". Any
+# error from cmp (not just a difference) counts as not blank.
+if ! cmp -s -n "$mib" "$dev" /dev/zero \
+   || ! cmp -s -n "$mib" -i "$((size - mib)):0" "$dev" /dev/zero; then
   echo "$dev has no filesystem signature but isn't blank; refusing to format it" >&2
   exit 1
 fi

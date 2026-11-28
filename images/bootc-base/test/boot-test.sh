@@ -87,7 +87,7 @@ SCSI3_SUM=$(head -c 1048576 "$W/scsi3.raw" | sha256sum)
 boot() {
   qemu-system-x86_64 -enable-kvm -cpu host -m 2048 -smp 2 \
     -display none -serial "file:$W/console.log" \
-    -drive "file=$W/overlay.qcow2,if=virtio" \
+    -drive "file=$W/overlay.qcow2,if=none,id=os" -device virtio-blk-pci,drive=os,bootindex=0 \
     -drive "file=$W/seed.iso,media=cdrom,readonly=on" \
     -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" \
     -device "virtio-net-pci,netdev=net0,mac=$MAC" \
